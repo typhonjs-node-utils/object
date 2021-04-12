@@ -1,6 +1,6 @@
 {
   "name": "@typhonjs-node-utils/object-util",
-  "description": "Provides an eventbus ",
+  "description": "Provides common object manipulation utility functions.",
   "version": "0.0.0",
   "author": "typhonrt",
   "type": "module",
