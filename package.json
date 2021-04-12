@@ -1,0 +1,44 @@
+{
+  "name": "@typhonjs-node-utils/object-util",
+  "description": "Provides an eventbus ",
+  "version": "0.0.0",
+  "author": "typhonrt",
+  "type": "module",
+  "main": "src/objectUtil.js",
+  "module": "src/objectUtil.js",
+  "exports": {
+    ".": "./src/objectUtil.js",
+    "./plugin": "./src/ObjectUtilPlugin.js"
+  },
+  "maintainers": [
+    {
+      "name": "Michael Leahy",
+      "email": "support@typhonjs.io",
+      "url": "https://github.com/typhonrt"
+    }
+  ],
+  "devDependencies": {
+    "@typhonjs-node-utils/build-test": "^0.1.0"
+  },
+  "engines": {
+    "node": ">=12.0.0"
+  },
+  "files": [
+    "/npm-shrinkwrap.json",
+    "/src"
+  ],
+  "homepage": "https://github.com/typhonjs-node-utils/object-util",
+  "keywords": [
+    "typhonjs",
+    "eventbus"
+  ],
+  "license": "MPL-2.0",
+  "repository": "typhonjs-node-utils/object-util",
+  "bugs": "https://github.com/typhonjs-node-utils/object-util/issues",
+  "scripts": {
+    "eslint": "eslint .",
+    "posttest": "npm run eslint",
+    "prepublishOnly": "npm run test",
+    "test": "c8 --reporter=lcov --reporter=text-summary mocha -colors \"test/src/**/*.test.js\""
+  }
+}
