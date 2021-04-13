@@ -3,18 +3,18 @@ import * as OU from './objectUtil.js';
 /**
  * Wires up ObjectUtil on the plugin eventbus. The following event bindings are available:
  *
- * `typhonjs:object:util:deep:freeze`: Invokes `deepFreeze`.
- * `typhonjs:object:util:depth:traverse`: Invokes `depthTraverse`.
- * `typhonjs:object:util:get:accessor:list`: Invokes `getAccessorList`.
- * `typhonjs:object:util:safe:access`: Invokes `safeAccess`.
- * `typhonjs:object:util:safe:batch:set`: Invokes `safeBatchSet`.
- * `typhonjs:object:util:safe:equal`: Invokes `safeEqual`.
- * `typhonjs:object:util:safe:set`: Invokes `safeSet`.
- * `typhonjs:object:util:safe:set:all`: Invokes `safeSetAll`.
- * `typhonjs:object:util:validate`: Invokes `validate`.
- * `typhonjs:object:util:validate:array`: Invokes `validateArray`.
- * `typhonjs:object:util:validate:entry`: Invokes `validateEntry`.
- * `typhonjs:object:util:validate:entry|array`: Invokes `validateEntryOrArray`.
+ * `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
+ * `typhonjs:utils:object:depth:traverse`: Invokes `depthTraverse`.
+ * `typhonjs:utils:object:get:accessor:list`: Invokes `getAccessorList`.
+ * `typhonjs:utils:object:safe:access`: Invokes `safeAccess`.
+ * `typhonjs:utils:object:safe:batch:set`: Invokes `safeBatchSet`.
+ * `typhonjs:utils:object:safe:equal`: Invokes `safeEqual`.
+ * `typhonjs:utils:object:safe:set`: Invokes `safeSet`.
+ * `typhonjs:utils:object:safe:set:all`: Invokes `safeSetAll`.
+ * `typhonjs:utils:object:validate`: Invokes `validate`.
+ * `typhonjs:utils:object:validate:array`: Invokes `validateArray`.
+ * `typhonjs:utils:object:validate:entry`: Invokes `validateEntry`.
+ * `typhonjs:utils:object:validate:entry|array`: Invokes `validateEntryOrArray`.
  *
  * @param {object} ev - PluginEvent - The plugin event.
  * @ignore
@@ -25,17 +25,17 @@ export default class ObjectUtilPlugin
    {
       const eventbus = ev.eventbus;
 
-      eventbus.on('typhonjs:object:util:deep:freeze', OU.deepFreeze);
-      eventbus.on('typhonjs:object:util:depth:traverse', OU.depthTraverse);
-      eventbus.on('typhonjs:object:util:get:accessor:list', OU.getAccessorList);
-      eventbus.on('typhonjs:object:util:safe:access', OU.safeAccess);
-      eventbus.on('typhonjs:object:util:safe:batch:set', OU.safeBatchSet);
-      eventbus.on('typhonjs:object:util:safe:equal', OU.safeEqual);
-      eventbus.on('typhonjs:object:util:safe:set', OU.safeSet);
-      eventbus.on('typhonjs:object:util:safe:set:all', OU.safeSetAll);
-      eventbus.on('typhonjs:object:util:validate', OU.validate);
-      eventbus.on('typhonjs:object:util:validate:array', OU.validateArray);
-      eventbus.on('typhonjs:object:util:validate:entry', OU.validateEntry);
-      eventbus.on('typhonjs:object:util:validate:entry|array', OU.validateEntryOrArray);
+      eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze);
+      eventbus.on('typhonjs:utils:object:depth:traverse', OU.depthTraverse);
+      eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList);
+      eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess);
+      eventbus.on('typhonjs:utils:object:safe:batch:set', OU.safeBatchSet);
+      eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual);
+      eventbus.on('typhonjs:utils:object:safe:set', OU.safeSet);
+      eventbus.on('typhonjs:utils:object:safe:set:all', OU.safeSetAll);
+      eventbus.on('typhonjs:utils:object:validate', OU.validate);
+      eventbus.on('typhonjs:utils:object:validate:array', OU.validateArray);
+      eventbus.on('typhonjs:utils:object:validate:entry', OU.validateEntry);
+      eventbus.on('typhonjs:utils:object:validate:entry|array', OU.validateEntryOrArray);
    }
 }
