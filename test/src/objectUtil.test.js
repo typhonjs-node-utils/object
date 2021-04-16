@@ -188,6 +188,30 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
+   it('isIterable:', () =>
+   {
+      assert.isFalse(ObjectUtil.isIterable(false));
+      assert.isFalse(ObjectUtil.isIterable(null));
+      assert.isFalse(ObjectUtil.isIterable({}));
+      assert.isFalse(ObjectUtil.isIterable(''));
+      assert.isFalse(ObjectUtil.isIterable((async function *generator() {})()));
+
+      assert.isTrue(ObjectUtil.isIterable(new Set('a').keys()));
+      assert.isTrue(ObjectUtil.isIterable((function *generator() {})()));
+   });
+
+   it('isIterableAsync:', () =>
+   {
+      assert.isFalse(ObjectUtil.isIterableAsync(false));
+      assert.isFalse(ObjectUtil.isIterableAsync(null));
+      assert.isFalse(ObjectUtil.isIterableAsync({}));
+      assert.isFalse(ObjectUtil.isIterableAsync(''));
+      assert.isFalse(ObjectUtil.isIterableAsync(new Set('a').keys()));
+      assert.isFalse(ObjectUtil.isIterableAsync((function *generator() {})()));
+
+      assert.isTrue(ObjectUtil.isIterableAsync((async function *generator() {})()));
+   });
+
    it('safeAccess:', () =>
    {
       const output = [];

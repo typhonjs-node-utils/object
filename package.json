@@ -8,7 +8,7 @@
   "module": "src/objectUtil.js",
   "exports": {
     ".": "./src/objectUtil.js",
-    "./plugin": "./src/ObjectUtilPlugin.js"
+    "./plugin": "./src/objectUtilPlugin.js"
   },
   "maintainers": [
     {

@@ -79,6 +79,34 @@ export function getAccessorList(data)
 }
 
 /**
+ * Tests for whether an object is iterable.
+ *
+ * @param {object} object - An object.
+ *
+ * @returns {boolean} Whether object is iterable.
+ */
+export function isIterable(object)
+{
+   if (object === null || object === void 0 || typeof object !== 'object') { return false; }
+
+   return typeof object[Symbol.iterator] === 'function';
+}
+
+/**
+ * Tests for whether an object is async iterable.
+ *
+ * @param {object} object - An object.
+ *
+ * @returns {boolean} Whether object is async iterable.
+ */
+export function isIterableAsync(object)
+{
+   if (object === null || object === void 0 || typeof object !== 'object') { return false; }
+
+   return typeof object[Symbol.asyncIterator] === 'function';
+}
+
+/**
  * Provides a way to safely access an objects data / entries given an accessor string which describes the
  * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
  * to walk.
