@@ -2,7 +2,7 @@
   "name": "@typhonjs-utils/object",
   "description": "Provides common object manipulation utility functions.",
   "version": "0.0.0",
-  "author": "typhonrt",
+  "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "type": "module",
   "main": "src/objectUtil.js",
   "module": "src/objectUtil.js",
@@ -10,12 +10,8 @@
     ".": "./src/objectUtil.js",
     "./plugin": "./src/objectUtilPlugin.js"
   },
-  "maintainers": [
-    {
-      "name": "Michael Leahy",
-      "email": "support@typhonjs.io",
-      "url": "https://github.com/typhonrt"
-    }
+  "contributors": [
+    "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
   ],
   "devDependencies": {
     "@typhonjs-utils/build-test": "^0.1.0"
@@ -33,7 +29,7 @@
     "eventbus"
   ],
   "license": "MPL-2.0",
-  "repository": "typhonjs-node-utils/object",
+  "repository": "github:typhonjs-node-utils/object",
   "bugs": "https://github.com/typhonjs-node-utils/object/issues",
   "scripts": {
     "eslint": "eslint .",
