@@ -196,7 +196,7 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isIterable(''));
       assert.isFalse(ObjectUtil.isIterable((async function *generator() {})()));
 
-      assert.isTrue(ObjectUtil.isIterable(new Set('a').keys()));
+      assert.isTrue(ObjectUtil.isIterable(new Set('a')));
       assert.isTrue(ObjectUtil.isIterable((function *generator() {})()));
    });
 
@@ -206,7 +206,7 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isIterableAsync(null));
       assert.isFalse(ObjectUtil.isIterableAsync({}));
       assert.isFalse(ObjectUtil.isIterableAsync(''));
-      assert.isFalse(ObjectUtil.isIterableAsync(new Set('a').keys()));
+      assert.isFalse(ObjectUtil.isIterableAsync(new Set('a')));
       assert.isFalse(ObjectUtil.isIterableAsync((function *generator() {})()));
 
       assert.isTrue(ObjectUtil.isIterableAsync((async function *generator() {})()));
