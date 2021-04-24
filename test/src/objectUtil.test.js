@@ -212,6 +212,24 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.isIterableAsync((async function *generator() {})()));
    });
 
+   it('isObject', () =>
+   {
+      assert.isFalse(ObjectUtil.isObject(false));
+      assert.isFalse(ObjectUtil.isObject(null));
+      assert.isFalse(ObjectUtil.isObject(void 0));
+
+      assert.isTrue(ObjectUtil.isObject({}));
+   });
+
+   it('objectKeys', () =>
+   {
+      assert.deepEqual(ObjectUtil.objectKeys(false), []);
+      assert.deepEqual(ObjectUtil.objectKeys(null), []);
+      assert.deepEqual(ObjectUtil.objectKeys(void 0), []);
+      assert.deepEqual(ObjectUtil.objectKeys({}), []);
+      assert.deepEqual(ObjectUtil.objectKeys({ value: true }), ['value']);
+   });
+
    it('safeAccess:', () =>
    {
       const output = [];

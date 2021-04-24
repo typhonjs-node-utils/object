@@ -107,6 +107,30 @@ export function isIterableAsync(object)
 }
 
 /**
+ * Tests for whether object is not null and a typeof object.
+ *
+ * @param {object} object - An object.
+ *
+ * @returns {boolean} Is it an object.
+ */
+export function isObject(object)
+{
+   return object !== null && typeof object === 'object';
+}
+
+/**
+ * Safely returns keys on an object or an empty array if not an object.
+ *
+ * @param {object} object - An object.
+ *
+ * @returns {string[]} Object keys
+ */
+export function objectKeys(object)
+{
+   return object !== null && typeof object === 'object' ? Object.keys(object) : [];
+}
+
+/**
  * Provides a way to safely access an objects data / entries given an accessor string which describes the
  * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
  * to walk.

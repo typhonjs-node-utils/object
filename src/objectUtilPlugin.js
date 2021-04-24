@@ -8,6 +8,8 @@ import * as OU from './objectUtil.js';
  * `typhonjs:utils:object:get:accessor:list`: Invokes `getAccessorList`.
  * `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
  * `typhonjs:utils:object:is:iterable:async`: Invokes `isIterableAsync`.
+ * `typhonjs:utils:object:is:object`: Invokes `isObject`.
+ * `typhonjs:utils:object:keys`: Invokes `objectKeys`.
  * `typhonjs:utils:object:safe:access`: Invokes `safeAccess`.
  * `typhonjs:utils:object:safe:batch:set`: Invokes `safeBatchSet`.
  * `typhonjs:utils:object:safe:equal`: Invokes `safeEqual`.
@@ -30,6 +32,8 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList);
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable);
    eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isIterableAsync);
+   eventbus.on('typhonjs:utils:object:is:object', OU.isObject);
+   eventbus.on('typhonjs:utils:object:keys', OU.objectKeys);
    eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess);
    eventbus.on('typhonjs:utils:object:safe:batch:set', OU.safeBatchSet);
    eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual);
