@@ -230,6 +230,20 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(ObjectUtil.objectKeys({ value: true }), ['value']);
    });
 
+   it('objectSize', () =>
+   {
+      assert.strictEqual(ObjectUtil.objectSize(null), 0);
+      assert.strictEqual(ObjectUtil.objectSize(void 0), 0);
+      assert.strictEqual(ObjectUtil.objectSize(false), 0);
+      assert.strictEqual(ObjectUtil.objectSize('thing'), 0);
+      assert.strictEqual(ObjectUtil.objectSize({}), 0);
+      assert.strictEqual(ObjectUtil.objectSize({ one: true, two: true }), 2);
+      assert.strictEqual(ObjectUtil.objectSize([1, 2]), 2);
+      assert.strictEqual(ObjectUtil.objectSize(new Set([1, 2, 3])), 3);
+      assert.strictEqual(ObjectUtil.objectSize(new Map([[1, true]])), 1);
+      assert.strictEqual(ObjectUtil.objectSize(new String('test')), 4);
+   });
+
    it('safeAccess:', () =>
    {
       const output = [];

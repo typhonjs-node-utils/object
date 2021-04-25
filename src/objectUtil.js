@@ -5,6 +5,10 @@
  * Support for typhonjs-plugin-manager is enabled.
  */
 
+const s_TAG_MAP = '[object Map]';
+const s_TAG_SET = '[object Set]';
+const s_TAG_STRING = '[object String]';
+
 /**
  * @typedef {object} ValidationEntry - Provides data for a validation check.
  *
@@ -128,6 +132,26 @@ export function isObject(object)
 export function objectKeys(object)
 {
    return object !== null && typeof object === 'object' ? Object.keys(object) : [];
+}
+
+/**
+ * Safely returns an objects size. Note for String objects unicode is not taken into consideration.
+ *
+ * @param {object} object - An object.
+ *
+ * @returns {number} Size of object.
+ */
+export function objectSize(object)
+{
+   if (object === void 0 || object === null || typeof object !== 'object') { return 0; }
+
+   const tag = Object.prototype.toString.call(object);
+
+   if (tag === s_TAG_MAP || tag === s_TAG_SET) { return object.size; }
+
+   if (tag === s_TAG_STRING) { return object.length; }
+
+   return Object.keys(object).length;
 }
 
 /**
