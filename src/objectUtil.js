@@ -461,7 +461,7 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
    {
       for (let cntr = 0; cntr < dataArray.length; cntr++)
       {
-         if (expected.indexOf(dataArray[cntr]) < 0)
+         if (!expected.includes(dataArray[cntr]))
          {
             if (error)
             {
@@ -574,7 +574,7 @@ export function validateEntry(data, accessor, { type = void 0, expected = void 0
    }
 
    if ((expected instanceof Set && !expected.has(dataEntry)) ||
-    (Array.isArray(expected) && expected.indexOf(dataEntry) < 0))
+    (Array.isArray(expected) && !expected.includes(dataEntry)))
    {
       if (error)
       {
@@ -670,7 +670,7 @@ function _deepFreeze(data, skipFreezeKeys)
       for (const key in data)
       {
          // eslint-disable-next-line no-prototype-builtins
-         if (data.hasOwnProperty(key) && skipFreezeKeys.indexOf(key) === -1) { _deepFreeze(data[key], skipFreezeKeys); }
+         if (data.hasOwnProperty(key) && !skipFreezeKeys.includes(key)) { _deepFreeze(data[key], skipFreezeKeys); }
       }
    }
 
