@@ -26,7 +26,8 @@
   "homepage": "https://github.com/typhonjs-node-utils/object",
   "keywords": [
     "typhonjs",
-    "eventbus"
+    "utils",
+    "object"
   ],
   "license": "MPL-2.0",
   "repository": "github:typhonjs-node-utils/object",
