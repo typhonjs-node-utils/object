@@ -1,6 +1,6 @@
 import { assert } from 'chai';
 
-import * as ObjectUtil from '../../src/objectUtil.js';
+import * as ObjectUtil from '../../src/functions.js';
 
 const s_OBJECT_DEEP =
 {

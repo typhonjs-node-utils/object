@@ -1,4 +1,4 @@
-import * as OU from './objectUtil.js';
+import * as OU from './functions.js';
 
 /**
  * Wires up object util functions on the plugin eventbus. The following event bindings are available:

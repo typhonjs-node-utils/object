@@ -4,11 +4,11 @@
   "version": "0.0.0",
   "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "type": "module",
-  "main": "src/objectUtil.js",
-  "module": "src/objectUtil.js",
+  "main": "src/functions.js",
+  "module": "src/functions.js",
   "exports": {
-    ".": "./src/objectUtil.js",
-    "./plugin": "./src/objectUtilPlugin.js"
+    ".": "./src/functions.js",
+    "./plugin": "./src/plugin.js"
   },
   "contributors": [
     "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
