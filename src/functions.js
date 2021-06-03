@@ -1,8 +1,6 @@
 /**
  * Provides common object manipulation utilities including depth traversal, obtaining accessors, safely setting values /
  * equality tests, and validation.
- *
- * Support for typhonjs-plugin-manager is enabled.
  */
 
 const s_TAG_MAP = '[object Map]';
