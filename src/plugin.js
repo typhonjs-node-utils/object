@@ -22,27 +22,38 @@ import * as OU from './functions.js';
  * `typhonjs:utils:object:validate:entry|array`: Invokes `validateEntryOrArray`.
  *
  * @param {object} ev - PluginEvent - The plugin event.
+ *
  * @ignore
  */
 export function onPluginLoad(ev)
 {
    const eventbus = ev.eventbus;
 
-   eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:depth:traverse', OU.depthTraverse, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isIterableAsync, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:safe:batch:set', OU.safeBatchSet, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:safe:set', OU.safeSet, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:safe:set:all', OU.safeSetAll, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:validate', OU.validate, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:validate:array', OU.validateArray, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:validate:entry', OU.validateEntry, void 0, { guard: true });
-   eventbus.on('typhonjs:utils:object:validate:entry|array', OU.validateEntryOrArray, void 0, { guard: true });
+   const options = ev.pluginOptions;
+
+   let guard = true;
+
+   // Apply any plugin options.
+   if (typeof options === 'object')
+   {
+      if (typeof options.guard === 'boolean') { guard = options.guard; }
+   }
+
+   eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:depth:traverse', OU.depthTraverse, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isIterableAsync, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:safe:batch:set', OU.safeBatchSet, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:safe:set', OU.safeSet, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:safe:set:all', OU.safeSetAll, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:validate', OU.validate, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:validate:array', OU.validateArray, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:validate:entry', OU.validateEntry, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:validate:entry|array', OU.validateEntryOrArray, void 0, { guard });
 }

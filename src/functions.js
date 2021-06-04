@@ -708,6 +708,7 @@ function _deepFreeze(data, skipFreezeKeys)
  *
  * @param {boolean}        modify - If true then the result of the callback function is used to modify in place
  *                                  the given data.
+ *
  * @returns {*} The data object.
  * @ignore
  * @private
