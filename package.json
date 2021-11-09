@@ -1,14 +1,15 @@
 {
   "name": "@typhonjs-utils/object",
   "description": "Provides common object manipulation utility functions.",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "type": "module",
   "main": "src/functions.js",
   "module": "src/functions.js",
   "exports": {
     ".": "./src/functions.js",
-    "./plugin": "./src/plugin.js"
+    "./plugin": "./src/plugin.js",
+    "./package.json": "./package.json"
   },
   "contributors": [
     "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
