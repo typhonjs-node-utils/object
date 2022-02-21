@@ -72,7 +72,7 @@ export function deepMergeCopy(...sourceObj)
  *
  * @returns {object}    Target object.
  */
-export function deepMergeInPlace(target, ...sourceObj)
+export function deepMergeInPlace(target = {}, ...sourceObj)
 {
    if (Object.prototype.toString.call(target) !== s_TAG_OBJECT)
    {
@@ -94,8 +94,8 @@ export function deepMergeInPlace(target, ...sourceObj)
       {
          if (Object.prototype.hasOwnProperty.call(obj, prop))
          {
-            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT ?
-             deepMergeInPlace(target[prop], obj[prop]) : obj[prop];
+            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT &&
+             obj[prop].constructor === 'Object' ? deepMergeInPlace(target[prop], obj[prop]) : obj[prop];
          }
       }
    }
@@ -783,8 +783,8 @@ function _deepMergeCopy(...sourceObj)
       {
          if (Object.prototype.hasOwnProperty.call(obj, prop))
          {
-            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT ?
-             _deepMergeCopy(target[prop], obj[prop]) : obj[prop];
+            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT &&
+             obj[prop].constructor === 'Object' ? _deepMergeCopy(target[prop], obj[prop]) : obj[prop];
          }
       }
    }
