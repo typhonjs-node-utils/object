@@ -79,8 +79,7 @@ export function deepMergeInPlace(target = {}, ...sourceObj)
       throw new TypeError(`deepMergeInPlace error: 'target' is not an 'object'.`);
    }
 
-   // iterate through all objects and
-   // deep merge them with target
+   // Iterate and merge all source objects into target.
    for (let cntr = 0; cntr < sourceObj.length; cntr++)
    {
       const obj = sourceObj[cntr];
