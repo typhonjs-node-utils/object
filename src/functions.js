@@ -3,6 +3,7 @@
  * equality tests, and validation.
  */
 
+const s_TAG_OBJECT = '[object Object]';
 const s_TAG_MAP = '[object Map]';
 const s_TAG_SET = '[object Set]';
 const s_TAG_STRING = '[object String]';
@@ -40,6 +41,66 @@ export function deepFreeze(data, skipFreezeKeys = [])
    if (!Array.isArray(skipFreezeKeys)) { throw new TypeError(`'skipFreezeKeys' is not an 'array'.`); }
 
    return _deepFreeze(data, skipFreezeKeys);
+}
+
+/**
+ * Deep merges all source objects into a newly created object.
+ *
+ * @param {...object}   sourceObj - Source objects.
+ *
+ * @returns {object} New object with merged data from source objects.
+ */
+export function deepMergeCopy(...sourceObj)
+{
+   for (let cntr = 0; cntr < sourceObj.length; cntr++)
+   {
+      if (Object.prototype.toString.call(sourceObj[cntr]) !== s_TAG_OBJECT)
+      {
+         throw new TypeError(`deepMergeCopy error: 'sourceObj[${cntr}]' is not an 'object'.`);
+      }
+   }
+
+   return _deepMergeCopy(...sourceObj);
+}
+
+/**
+ * Deep merges all source objects into the target object in place.
+ *
+ * @param {object}      target - Target object.
+ *
+ * @param {...object}   sourceObj - One or more source objects.
+ *
+ * @returns {object}    Target object.
+ */
+export function deepMergeInPlace(target, ...sourceObj)
+{
+   if (Object.prototype.toString.call(target) !== s_TAG_OBJECT)
+   {
+      throw new TypeError(`deepMergeInPlace error: 'target' is not an 'object'.`);
+   }
+
+   // iterate through all objects and
+   // deep merge them with target
+   for (let cntr = 0; cntr < sourceObj.length; cntr++)
+   {
+      const obj = sourceObj[cntr];
+
+      if (Object.prototype.toString.call(obj) !== s_TAG_OBJECT)
+      {
+         throw new TypeError(`deepMergeInPlace error: 'sourceObj[${cntr}]' is not an 'object'.`);
+      }
+
+      for (const prop in obj)
+      {
+         if (Object.prototype.hasOwnProperty.call(obj, prop))
+         {
+            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT ?
+             deepMergeInPlace(target[prop], obj[prop]) : obj[prop];
+         }
+      }
+   }
+
+   return target;
 }
 
 /**
@@ -697,6 +758,41 @@ function _deepFreeze(data, skipFreezeKeys)
    }
 
    return Object.freeze(data);
+}
+
+/**
+ * Deep merges all source objects into a newly created object.
+ *
+ * @param {...object}   sourceObj - Source objects.
+ *
+ * @returns {object} New object with merged data from source objects.
+ * @private
+ */
+function _deepMergeCopy(...sourceObj)
+{
+   const target = {};
+
+   /**
+    * @param {object}   obj - Object to merge.
+    *
+    * @private
+    */
+   function _merger(obj)
+   {
+      for (const prop in obj)
+      {
+         if (Object.prototype.hasOwnProperty.call(obj, prop))
+         {
+            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT ?
+             _deepMergeCopy(target[prop], obj[prop]) : obj[prop];
+         }
+      }
+   }
+
+   // Iterate and merge all source objects into target.
+   for (let cntr = 0; cntr < sourceObj.length; cntr++) { _merger(sourceObj[cntr]); }
+
+   return target;
 }
 
 /**
