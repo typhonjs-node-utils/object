@@ -4,8 +4,7 @@ import * as OU from './functions.js';
  * Wires up object util functions on the plugin eventbus. The following event bindings are available:
  *
  * `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
- * `typhonjs:utils:object:deep:merge:copy`: Invokes `deepMergeCopy`.
- * `typhonjs:utils:object:deep:merge:in:place`: Invokes `deepMergeInPlace`.
+ * `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * `typhonjs:utils:object:depth:traverse`: Invokes `depthTraverse`.
  * `typhonjs:utils:object:get:accessor:list`: Invokes `getAccessorList`.
  * `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
@@ -42,8 +41,7 @@ export function onPluginLoad(ev)
    }
 
    eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:deep:merge:copy', OU.deepMergeCopy, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:deep:merge:in:place', OU.deepMergeInPlace, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:depth:traverse', OU.depthTraverse, void 0, { guard });
    eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
