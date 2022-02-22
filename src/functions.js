@@ -44,27 +44,9 @@ export function deepFreeze(data, skipFreezeKeys = [])
 }
 
 /**
- * Deep merges all source objects into a newly created object.
- *
- * @param {...object}   sourceObj - Source objects.
- *
- * @returns {object} New object with merged data from source objects.
- */
-export function deepMergeCopy(...sourceObj)
-{
-   for (let cntr = 0; cntr < sourceObj.length; cntr++)
-   {
-      if (Object.prototype.toString.call(sourceObj[cntr]) !== s_TAG_OBJECT)
-      {
-         throw new TypeError(`deepMergeCopy error: 'sourceObj[${cntr}]' is not an 'object'.`);
-      }
-   }
-
-   return _deepMergeCopy(...sourceObj);
-}
-
-/**
- * Deep merges all source objects into the target object in place.
+ * Recursively deep merges all source objects into the target object in place. Like `Object.assign` if you provide `{}`
+ * as the target a copy is produced. If the target and source property are object literals they are merged.
+ * Deleting keys is supported by specifying a property starting with `-=`.
  *
  * @param {object}      target - Target object.
  *
@@ -72,34 +54,22 @@ export function deepMergeCopy(...sourceObj)
  *
  * @returns {object}    Target object.
  */
-export function deepMergeInPlace(target = {}, ...sourceObj)
+export function deepMerge(target = {}, ...sourceObj)
 {
    if (Object.prototype.toString.call(target) !== s_TAG_OBJECT)
    {
-      throw new TypeError(`deepMergeInPlace error: 'target' is not an 'object'.`);
+      throw new TypeError(`deepMerge error: 'target' is not an 'object'.`);
    }
 
-   // Iterate and merge all source objects into target.
    for (let cntr = 0; cntr < sourceObj.length; cntr++)
    {
-      const obj = sourceObj[cntr];
-
-      if (Object.prototype.toString.call(obj) !== s_TAG_OBJECT)
+      if (Object.prototype.toString.call(sourceObj[cntr]) !== s_TAG_OBJECT)
       {
-         throw new TypeError(`deepMergeInPlace error: 'sourceObj[${cntr}]' is not an 'object'.`);
-      }
-
-      for (const prop in obj)
-      {
-         if (Object.prototype.hasOwnProperty.call(obj, prop))
-         {
-            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT &&
-             obj[prop].constructor === 'Object' ? deepMergeInPlace(target[prop], obj[prop]) : obj[prop];
-         }
+         throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an 'object'.`);
       }
    }
 
-   return target;
+   return _deepMerge(target, ...sourceObj);
 }
 
 /**
@@ -760,36 +730,39 @@ function _deepFreeze(data, skipFreezeKeys)
 }
 
 /**
- * Deep merges all source objects into a newly created object.
+ * Internal implementation for `deepMerge`.
  *
- * @param {...object}   sourceObj - Source objects.
+ * @param {object}      target - Target object.
  *
- * @returns {object} New object with merged data from source objects.
- * @private
+ * @param {...object}   sourceObj - One or more source objects.
+ *
+ * @returns {object}    Target object.
  */
-function _deepMergeCopy(...sourceObj)
+function _deepMerge(target = {}, ...sourceObj)
 {
-   const target = {};
-
-   /**
-    * @param {object}   obj - Object to merge.
-    *
-    * @private
-    */
-   function _merger(obj)
+   // Iterate and merge all source objects into target.
+   for (let cntr = 0; cntr < sourceObj.length; cntr++)
    {
+      const obj = sourceObj[cntr];
+
       for (const prop in obj)
       {
          if (Object.prototype.hasOwnProperty.call(obj, prop))
          {
-            target[prop] = Object.prototype.toString.call(obj[prop]) === s_TAG_OBJECT &&
-             obj[prop].constructor === 'Object' ? _deepMergeCopy(target[prop], obj[prop]) : obj[prop];
+            // Handle the special property starting with '-=' to delete keys.
+            if (prop.startsWith('-='))
+            {
+               delete target[prop.slice(2)];
+               continue;
+            }
+
+            // If target already has prop and both target[prop] and obj[prop] are object literals then merge them
+            // otherwise assign obj[prop] to target[prop].
+            target[prop] = Object.prototype.hasOwnProperty.call(target, prop) && target[prop]?.constructor === Object &&
+            obj[prop]?.constructor === Object ? _deepMerge({}, target[prop], obj[prop]) : obj[prop];
          }
       }
    }
-
-   // Iterate and merge all source objects into target.
-   for (let cntr = 0; cntr < sourceObj.length; cntr++) { _merger(sourceObj[cntr]); }
 
    return target;
 }

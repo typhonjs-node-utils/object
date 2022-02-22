@@ -170,69 +170,30 @@ describe('ObjectUtil:', () =>
       assert.throws(() => { s_OBJECT_DEEP.level1.level2.array2[2].push(1); });
    });
 
-   describe('deepMergeCopy', () =>
-   {
-      it('basic objects:', () =>
-      {
-         const initial = { a: true, b: { b1: true } };
-         const target = initial;
-         const result = { a: 1, b: { b1: 2 } };
-
-         const targetMod = ObjectUtil.deepMergeCopy(target, { a: 1 }, { b: { b1: 2 } });
-
-         assert.notEqual(target, targetMod);
-         assert.deepEqual(target, initial);
-         assert.deepEqual(targetMod, result);
-      });
-
-      it('instantiated class:', () =>
-      {
-         const initial = { a: true, b: { b1: true } };
-         const target = initial;
-         const result = { a: 1, b: { b1: 2 } };
-
-         class Test { constructor() { this.a = 1; } }
-
-         const targetMod = ObjectUtil.deepMergeCopy(target, new Test(), { b: { b1: 2 } });
-
-         assert.notEqual(target, targetMod);
-         assert.deepEqual(target, initial);
-         assert.deepEqual(targetMod, result);
-      });
-
-      it('instantiated classes:', () =>
-      {
-         class Target { constructor() { this.a = true; this.b = { b1: true }; } }
-         class Test { constructor() { this.a = 1; } }
-
-         const target = new Target();
-         const result = { a: 1, b: { b1: 2 } };
-
-         const targetMod = ObjectUtil.deepMergeCopy(target, new Test(), { b: { b1: 2 } });
-
-         assert.notEqual(target, targetMod);
-         assert.deepEqual(target, new Target());
-         assert.deepEqual(targetMod, result);
-      });
-
-      it('error - source not object', () =>
-      {
-         assert.throws(() => ObjectUtil.deepMergeCopy({}, 'bad'), TypeError,
-          `deepMergeCopy error: 'sourceObj[1]' is not an 'object'.`);
-      });
-   });
-
-   describe('deepMergeInPlace', () =>
+   describe('deepMerge', () =>
    {
       it('basic objects:', () =>
       {
          const target = { a: true, b: { b1: true } };
          const result = { a: 1, b: { b1: 2 } };
 
-         const targetMod = ObjectUtil.deepMergeInPlace(target, { a: 1 }, { b: { b1: 2 } });
+         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } });
 
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
+      });
+
+      it('basic objects (copy):', () =>
+      {
+         const initial = { a: true, b: { b1: true } };
+         const target = initial;
+         const result = { a: 1, b: { b1: 2 } };
+
+         const targetMod = ObjectUtil.deepMerge({}, target, { a: 1 }, { b: { b1: 2 } });
+
+         assert.notEqual(target, targetMod);
+         assert.deepEqual(target, initial);
+         assert.deepEqual(targetMod, result);
       });
 
       it('add property:', () =>
@@ -240,7 +201,7 @@ describe('ObjectUtil:', () =>
          const target = { a: true, b: { b1: true } };
          const result = { a: 1, b: { b1: 2 }, c: false };
 
-         const targetMod = ObjectUtil.deepMergeInPlace(target, { a: 1 }, { b: { b1: 2 } }, { c: false });
+         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } }, { c: false });
 
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
@@ -251,7 +212,30 @@ describe('ObjectUtil:', () =>
          const target = { a: true, b: { b1: true }, c: { c1: true } };
          const result = { a: 1, b: { b1: 2 }, c: { c1: [1, 2] } };
 
-         const targetMod = ObjectUtil.deepMergeInPlace(target, { a: 1 }, { b: { b1: 2 } }, { c: { c1: [1, 2] } });
+         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } }, { c: { c1: [1, 2] } });
+
+         assert.equal(target, targetMod);
+         assert.deepEqual(target, result);
+      });
+
+      it('merge objects (primitive):', () =>
+      {
+         const target = { a: { a1: true }, b: { b1: true }, c: { c1: true } };
+         const result = { a: 1, b: { b1: true, b2: 2 }, c: { c1: true, c2: 2 } };
+
+         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b2: 2 } }, { c: { c2: 1 } }, { c: { c2: 2 } });
+
+         assert.equal(target, targetMod);
+         assert.deepEqual(target, result);
+      });
+
+      it('merge objects (extended primitive override):', () =>
+      {
+         const target = { a: { a1: true }, b: { b1: true }, c: { c1: true } };
+         const result = { a: 1, b: { b1: true, b2: 2 }, c: { c1: true, c2: 2 } };
+
+         const targetMod = ObjectUtil.deepMerge(target, { a: { a2: true } }, { a: 1 }, { b: { b2: 2 } },
+          { c: { c2: 1 } }, { c: { c2: 2 } });
 
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
@@ -264,7 +248,7 @@ describe('ObjectUtil:', () =>
 
          class Test { constructor() { this.a = 1; } }
 
-         const targetMod = ObjectUtil.deepMergeInPlace(target, new Test(), { b: { b1: 2 } });
+         const targetMod = ObjectUtil.deepMerge(target, new Test(), { b: { b1: 2 } });
 
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
@@ -278,7 +262,29 @@ describe('ObjectUtil:', () =>
          const target = new Target();
          const result = { a: 1, b: { b1: 2 } };
 
-         const targetMod = ObjectUtil.deepMergeInPlace(target, new Test(), { b: { b1: 2 } });
+         const targetMod = ObjectUtil.deepMerge(target, new Test(), { b: { b1: 2 } });
+
+         assert.equal(target, targetMod);
+         assert.deepEqual(target, result);
+      });
+
+      it('delete props:', () =>
+      {
+         const target = { a: true, b: true };
+         const result = {};
+
+         const targetMod = ObjectUtil.deepMerge(target, { '-=a': null }, { '-=b': null });
+
+         assert.equal(target, targetMod);
+         assert.deepEqual(target, result);
+      });
+
+      it('delete nested prop:', () =>
+      {
+         const target = { a: true, b: { b1: true } };
+         const result = { a: 1, b: {} };
+
+         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { '-=b1': null } });
 
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
@@ -286,20 +292,20 @@ describe('ObjectUtil:', () =>
 
       it('error - target not object', () =>
       {
-         assert.throws(() => ObjectUtil.deepMergeInPlace('bad', {}), TypeError,
-          `deepMergeInPlace error: 'target' is not an 'object'.`);
+         assert.throws(() => ObjectUtil.deepMerge('bad', {}), TypeError,
+          `deepMerge error: 'target' is not an 'object'.`);
       });
 
       it('error - source not object (string)', () =>
       {
-         assert.throws(() => ObjectUtil.deepMergeInPlace({}, 'bad'), TypeError,
-          `deepMergeInPlace error: 'sourceObj[0]' is not an 'object'.`);
+         assert.throws(() => ObjectUtil.deepMerge({}, 'bad'), TypeError,
+          `deepMerge error: 'sourceObj[0]' is not an 'object'.`);
       });
 
       it('error - source not object (array)', () =>
       {
-         assert.throws(() => ObjectUtil.deepMergeInPlace({}, [1, 2]), TypeError,
-          `deepMergeInPlace error: 'sourceObj[0]' is not an 'object'.`);
+         assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
+          `deepMerge error: 'sourceObj[0]' is not an 'object'.`);
       });
    });
 
