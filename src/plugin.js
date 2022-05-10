@@ -47,6 +47,7 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isIterableAsync, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:object:plain', OU.isPlainObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard });
    eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard });
    eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess, void 0, { guard });

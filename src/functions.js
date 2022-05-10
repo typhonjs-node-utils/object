@@ -113,41 +113,58 @@ export function getAccessorList(data)
 /**
  * Tests for whether an object is iterable.
  *
- * @param {object} object - An object.
+ * @param {*} value - Any value.
  *
  * @returns {boolean} Whether object is iterable.
  */
-export function isIterable(object)
+export function isIterable(value)
 {
-   if (object === null || object === void 0 || typeof object !== 'object') { return false; }
+   if (value === null || value === void 0 || typeof value !== 'object') { return false; }
 
-   return typeof object[Symbol.iterator] === 'function';
+   return typeof value[Symbol.iterator] === 'function';
 }
 
 /**
  * Tests for whether an object is async iterable.
  *
- * @param {object} object - An object.
+ * @param {*} value - Any value.
  *
- * @returns {boolean} Whether object is async iterable.
+ * @returns {boolean} Whether value is async iterable.
  */
-export function isIterableAsync(object)
+export function isIterableAsync(value)
 {
-   if (object === null || object === void 0 || typeof object !== 'object') { return false; }
+   if (value === null || value === void 0 || typeof value !== 'object') { return false; }
 
-   return typeof object[Symbol.asyncIterator] === 'function';
+   return typeof value[Symbol.asyncIterator] === 'function';
 }
 
 /**
  * Tests for whether object is not null and a typeof object.
  *
- * @param {object} object - An object.
+ * @param {*} value - Any value.
  *
  * @returns {boolean} Is it an object.
  */
-export function isObject(object)
+export function isObject(value)
 {
-   return object !== null && typeof object === 'object';
+   return value !== null && typeof value === 'object';
+}
+
+/**
+ * Tests for whether the given value is a plain object.
+ *
+ * An object is plain if it is created by either: {}, new Object() or Object.create(null).
+ *
+ * @param {*} value - Any value
+ *
+ * @returns {boolean} Is it a plain object.
+ */
+export function isPlainObject(value)
+{
+   if (Object.prototype.toString.call(value) !== s_TAG_OBJECT) { return false; }
+
+   const prototype = Object.getPrototypeOf(value);
+   return prototype === null || prototype === Object.prototype;
 }
 
 /**

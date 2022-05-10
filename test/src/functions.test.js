@@ -360,6 +360,18 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.isObject({}));
    });
 
+   it('isPlainObject', () =>
+   {
+      assert.isFalse(ObjectUtil.isPlainObject(false));
+      assert.isFalse(ObjectUtil.isPlainObject(null));
+      assert.isFalse(ObjectUtil.isPlainObject(void 0));
+      assert.isFalse(ObjectUtil.isPlainObject(new String('test')));
+
+      assert.isTrue(ObjectUtil.isPlainObject({}));
+      assert.isTrue(ObjectUtil.isPlainObject(Object.create(null)));
+      assert.isTrue(ObjectUtil.isPlainObject(new Object())); // eslint-disable-line no-new-object
+   });
+
    it('objectKeys', () =>
    {
       assert.deepEqual(ObjectUtil.objectKeys(false), []);
