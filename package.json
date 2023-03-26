@@ -1,13 +1,16 @@
 {
   "name": "@typhonjs-utils/object",
   "description": "Provides common object manipulation utility functions.",
-  "version": "0.0.9",
+  "version": "0.0.10",
   "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "type": "module",
   "main": "src/functions.js",
   "module": "src/functions.js",
   "exports": {
-    ".": "./src/functions.js",
+    ".": {
+      "types": "./types/functions.d.ts",
+      "import": "./src/functions.js"
+    },
     "./plugin": "./src/plugin.js",
     "./package.json": "./package.json"
   },
@@ -15,6 +18,7 @@
     "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
   ],
   "devDependencies": {
+    "@typhonjs-build-test/esm-d-ts": "^0.0.10",
     "@typhonjs-utils/build-test": "^0.1.0"
   },
   "engines": {
@@ -22,7 +26,8 @@
   },
   "files": [
     "/npm-shrinkwrap.json",
-    "/src"
+    "/src",
+    "/types"
   ],
   "homepage": "https://github.com/typhonjs-node-utils/object#readme",
   "keywords": [
@@ -36,7 +41,8 @@
   "scripts": {
     "eslint": "eslint .",
     "posttest": "npm run eslint",
-    "prepublishOnly": "npm run test",
-    "test": "c8 --reporter=lcov --reporter=text-summary mocha -colors \"test/src/**/*.test.js\""
+    "prepublishOnly": "npm run types && npm run test",
+    "test": "c8 --reporter=lcov --reporter=text-summary mocha -colors \"test/src/**/*.test.js\"",
+    "types": "node -e \"import('@typhonjs-build-test/esm-d-ts').then(module => { module.generateTSDef({ main: './src/functions.js', output: './types/functions.d.ts' }) });\""
   }
 }
