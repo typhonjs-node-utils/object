@@ -9,36 +9,24 @@ const s_TAG_SET = '[object Set]';
 const s_TAG_STRING = '[object String]';
 
 /**
- * @typedef {object} ValidationEntry - Provides data for a validation check.
- *
- * @property {string}               [type] - Optionally tests with a typeof check.
- *
- * @property {Array<*>|Function|Set<*>}  [expected] - Optional array, function, or set of expected values to test
- * against.
- *
- * @property {string}               [message] - Optional message to include.
- *
- * @property {boolean}              [required=true] - When false if the accessor is missing validation is skipped.
- *
- * @property {boolean}              [error=true] - When true and error is thrown otherwise a boolean is returned.
- */
-
-/**
  * Freezes all entries traversed that are objects including entries in arrays.
  *
- * @param {object|Array}   data - An object or array.
+ * @param {object | []}   data - An object or array.
  *
- * @param {string[]}       skipFreezeKeys - An array of strings indicating keys of objects to not freeze.
+ * @param {Set<string>}   [skipFreezeKeys] - A Set of strings indicating keys of objects to not freeze.
  *
- * @returns {object|Array} The frozen object.
+ * @returns {object | []} The frozen object.
  */
-export function deepFreeze(data, skipFreezeKeys = [])
+export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): object | []
 {
-   /* istanbul ignore if */
+   /* c8 ignore next 1 */
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
 
-   /* istanbul ignore if */
-   if (!Array.isArray(skipFreezeKeys)) { throw new TypeError(`'skipFreezeKeys' is not an 'array'.`); }
+   /* c8 ignore next 4 */
+   if (skipFreezeKeys !== void 0 && !(skipFreezeKeys instanceof Set))
+   {
+      throw new TypeError(`'skipFreezeKeys' is not an 'Set'.`);
+   }
 
    return _deepFreeze(data, skipFreezeKeys);
 }
@@ -54,7 +42,7 @@ export function deepFreeze(data, skipFreezeKeys = [])
  *
  * @returns {object}    Target object.
  */
-export function deepMerge(target = {}, ...sourceObj)
+export function deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
    if (Object.prototype.toString.call(target) !== s_TAG_OBJECT)
    {
@@ -76,21 +64,21 @@ export function deepMerge(target = {}, ...sourceObj)
  * Performs a naive depth traversal of an object / array. The data structure _must not_ have circular references.
  * The result of the callback function is used to modify in place the given data.
  *
- * @param {object|Array}   data - An object or array.
+ * @param {object | []}   data - An object or array.
  *
- * @param {Function}       func - A callback function to process leaf values in children arrays or object members.
+ * @param {(any) => any}  func - A callback function to process leaf values in children arrays or object members.
  *
- * @param {boolean}        modify - If true then the result of the callback function is used to modify in place
+ * @param {boolean}       modify - If true then the result of the callback function is used to modify in place
  *                                  the given data.
  *
  * @returns {*} The data object.
  */
-export function depthTraverse(data, func, modify = false)
+export function depthTraverse(data: object | [], func: Function, modify: boolean = false): object | []
 {
-   /* istanbul ignore if */
+   /* c8 ignore next 1 */
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
 
-   /* istanbul ignore if */
+   /* c8 ignore next 1 */
    if (typeof func !== 'function') { throw new TypeError(`'func' is not a 'function'.`); }
 
    return _depthTraverse(data, func, modify);
@@ -103,7 +91,7 @@ export function depthTraverse(data, func, modify = false)
  *
  * @returns {string[]} Accessor list.
  */
-export function getAccessorList(data)
+export function getAccessorList(data: object): string[]
 {
    if (typeof data !== 'object') { throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`); }
 
@@ -111,43 +99,43 @@ export function getAccessorList(data)
 }
 
 /**
- * Tests for whether an object is iterable.
- *
- * @param {*} value - Any value.
- *
- * @returns {boolean} Whether object is iterable.
- */
-export function isIterable(value)
-{
-   if (value === null || value === void 0 || typeof value !== 'object') { return false; }
-
-   return typeof value[Symbol.iterator] === 'function';
-}
-
-/**
  * Tests for whether an object is async iterable.
  *
- * @param {*} value - Any value.
+ * @param {unknown} value - Any value.
  *
  * @returns {boolean} Whether value is async iterable.
  */
-export function isIterableAsync(value)
+export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown>
 {
    if (value === null || value === void 0 || typeof value !== 'object') { return false; }
 
-   return typeof value[Symbol.asyncIterator] === 'function';
+   return Symbol.asyncIterator in value;
+}
+
+/**
+ * Tests for whether an object is iterable.
+ *
+ * @param {unknown} value - Any value.
+ *
+ * @returns {boolean} Whether object is iterable.
+ */
+export function isIterable(value: unknown): value is Iterable<unknown>
+{
+   if (value === null || value === void 0 || typeof value !== 'object') { return false; }
+
+   return Symbol.iterator in value;
 }
 
 /**
  * Tests for whether object is not null and a typeof object.
  *
- * @param {*} value - Any value.
+ * @param {unknown} value - Any value.
  *
  * @returns {boolean} Is it an object.
  */
-export function isObject(value)
+export function isObject(value: unknown): value is Record<string, unknown>
 {
-   return value !== null && typeof value === 'object';
+   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
 /**
@@ -155,11 +143,11 @@ export function isObject(value)
  *
  * An object is plain if it is created by either: `{}`, `new Object()` or `Object.create(null)`.
  *
- * @param {*} value - Any value
+ * @param {unknown} value - Any value
  *
  * @returns {boolean} Is it a plain object.
  */
-export function isPlainObject(value)
+export function isPlainObject(value: unknown): value is JSONObject
 {
    if (Object.prototype.toString.call(value) !== s_TAG_OBJECT) { return false; }
 
@@ -172,21 +160,21 @@ export function isPlainObject(value)
  *
  * @param {object} object - An object.
  *
- * @returns {string[]} Object keys
+ * @returns {string[]}  Object keys or empty array.
  */
-export function objectKeys(object)
+export function objectKeys(object: object): string[]
 {
-   return object !== null && typeof object === 'object' ? Object.keys(object) : [];
+   return isObject(object) ? Object.keys(object) : [];
 }
 
 /**
  * Safely returns an objects size. Note for String objects unicode is not taken into consideration.
  *
- * @param {object} object - An object.
+ * @param {any} object - Any value, but size returned for object / Map / Set / arrays / strings.
  *
  * @returns {number} Size of object.
  */
-export function objectSize(object)
+export function objectSize(object: any)
 {
    if (object === void 0 || object === null || typeof object !== 'object') { return 0; }
 
@@ -206,13 +194,13 @@ export function objectSize(object)
  *
  * @param {object}   data - An object to access entry data.
  *
- * @param {string}   accessor - A string describing the entries to access.
+ * @param {string}   accessor - A string describing the entries to access with keys separated by `.`.
  *
- * @param {*}        defaultValue - (Optional) A default value to return if an entry for accessor is not found.
+ * @param {any}      [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
  *
  * @returns {object} The data object.
  */
-export function safeAccess(data, accessor, defaultValue = void 0)
+export function safeAccess(data: object, accessor: string, defaultValue?: any)
 {
    if (typeof data !== 'object') { return defaultValue; }
    if (typeof accessor !== 'string') { return defaultValue; }
@@ -238,22 +226,21 @@ export function safeAccess(data, accessor, defaultValue = void 0)
  * subsequently set to `data` by the given operation. If `value` is not an object it will be used as the target
  * value to set across all accessors.
  *
- * @param {object}         data - An object to access entry data.
+ * @param {object}   data - An object to access entry data.
  *
- * @param {Array<string>}  accessors - A string describing the entries to access.
+ * @param {string[]} accessors - A string describing the entries to access.
  *
- * @param {object|*}       value - A new value to set if an entry for accessor is found.
+ * @param {any}      value - A new value to set if an entry for accessor is found.
  *
- * @param {string}         [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
- *                                             'set-undefined', 'sub'.
+ * @param {SafeSetOperation}   [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
+ *        'set-undefined', 'sub'.
  *
- * @param {object|*}       [defaultAccessValue=0] - A new value to set if an entry for accessor is found.
+ * @param {any}      [defaultAccessValue=0] - A new value to set if an entry for accessor is found.
  *
- *
- * @param {boolean}  [createMissing=true] - If true missing accessor entries will be created as objects
- *                                          automatically.
+ * @param {boolean}  [createMissing=true] - If true missing accessor entries will be created as objects automatically.
  */
-export function safeBatchSet(data, accessors, value, operation = 'set', defaultAccessValue = 0, createMissing = true)
+export function safeBatchSet(data: object, accessors: string[], value: any, operation: SafeSetOperation = 'set',
+ defaultAccessValue: any = 0, createMissing: boolean = true)
 {
    if (typeof data !== 'object') { throw new TypeError(`safeBatchSet Error: 'data' is not an 'object'.`); }
    if (!Array.isArray(accessors)) { throw new TypeError(`safeBatchSet Error: 'accessors' is not an 'array'.`); }
@@ -286,7 +273,7 @@ export function safeBatchSet(data, accessors, value, operation = 'set', defaultA
  *
  * @returns {boolean} True if equal.
  */
-export function safeEqual(source, target)
+export function safeEqual(source: object, target: object): boolean
 {
    if (typeof source === 'undefined' || source === null || typeof target === 'undefined' || target === null)
    {
@@ -317,17 +304,18 @@ export function safeEqual(source, target)
  *
  * @param {string}   accessor - A string describing the entries to access.
  *
- * @param {*}        value - A new value to set if an entry for accessor is found.
+ * @param {any}      value - A new value to set if an entry for accessor is found.
  *
- * @param {string}   [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
- *                                       'set-undefined', 'sub'.
+ * @param {SafeSetOperation}   [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
+ *        'set-undefined', 'sub'.
  *
  * @param {boolean}  [createMissing=true] - If true missing accessor entries will be created as objects
- *                                          automatically.
+ *        automatically.
  *
  * @returns {boolean} True if successful.
  */
-export function safeSet(data, accessor, value, operation = 'set', createMissing = true)
+export function safeSet(data: object, accessor: string, value: any, operation: SafeSetOperation = 'set',
+ createMissing: boolean = true): boolean
 {
    if (typeof data !== 'object') { throw new TypeError(`safeSet Error: 'data' is not an 'object'.`); }
    if (typeof accessor !== 'string') { throw new TypeError(`safeSet Error: 'accessor' is not a 'string'.`); }
@@ -394,22 +382,23 @@ export function safeSet(data, accessor, value, operation = 'set', createMissing 
  *
  * @param {object}            data - The data object to set data.
  *
- * @param {object<string, *>} accessorValues - Object of accessor keys to values to set.
+ * @param {Record<string, any>}  accessorValues - Object of accessor keys to values to set.
  *
- * @param {string}            [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'sub';
- *                                                default (`set`).
+ * @param {SafeSetOperation}  [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'sub';
+ *        default (`set`).
  *
  * @param {boolean}           [createMissing=true] - If true missing accessor entries will be created as objects
- *                                                   automatically.
+ *        automatically.
  */
-export function safeSetAll(data, accessorValues, operation = 'set', createMissing = true)
+export function safeSetAll(data: object, accessorValues: Record<string, any>, operation: SafeSetOperation = 'set',
+ createMissing: boolean = true)
 {
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
    if (typeof accessorValues !== 'object') { throw new TypeError(`'accessorValues' is not an 'object'.`); }
 
    for (const accessor of Object.keys(accessorValues))
    {
-      if (!accessorValues.hasOwnProperty(accessor)) { continue; } // eslint-disable-line no-prototype-builtins
+      if (!Object.prototype.hasOwnProperty.call(accessorValues, accessor)) { continue; }
 
       safeSet(data, accessor, accessorValues[accessor], operation, createMissing);
    }
@@ -420,13 +409,13 @@ export function safeSetAll(data, accessorValues, operation = 'set', createMissin
  *
  * @param {object}                           data - The data object to test.
  *
- * @param {object<string, ValidationEntry>}  validationData - Key is the accessor / value is a validation entry.
+ * @param {Record<string, ValidationEntry>}  validationData - Key is the accessor / value is a validation entry.
  *
  * @param {string}                           [dataName='data'] - Optional name of data.
  *
  * @returns {boolean} True if validation passes otherwise an exception is thrown.
  */
-export function validate(data, validationData = {}, dataName = 'data')
+export function validate(data: object, validationData: Record<string, ValidationEntry> = {}, dataName: string = 'data')
 {
    if (typeof data !== 'object') { throw new TypeError(`'${dataName}' is not an 'object'.`); }
    if (typeof validationData !== 'object') { throw new TypeError(`'validationData' is not an 'object'.`); }
@@ -435,7 +424,7 @@ export function validate(data, validationData = {}, dataName = 'data')
 
    for (const key of Object.keys(validationData))
    {
-      if (!validationData.hasOwnProperty(key)) { continue; } // eslint-disable-line no-prototype-builtins
+      if (!Object.prototype.hasOwnProperty.call(validationData, key)) { continue; }
 
       const entry = validationData[key];
 
@@ -465,33 +454,24 @@ export function validate(data, validationData = {}, dataName = 'data')
  *
  * @param {string}            accessor - A string describing the entries to access.
  *
- * @param {object}            opts - Options object.
- *
- * @param {string}            [opts.type] - Tests with a typeof check.
- *
- * @param {Function|Set<*>}   [opts.expected] - Optional function or set of expected values to test against.
- *
- * @param {string}            [opts.message] - Optional message to include.
- *
- * @param {boolean}           [opts.required] - When false if the accessor is missing validation is skipped.
- *
- * @param {boolean}           [opts.error=true] - When true and error is thrown otherwise a boolean is returned.
+ * @param {ValidationEntry}   entry - Validation entry object
  *
  * @param {string}            [dataName='data'] - Optional name of data.
  *
  * @returns {boolean} True if validation passes otherwise an exception is thrown.
  */
-export function validateArray(data, accessor, { type = void 0, expected = void 0, message = void 0, required = true,
- error = true } = {}, dataName = 'data')
+export function validateArray(data: object, accessor: string, entry: ValidationEntry, dataName = 'data')
 {
+   const valEntry: ValidationEntry = Object.assign({ required: true, error: true }, entry);
+
    const dataArray = safeAccess(data, accessor);
 
    // A non-required entry is missing so return without validation.
-   if (!required && typeof dataArray === 'undefined') { return true; }
+   if (!valEntry?.required && typeof dataArray === 'undefined') { return true; }
 
    if (!Array.isArray(dataArray))
    {
-      if (error)
+      if (valEntry.error)
       {
          throw _validateError(TypeError, `'${dataName}.${accessor}' is not an 'array'.`);
       }
@@ -501,19 +481,19 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
       }
    }
 
-   if (typeof type === 'string')
+   if (typeof valEntry.type === 'string')
    {
       for (let cntr = 0; cntr < dataArray.length; cntr++)
       {
-         if (!(typeof dataArray[cntr] === type))
+         if (!(typeof dataArray[cntr] === valEntry.type))
          {
-            if (error)
+            if (valEntry.error)
             {
                const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
                 dataArray[cntr];
 
                throw _validateError(TypeError,
-                `'${dataName}.${accessor}[${cntr}]': '${dataEntryString}' is not a '${type}'.`);
+                `'${dataName}.${accessor}[${cntr}]': '${dataEntryString}' is not a '${valEntry.type}'.`);
             }
             else
             {
@@ -524,21 +504,21 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
    }
 
    // If expected is a function then test all array entries against the test function. If expected is a Set then
-   // test all array entries for inclusion in the set. Otherwise if expected is a string then test that all array
+   // test all array entries for inclusion in the set. Otherwise, if expected is a string then test that all array
    // entries as a `typeof` test against expected.
-   if (Array.isArray(expected))
+   if (Array.isArray(valEntry.expected))
    {
       for (let cntr = 0; cntr < dataArray.length; cntr++)
       {
-         if (!expected.includes(dataArray[cntr]))
+         if (!valEntry.expected.includes(dataArray[cntr]))
          {
-            if (error)
+            if (valEntry.error)
             {
                const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
                 dataArray[cntr];
 
                throw _validateError(Error, `'${dataName}.${accessor}[${cntr}]': '${
-                dataEntryString}' is not an expected value: ${JSON.stringify(expected)}.`);
+                dataEntryString}' is not an expected value: ${JSON.stringify(valEntry.expected)}.`);
             }
             else
             {
@@ -547,19 +527,19 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
          }
       }
    }
-   else if (expected instanceof Set)
+   else if (valEntry.expected instanceof Set)
    {
       for (let cntr = 0; cntr < dataArray.length; cntr++)
       {
-         if (!expected.has(dataArray[cntr]))
+         if (!valEntry.expected.has(dataArray[cntr]))
          {
-            if (error)
+            if (valEntry.error)
             {
                const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
                 dataArray[cntr];
 
                throw _validateError(Error, `'${dataName}.${accessor}[${cntr}]': '${
-                dataEntryString}' is not an expected value: ${JSON.stringify(expected)}.`);
+                dataEntryString}' is not an expected value: ${JSON.stringify(valEntry.expected)}.`);
             }
             else
             {
@@ -568,19 +548,19 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
          }
       }
    }
-   else if (typeof expected === 'function')
+   else if (typeof valEntry.expected === 'function')
    {
       for (let cntr = 0; cntr < dataArray.length; cntr++)
       {
          try
          {
-            const result = expected(dataArray[cntr]);
+            const result = valEntry.expected(dataArray[cntr]);
 
-            if (typeof result === 'undefined' || !result) { throw new Error(message); }
+            if (typeof result === 'undefined' || !result) { throw new Error(valEntry.message); }
          }
          catch (err)
          {
-            if (error)
+            if (valEntry.error)
             {
                const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
                 dataArray[cntr];
@@ -606,35 +586,27 @@ export function validateArray(data, accessor, { type = void 0, expected = void 0
  *
  * @param {string}            accessor - A string describing the entries to access.
  *
- * @param {object}            opts - Options object
- *
- * @param {string}            [opts.type] - Tests with a typeof check.
- *
- * @param {Function|Set<*>}   [opts.expected] - Optional function or set of expected values to test against.
- *
- * @param {string}            [opts.message] - Optional message to include.
- *
- * @param {boolean}           [opts.required=true] - When false if the accessor is missing validation is skipped.
- *
- * @param {boolean}           [opts.error=true] - When true and error is thrown otherwise a boolean is returned.
+ * @param {ValidationEntry}   entry - Validation entry.
  *
  * @param {string}            [dataName='data'] - Optional name of data.
  *
  * @returns {boolean} True if validation passes otherwise an exception is thrown.
  */
-export function validateEntry(data, accessor, { type = void 0, expected = void 0, message = void 0, required = true,
- error = true } = {}, dataName = 'data')
+export function validateEntry(data: object, accessor: string, entry: ValidationEntry,
+ dataName: string = 'data'): boolean
 {
+   const valEntry: ValidationEntry = Object.assign({ required: true, error: true }, entry);
+
    const dataEntry = safeAccess(data, accessor);
 
    // A non-required entry is missing so return without validation.
-   if (!required && typeof dataEntry === 'undefined') { return true; }
+   if (!valEntry.required && typeof dataEntry === 'undefined') { return true; }
 
-   if (type && typeof dataEntry !== type)
+   if (valEntry.type && typeof dataEntry !== valEntry.type)
    {
-      if (error)
+      if (valEntry.error)
       {
-         throw _validateError(TypeError, `'${dataName}.${accessor}' is not a '${type}'.`);
+         throw _validateError(TypeError, `'${dataName}.${accessor}' is not a '${valEntry.type}'.`);
       }
       else
       {
@@ -642,32 +614,32 @@ export function validateEntry(data, accessor, { type = void 0, expected = void 0
       }
    }
 
-   if ((expected instanceof Set && !expected.has(dataEntry)) ||
-    (Array.isArray(expected) && !expected.includes(dataEntry)))
+   if ((valEntry.expected instanceof Set && !valEntry.expected.has(dataEntry)) ||
+    (Array.isArray(valEntry.expected) && !valEntry.expected.includes(dataEntry)))
    {
-      if (error)
+      if (valEntry.error)
       {
          const dataEntryString = typeof dataEntry === 'object' ? JSON.stringify(dataEntry) : dataEntry;
 
          throw _validateError(Error, `'${dataName}.${accessor}': '${dataEntryString}' is not an expected value: ${
-          JSON.stringify(expected)}.`);
+          JSON.stringify(valEntry.expected)}.`);
       }
       else
       {
          return false;
       }
    }
-   else if (typeof expected === 'function')
+   else if (typeof valEntry.expected === 'function')
    {
       try
       {
-         const result = expected(dataEntry);
+         const result = valEntry.expected(dataEntry);
 
-         if (typeof result === 'undefined' || !result) { throw new Error(message); }
+         if (typeof result === 'undefined' || !result) { throw new Error(valEntry.message); }
       }
       catch (err)
       {
-         if (error)
+         if (valEntry.error)
          {
             const dataEntryString = typeof dataEntry === 'object' ? JSON.stringify(dataEntry) : dataEntry;
 
@@ -697,7 +669,7 @@ export function validateEntry(data, accessor, { type = void 0, expected = void 0
  *
  * @returns {boolean} True if validation passes otherwise an exception is thrown.
  */
-export function validateEntryOrArray(data, accessor, entry, dataName = 'data')
+export function validateEntryOrArray(data: object, accessor: string, entry: ValidationEntry, dataName: string = 'data')
 {
    const dataEntry = safeAccess(data, accessor);
 
@@ -720,26 +692,28 @@ export function validateEntryOrArray(data, accessor, entry, dataName = 'data')
 /**
  * Private implementation of depth traversal.
  *
- * @param {object|Array}   data - An object or array.
+ * @param {any}         data - An object or array or any leaf.
  *
- * @param {string[]}       skipFreezeKeys - An array of strings indicating keys of objects to not freeze.
+ * @param {Set<string>} [skipFreezeKeys] - An array of strings indicating keys of objects to not freeze.
  *
  * @returns {*} The frozen object.
  * @ignore
  * @private
  */
-function _deepFreeze(data, skipFreezeKeys)
+function _deepFreeze(data: any, skipFreezeKeys?: Set<string>): object | []
 {
    if (Array.isArray(data))
    {
       for (let cntr = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipFreezeKeys); }
    }
-   else if (typeof data === 'object')
+   else if (isObject(data))
    {
       for (const key in data)
       {
-         // eslint-disable-next-line no-prototype-builtins
-         if (data.hasOwnProperty(key) && !skipFreezeKeys.includes(key)) { _deepFreeze(data[key], skipFreezeKeys); }
+         if (Object.prototype.hasOwnProperty.call(data, key) && !skipFreezeKeys?.has?.(key))
+         {
+            _deepFreeze(data[key], skipFreezeKeys);
+         }
       }
    }
 
@@ -755,7 +729,7 @@ function _deepFreeze(data, skipFreezeKeys)
  *
  * @returns {object}    Target object.
  */
-function _deepMerge(target = {}, ...sourceObj)
+function _deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
    // Iterate and merge all source objects into target.
    for (let cntr = 0; cntr < sourceObj.length; cntr++)
@@ -787,18 +761,18 @@ function _deepMerge(target = {}, ...sourceObj)
 /**
  * Private implementation of depth traversal.
  *
- * @param {object|Array}   data - An object or array.
+ * @param {any}      data - An object, array, or any leaf value
  *
- * @param {Function}       func - A callback function to process leaf values in children arrays or object members.
+ * @param {Function} func - A callback function to process leaf values in children arrays or object members.
  *
- * @param {boolean}        modify - If true then the result of the callback function is used to modify in place
- *                                  the given data.
+ * @param {boolean}  modify - If true then the result of the callback function is used to modify in place the
+ *        given data.
  *
  * @returns {*} The data object.
  * @ignore
  * @private
  */
-function _depthTraverse(data, func, modify)
+function _depthTraverse(data: any, func: Function, modify: boolean = false): Record<string, unknown> | []
 {
    if (modify)
    {
@@ -809,12 +783,14 @@ function _depthTraverse(data, func, modify)
             data[cntr] = _depthTraverse(data[cntr], func, modify);
          }
       }
-      else if (typeof data === 'object')
+      else if (isObject(data))
       {
          for (const key in data)
          {
-            // eslint-disable-next-line no-prototype-builtins
-            if (data.hasOwnProperty(key)) { data[key] = _depthTraverse(data[key], func, modify); }
+            if (Object.prototype.hasOwnProperty.call(data, key))
+            {
+               data[key] = _depthTraverse(data[key], func, modify);
+            }
          }
       }
       else
@@ -832,8 +808,7 @@ function _depthTraverse(data, func, modify)
       {
          for (const key in data)
          {
-            // eslint-disable-next-line no-prototype-builtins
-            if (data.hasOwnProperty(key)) { _depthTraverse(data[key], func, modify); }
+            if (Object.prototype.hasOwnProperty.call(data, key)) { _depthTraverse(data[key], func, modify); }
          }
       }
       else
@@ -854,13 +829,13 @@ function _depthTraverse(data, func, modify)
  * @ignore
  * @private
  */
-function _getAccessorList(data)
+function _getAccessorList(data: object): string[]
 {
    const accessors = [];
 
    for (const key in data)
    {
-      if (data.hasOwnProperty(key)) // eslint-disable-line no-prototype-builtins
+      if (Object.prototype.hasOwnProperty.call(data, key))
       {
          if (typeof data[key] === 'object')
          {
@@ -898,3 +873,60 @@ function _validateError(clazz, message = void 0)
    error._objectValidateError = true;
    return error;
 }
+
+/**
+ * Defines the operation to perform for `safeSet`.
+ */
+export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
+
+/**
+ * Provides data for a validation check.
+ */
+export type ValidationEntry = {
+   /**
+    * Optionally tests with a typeof check.
+    */
+   type?: string;
+
+   /**
+    * The type of entry / variable to test.
+    */
+   test: 'array' | 'entry' | 'entry|array';
+
+   /**
+    * Optional array, function, or set of expected values to test against.
+    */
+   expected?: any[] | Function | Set<any>;
+
+   /**
+    * Optional message to include.
+    */
+   message?: string;
+
+   /**
+    * When false if the accessor is missing validation is skipped; default: true
+    */
+   required?: boolean;
+
+   /**
+    * When true and an error is thrown otherwise a boolean is returned; default: true
+    */
+   error?: boolean;
+};
+
+type Primitive =
+ | bigint
+ | boolean
+ | null
+ | number
+ | string
+ | symbol
+ | undefined;
+
+type JSONValue = Primitive | JSONObject | JSONArray;
+
+interface JSONObject {
+   [key: string]: JSONValue;
+}
+
+interface JSONArray extends Array<JSONValue> { }
