@@ -8,22 +8,9 @@ export default () =>
 {
    return [
       {   // This bundle is for the Node distribution.
-         input: ['src/functions.ts'],
+         input: ['src/functions.ts', 'src/plugin.ts'],
          output: [{
-            file: `./dist/functions.js`,
-            format: 'es',
-            generatedCode: { constBindings: true },
-            sourcemap,
-         }],
-         plugins: [
-            typescript({ include: ['src/**/*'] })
-         ]
-      },
-
-      {   // This bundle is for the Node distribution.
-         input: ['src/plugin.ts'],
-         output: [{
-            file: `./dist/plugin.js`,
+            dir: './dist',
             format: 'es',
             generatedCode: { constBindings: true },
             sourcemap,
