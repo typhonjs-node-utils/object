@@ -362,7 +362,75 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
-   it('isIterable:', () => {
+   it('hasAccessor:', () =>
+   {
+      const data = {
+         get test() { return 0; },
+         get bad() { return 1; },
+
+         set test(val) { } // eslint-disable-line no-unused-vars
+      }
+
+      assert.isFalse(ObjectUtil.hasAccessor({}, 'nope'));
+      assert.isFalse(ObjectUtil.hasAccessor(null, 'nope'));
+      assert.isFalse(ObjectUtil.hasAccessor(void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasAccessor(() => void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasAccessor(data, 'bad'));
+
+      assert.isTrue(ObjectUtil.hasAccessor(data, 'test'));
+   });
+
+   it('hasGetter:', () =>
+   {
+      const data = {
+         get test() { return 0; },
+         bad() { return 1; }
+      }
+
+      assert.isFalse(ObjectUtil.hasGetter({}, 'nope'));
+      assert.isFalse(ObjectUtil.hasGetter(null, 'nope'));
+      assert.isFalse(ObjectUtil.hasGetter(void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasGetter(() => void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasGetter(data, 'bad'));
+
+      assert.isTrue(ObjectUtil.hasGetter(data, 'test'));
+   });
+
+   it('hasPrototype:', () =>
+   {
+      class Base {}
+
+      class Child extends Base{}
+
+      assert.isFalse(ObjectUtil.hasPrototype({}, Base));
+      assert.isFalse(ObjectUtil.hasPrototype(null, Base));
+      assert.isFalse(ObjectUtil.hasPrototype(void 0, Base));
+      assert.isFalse(ObjectUtil.hasPrototype(() => void 0, Base));
+
+      assert.isTrue(ObjectUtil.hasPrototype(Base, Base));
+      assert.isTrue(ObjectUtil.hasPrototype(Child, Base));
+   });
+
+   it('hasSetter:', () =>
+   {
+      const data = {
+         get test() { return 0; },
+         get bad() { return 1; },
+
+         set test(val) { } // eslint-disable-line no-unused-vars
+      }
+
+      assert.isFalse(ObjectUtil.hasSetter({}, 'nope'));
+      assert.isFalse(ObjectUtil.hasSetter(null, 'nope'));
+      assert.isFalse(ObjectUtil.hasSetter(void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasSetter(() => void 0, 'nope'));
+      assert.isFalse(ObjectUtil.hasSetter(data, 'bad'));
+
+      assert.isTrue(ObjectUtil.hasSetter(data, 'test'));
+   });
+
+   it('isIterable:', () =>
+   {
       assert.isFalse(ObjectUtil.isIterable(false));
       assert.isFalse(ObjectUtil.isIterable(null));
       assert.isFalse(ObjectUtil.isIterable({}));

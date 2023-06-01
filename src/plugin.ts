@@ -7,6 +7,10 @@ import * as OU from './functions.js';
  * `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * `typhonjs:utils:object:depth:traverse`: Invokes `depthTraverse`.
  * `typhonjs:utils:object:get:accessor:list`: Invokes `getAccessorList`.
+ * `typhonjs:utils:object:has:accessor`: Invokes `hasAccessor`.
+ * `typhonjs:utils:object:has:getter`: Invokes `hasGetter`.
+ * `typhonjs:utils:object:has:prototype`: Invokes `hasPrototype`.
+ * `typhonjs:utils:object:has:setter`: Invokes `hasSetter`.
  * `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
  * `typhonjs:utils:object:is:iterable:async`: Invokes `isIterableAsync`.
  * `typhonjs:utils:object:is:object`: Invokes `isObject`.
@@ -44,6 +48,10 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:depth:traverse', OU.depthTraverse, void 0, { guard });
    eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:has:accessor', OU.hasAccessor, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:has:getter', OU.hasGetter, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:has:prototype', OU.hasPrototype, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:has:setter', OU.hasSetter, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isAsyncIterable, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
