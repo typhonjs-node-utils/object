@@ -1,3 +1,4 @@
+import resolve             from '@rollup/plugin-node-resolve';
 import typescript          from '@rollup/plugin-typescript';
 import dts                 from 'rollup-plugin-dts';
 
@@ -16,20 +17,20 @@ export default () =>
             sourcemap,
          }],
          plugins: [
+            resolve({ browser: true }),
             typescript({ include: ['src/**/*'] })
          ]
       },
 
       {   // This bundle is for bundled types.
-         input: ['src/functions.ts'],
+         input: 'src/functions.ts',
          output: [{
-            file: `./types/functions.d.mts`,
+            file: `./types/functions.d.ts`,
             format: 'es',
             sourcemap: false
          }],
          plugins: [
-            typescript({ include: ['src/**/*'], sourceMap: false, inlineSources: false }),
-            dts()
+            dts({ respectExternal: true })
          ]
       }
    ];
