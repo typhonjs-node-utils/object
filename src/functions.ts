@@ -8,6 +8,8 @@ const s_TAG_MAP = '[object Map]';
 const s_TAG_SET = '[object Set]';
 const s_TAG_STRING = '[object String]';
 
+export * from 'klona/full';
+
 /**
  * Freezes all entries traversed that are objects including entries in arrays.
  *
@@ -1020,7 +1022,7 @@ export type ValidationEntry = {
    error?: boolean;
 };
 
-type Primitive =
+export type Primitive =
  | bigint
  | boolean
  | null
@@ -1029,10 +1031,10 @@ type Primitive =
  | symbol
  | undefined;
 
-type JSONValue = Primitive | JSONObject | JSONArray;
+export type JSONValue = Primitive | JSONObject | JSONArray;
 
-interface JSONObject {
+export interface JSONObject {
    [key: string]: JSONValue;
 }
 
-interface JSONArray extends Array<JSONValue> { }
+export interface JSONArray extends Array<JSONValue> { }
