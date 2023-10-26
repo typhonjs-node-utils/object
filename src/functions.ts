@@ -235,7 +235,7 @@ export function isIterable(value: unknown): value is Iterable<unknown>
 }
 
 /**
- * Tests for whether object is not null and a typeof object.
+ * Tests for whether object is not null, typeof object, and not an array.
  *
  * @param {unknown} value - Any value.
  *
