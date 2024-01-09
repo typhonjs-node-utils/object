@@ -1,7 +1,7 @@
 {
   "name": "@typhonjs-utils/object",
   "description": "Provides common object manipulation utility functions and TypeScript type guards.",
-  "version": "0.0.17",
+  "version": "0.1.0",
   "license": "MPL-2.0",
   "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "contributors": [
@@ -43,8 +43,16 @@
     "utils",
     "object"
   ],
+  "typedocOptions": {
+    "dmtLinksService": {
+      "Discord": "https://typhonjs.io/discord/",
+      "GitHub": "https://github.com/typhonjs-node-utils/object",
+      "NPM": "https://www.npmjs.com/package/@typhonjs-utils/object"
+    }
+  },
   "repository": "github:typhonjs-node-utils/object",
   "bugs": "https://github.com/typhonjs-node-utils/object/issues",
+  "apidocs": "https://typhonjs-node-utils.github.io/object/",
   "scripts": {
     "build": "rollup -c",
     "docs": "typedoc-pkg --api-link esm",
