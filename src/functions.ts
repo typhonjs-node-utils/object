@@ -350,8 +350,8 @@ export function safeAccess(data: object, accessor: string, defaultValue?: any)
 export function safeBatchSet(data: object, accessors: string[], value: any, operation: SafeSetOperation = 'set',
  defaultAccessValue: any = 0, createMissing: boolean = true)
 {
-   if (typeof data !== 'object') { throw new TypeError(`safeBatchSet Error: 'data' is not an 'object'.`); }
-   if (!Array.isArray(accessors)) { throw new TypeError(`safeBatchSet Error: 'accessors' is not an 'array'.`); }
+   if (typeof data !== 'object') { throw new TypeError(`safeBatchSet error: 'data' is not an 'object'.`); }
+   if (!Array.isArray(accessors)) { throw new TypeError(`safeBatchSet error: 'accessors' is not an 'array'.`); }
 
    if (typeof value === 'object')
    {
@@ -425,8 +425,8 @@ export function safeEqual(source: object, target: object): boolean
 export function safeSet(data: object, accessor: string, value: any, operation: SafeSetOperation = 'set',
  createMissing: boolean = true): boolean
 {
-   if (typeof data !== 'object') { throw new TypeError(`safeSet Error: 'data' is not an 'object'.`); }
-   if (typeof accessor !== 'string') { throw new TypeError(`safeSet Error: 'accessor' is not a 'string'.`); }
+   if (typeof data !== 'object') { throw new TypeError(`safeSet error: 'data' is not an 'object'.`); }
+   if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a 'string'.`); }
 
    const access = accessor.split('.');
 
@@ -501,8 +501,11 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
 export function safeSetAll(data: object, accessorValues: Record<string, any>, operation: SafeSetOperation = 'set',
  createMissing: boolean = true)
 {
-   if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
-   if (typeof accessorValues !== 'object') { throw new TypeError(`'accessorValues' is not an 'object'.`); }
+   if (typeof data !== 'object') { throw new TypeError(`safeSetAll error: 'data' is not an 'object'.`); }
+   if (typeof accessorValues !== 'object')
+   {
+      throw new TypeError(`safeSetAll error: 'accessorValues' is not an 'object'.`);
+   }
 
    for (const accessor of Object.keys(accessorValues))
    {
@@ -525,8 +528,11 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
  */
 export function validate(data: object, validationData: Record<string, ValidationEntry> = {}, dataName: string = 'data')
 {
-   if (typeof data !== 'object') { throw new TypeError(`'${dataName}' is not an 'object'.`); }
-   if (typeof validationData !== 'object') { throw new TypeError(`'validationData' is not an 'object'.`); }
+   if (typeof data !== 'object') { throw new TypeError(`validate error: '${dataName}' is not an 'object'.`); }
+   if (typeof validationData !== 'object')
+   {
+      throw new TypeError(`validate error: 'validationData' is not an 'object'.`);
+   }
 
    let result;
 
