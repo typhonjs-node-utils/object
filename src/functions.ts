@@ -13,11 +13,11 @@ export * from 'klona/full';
 /**
  * Freezes all entries traversed that are objects including entries in arrays.
  *
- * @param {object | []}   data - An object or array.
+ * @param data - An object or array.
  *
- * @param {Set<string>}   [skipFreezeKeys] - A Set of strings indicating keys of objects to not freeze.
+ * @param [skipFreezeKeys] - A Set of strings indicating keys of objects to not freeze.
  *
- * @returns {object | []} The frozen object.
+ * @returns The frozen object.
  */
 export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): object | []
 {
@@ -27,7 +27,7 @@ export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): obj
    /* c8 ignore next 4 */
    if (skipFreezeKeys !== void 0 && !(skipFreezeKeys instanceof Set))
    {
-      throw new TypeError(`'skipFreezeKeys' is not an 'Set'.`);
+      throw new TypeError(`'skipFreezeKeys' is not a 'Set'.`);
    }
 
    return _deepFreeze(data, skipFreezeKeys);
@@ -38,11 +38,11 @@ export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): obj
  * as the target a copy is produced. If the target and source property are object literals they are merged.
  * Deleting keys is supported by specifying a property starting with `-=`.
  *
- * @param {object}      target - Target object.
+ * @param target - Target object.
  *
- * @param {...object}   sourceObj - One or more source objects.
+ * @param sourceObj - One or more source objects.
  *
- * @returns {object}    Target object.
+ * @returns Target object.
  */
 export function deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
@@ -66,16 +66,15 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
  * Performs a naive depth traversal of an object / array. The data structure _must not_ have circular references.
  * The result of the callback function is used to modify in place the given data.
  *
- * @param {object | []}   data - An object or array.
+ * @param data - An object or array.
  *
- * @param {(any) => any}  func - A callback function to process leaf values in children arrays or object members.
+ * @param func - A callback function to process leaf values in children arrays or object members.
  *
- * @param {boolean}       modify - If true then the result of the callback function is used to modify in place
- *                                  the given data.
+ * @param [modify] - If true then the result of the callback function is used to modify in place the given data.
  *
- * @returns {*} The data object.
+ * @returns The data object.
  */
-export function depthTraverse(data: object | [], func: Function, modify: boolean = false): object | []
+export function depthTraverse(data: object | [], func: (arg0: any) => any, modify: boolean = false): object | []
 {
    /* c8 ignore next 1 */
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
@@ -89,9 +88,9 @@ export function depthTraverse(data: object | [], func: Function, modify: boolean
 /**
  * Returns a list of accessor keys by traversing the given object.
  *
- * @param {object}   data - An object to traverse for accessor keys.
+ * @param data - An object to traverse for accessor keys.
  *
- * @returns {string[]} Accessor list.
+ * @returns Accessor list.
  */
 export function getAccessorList(data: object): string[]
 {
@@ -103,11 +102,11 @@ export function getAccessorList(data: object): string[]
 /**
  * Provides a method to determine if the passed in Svelte component has a getter & setter accessor.
  *
- * @param {object}   object - An object.
+ * @param object - An object.
  *
- * @param {string}   accessor - Accessor to test.
+ * @param accessor - Accessor to test.
  *
- * @returns {boolean} Whether the component has the getter and setter for accessor.
+ * @returns Whether the component has the getter and setter for accessor.
  */
 export function hasAccessor(object: object, accessor: string): boolean
 {
@@ -130,11 +129,11 @@ export function hasAccessor(object: object, accessor: string): boolean
 /**
  * Provides a method to determine if the passed in Svelte component has a getter accessor.
  *
- * @param {object}   object - An object.
+ * @param object - An object.
  *
- * @param {string}   accessor - Accessor to test.
+ * @param accessor - Accessor to test.
  *
- * @returns {boolean} Whether the component has the getter for accessor.
+ * @returns Whether the component has the getter for accessor.
  */
 export function hasGetter(object: object, accessor: string): boolean
 {
@@ -157,11 +156,11 @@ export function hasGetter(object: object, accessor: string): boolean
 /**
  * Returns whether the target is or has the given prototype walking up the prototype chain.
  *
- * @param {unknown}  target - Any target to test.
+ * @param target - Any target to test.
  *
- * @param {new (...args: any[]) => any} Prototype - Prototype function / class constructor to find.
+ * @param Prototype - Prototype function / class constructor to find.
  *
- * @returns {boolean} Target matches prototype.
+ * @returns Target matches prototype.
  */
 export function hasPrototype(target: unknown, Prototype: new (...args: any[]) => any): boolean
 {
@@ -182,11 +181,11 @@ export function hasPrototype(target: unknown, Prototype: new (...args: any[]) =>
 /**
  * Provides a method to determine if the passed in Svelte component has a setter accessor.
  *
- * @param {object}   object - An object.
+ * @param object - An object.
  *
- * @param {string}   accessor - Accessor to test.
+ * @param accessor - Accessor to test.
  *
- * @returns {boolean} Whether the component has the setter for accessor.
+ * @returns Whether the component has the setter for accessor.
  */
 export function hasSetter(object: object, accessor: string): boolean
 {
@@ -209,11 +208,11 @@ export function hasSetter(object: object, accessor: string): boolean
 /**
  * Tests for whether an object is async iterable.
  *
- * @param {unknown} value - Any value.
+ * @param value - Any value.
  *
- * @returns {boolean} Whether value is async iterable.
+ * @returns Whether value is async iterable.
  */
-export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown>
+export function isAsyncIterable(value: unknown): value is AsyncIterable<any>
 {
    if (typeof value !== 'object' || value === null || value === void 0) { return false; }
 
@@ -223,11 +222,11 @@ export function isAsyncIterable(value: unknown): value is AsyncIterable<unknown>
 /**
  * Tests for whether an object is iterable.
  *
- * @param {unknown} value - Any value.
+ * @param value - Any value.
  *
- * @returns {boolean} Whether object is iterable.
+ * @returns Whether object is iterable.
  */
-export function isIterable(value: unknown): value is Iterable<unknown>
+export function isIterable(value: unknown): value is Iterable<any>
 {
    if (value === null || value === void 0 || typeof value !== 'object') { return false; }
 
@@ -237,9 +236,9 @@ export function isIterable(value: unknown): value is Iterable<unknown>
 /**
  * Tests for whether object is not null, typeof object, and not an array.
  *
- * @param {unknown} value - Any value.
+ * @param value - Any value.
  *
- * @returns {boolean} Is it an object.
+ * @returns Is it an object.
  */
 export function isObject(value: unknown): value is Record<string, unknown>
 {
@@ -251,9 +250,9 @@ export function isObject(value: unknown): value is Record<string, unknown>
  *
  * An object is plain if it is created by either: `{}`, `new Object()` or `Object.create(null)`.
  *
- * @param {unknown} value - Any value
+ * @param value - Any value
  *
- * @returns {boolean} Is it a plain object.
+ * @returns Is it a plain object.
  */
 export function isPlainObject(value: unknown): value is JSONObject
 {
@@ -266,9 +265,9 @@ export function isPlainObject(value: unknown): value is JSONObject
 /**
  * Safely returns keys on an object or an empty array if not an object.
  *
- * @param {object} object - An object.
+ * @param object - An object.
  *
- * @returns {string[]}  Object keys or empty array.
+ * @returns Object keys or empty array.
  */
 export function objectKeys(object: object): string[]
 {
@@ -278,11 +277,11 @@ export function objectKeys(object: object): string[]
 /**
  * Safely returns an objects size. Note for String objects unicode is not taken into consideration.
  *
- * @param {any} object - Any value, but size returned for object / Map / Set / arrays / strings.
+ * @param object - Any value, but size returned for object / Map / Set / arrays / strings.
  *
- * @returns {number} Size of object.
+ * @returns Size of object.
  */
-export function objectSize(object: any)
+export function objectSize(object: any): number
 {
    if (object === void 0 || object === null || typeof object !== 'object') { return 0; }
 
@@ -300,15 +299,15 @@ export function objectSize(object: any)
  * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
  * to walk.
  *
- * @param {object}   data - An object to access entry data.
+ * @param data - An object to access entry data.
  *
- * @param {string}   accessor - A string describing the entries to access with keys separated by `.`.
+ * @param accessor - A string describing the entries to access with keys separated by `.`.
  *
- * @param {any}      [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
+ * @param [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
  *
- * @returns {object} The data object.
+ * @returns The value referenced by the accessor.
  */
-export function safeAccess(data: object, accessor: string, defaultValue?: any)
+export function safeAccess(data: object, accessor: string, defaultValue?: any): any
 {
    if (typeof data !== 'object') { return defaultValue; }
    if (typeof accessor !== 'string') { return defaultValue; }
@@ -334,21 +333,20 @@ export function safeAccess(data: object, accessor: string, defaultValue?: any)
  * subsequently set to `data` by the given operation. If `value` is not an object it will be used as the target
  * value to set across all accessors.
  *
- * @param {object}   data - An object to access entry data.
+ * @param data - An object to access entry data.
  *
- * @param {string[]} accessors - A string describing the entries to access.
+ * @param accessors - A list of accessor strings describing the entries to access.
  *
- * @param {any}      value - A new value to set if an entry for accessor is found.
+ * @param value - A new value to set if an entry for accessor is found.
  *
- * @param {SafeSetOperation}   [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
- *        'set-undefined', 'sub'.
+ * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'set-undefined', 'sub'.
  *
- * @param {any}      [defaultAccessValue=0] - A new value to set if an entry for accessor is found.
+ * @param [defaultAccessValue=0] - A new value to set if an entry for accessor is found.
  *
- * @param {boolean}  [createMissing=true] - If true missing accessor entries will be created as objects automatically.
+ * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
  */
 export function safeBatchSet(data: object, accessors: string[], value: any, operation: SafeSetOperation = 'set',
- defaultAccessValue: any = 0, createMissing: boolean = true)
+ defaultAccessValue: any = 0, createMissing: boolean = true): void
 {
    if (typeof data !== 'object') { throw new TypeError(`safeBatchSet error: 'data' is not an 'object'.`); }
    if (!Array.isArray(accessors)) { throw new TypeError(`safeBatchSet error: 'accessors' is not an 'array'.`); }
@@ -375,11 +373,11 @@ export function safeBatchSet(data: object, accessors: string[], value: any, oper
  * the target object then `true` is returned otherwise `false`. If either object is undefined or null then false
  * is returned.
  *
- * @param {object}   source - Source object.
+ * @param source - Source object.
  *
- * @param {object}   target - Target object.
+ * @param target - Target object.
  *
- * @returns {boolean} True if equal.
+ * @returns True if equal.
  */
 export function safeEqual(source: object, target: object): boolean
 {
@@ -408,19 +406,17 @@ export function safeEqual(source: object, target: object): boolean
  * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
  * to walk.
  *
- * @param {object}   data - An object to access entry data.
+ * @param data - An object to access entry data.
  *
- * @param {string}   accessor - A string describing the entries to access.
+ * @param accessor - A string describing the entries to access.
  *
- * @param {any}      value - A new value to set if an entry for accessor is found.
+ * @param value - A new value to set if an entry for accessor is found.
  *
- * @param {SafeSetOperation}   [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set',
- *        'set-undefined', 'sub'.
+ * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'set-undefined', 'sub'.
  *
- * @param {boolean}  [createMissing=true] - If true missing accessor entries will be created as objects
- *        automatically.
+ * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
  *
- * @returns {boolean} True if successful.
+ * @returns True if successful.
  */
 export function safeSet(data: object, accessor: string, value: any, operation: SafeSetOperation = 'set',
  createMissing: boolean = true): boolean
@@ -488,18 +484,16 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
 /**
  * Performs bulk setting of values to the given data object.
  *
- * @param {object}            data - The data object to set data.
+ * @param data - The data object to set data.
  *
- * @param {Record<string, any>}  accessorValues - Object of accessor keys to values to set.
+ * @param accessorValues - Object of accessor keys to values to set.
  *
- * @param {SafeSetOperation}  [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'sub';
- *        default (`set`).
+ * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'sub'; default (`set`).
  *
- * @param {boolean}           [createMissing=true] - If true missing accessor entries will be created as objects
- *        automatically.
+ * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
  */
 export function safeSetAll(data: object, accessorValues: Record<string, any>, operation: SafeSetOperation = 'set',
- createMissing: boolean = true)
+ createMissing: boolean = true): void
 {
    if (typeof data !== 'object') { throw new TypeError(`safeSetAll error: 'data' is not an 'object'.`); }
    if (typeof accessorValues !== 'object')
@@ -518,15 +512,16 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
 /**
  * Performs bulk validation of data given an object, `validationData`, which describes all entries to test.
  *
- * @param {object}                           data - The data object to test.
+ * @param data - The data object to test.
  *
- * @param {Record<string, ValidationEntry>}  validationData - Key is the accessor / value is a validation entry.
+ * @param validationData - Key is the accessor / value is a validation entry.
  *
- * @param {string}                           [dataName='data'] - Optional name of data.
+ * @param [dataName='data'] - Optional name of data.
  *
- * @returns {boolean} True if validation passes otherwise an exception is thrown.
+ * @returns True if validation passes otherwise an exception is thrown.
  */
-export function validate(data: object, validationData: Record<string, ValidationEntry> = {}, dataName: string = 'data')
+export function validate(data: object, validationData: Record<string, ValidationEntry> = {}, dataName: string = 'data'):
+ boolean
 {
    if (typeof data !== 'object') { throw new TypeError(`validate error: '${dataName}' is not an 'object'.`); }
    if (typeof validationData !== 'object')
@@ -534,13 +529,13 @@ export function validate(data: object, validationData: Record<string, Validation
       throw new TypeError(`validate error: 'validationData' is not an 'object'.`);
    }
 
-   let result;
+   let result: boolean;
 
    for (const key of Object.keys(validationData))
    {
       if (!Object.prototype.hasOwnProperty.call(validationData, key)) { continue; }
 
-      const entry = validationData[key];
+      const entry: ValidationEntry = validationData[key];
 
       switch (entry.test)
       {
@@ -564,17 +559,17 @@ export function validate(data: object, validationData: Record<string, Validation
 /**
  * Validates all array entries against potential type and expected tests.
  *
- * @param {object}            data - The data object to test.
+ * @param data - The data object to test.
  *
- * @param {string}            accessor - A string describing the entries to access.
+ * @param accessor - A string describing the entries to access.
  *
- * @param {ValidationEntry}   entry - Validation entry object
+ * @param entry - Validation entry object
  *
- * @param {string}            [dataName='data'] - Optional name of data.
+ * @param [dataName='data'] - Optional name of data.
  *
- * @returns {boolean} True if validation passes otherwise an exception is thrown.
+ * @returns True if validation passes otherwise an exception is thrown.
  */
-export function validateArray(data: object, accessor: string, entry: ValidationEntry, dataName = 'data')
+export function validateArray(data: object, accessor: string, entry: ValidationEntry, dataName = 'data'): boolean
 {
    const valEntry: ValidationEntry = Object.assign({ required: true, error: true }, entry);
 
@@ -696,15 +691,15 @@ export function validateArray(data: object, accessor: string, entry: ValidationE
 /**
  * Validates data entry with a typeof check and potentially tests against the values in any given expected set.
  *
- * @param {object}            data - The object data to validate.
+ * @param data - The object data to validate.
  *
- * @param {string}            accessor - A string describing the entries to access.
+ * @param accessor - A string describing the entries to access.
  *
- * @param {ValidationEntry}   entry - Validation entry.
+ * @param entry - Validation entry.
  *
- * @param {string}            [dataName='data'] - Optional name of data.
+ * @param [dataName='data'] - Optional name of data.
  *
- * @returns {boolean} True if validation passes otherwise an exception is thrown.
+ * @returns True if validation passes otherwise an exception is thrown.
  */
 export function validateEntry(data: object, accessor: string, entry: ValidationEntry,
  dataName: string = 'data'): boolean
@@ -773,21 +768,22 @@ export function validateEntry(data: object, accessor: string, entry: ValidationE
 /**
  * Dispatches validation of data entry to string or array validation depending on data entry type.
  *
- * @param {object}            data - The data object to test.
+ * @param data - The data object to test.
  *
- * @param {string}            accessor - A string describing the entries to access.
+ * @param accessor - A string describing the entries to access.
  *
- * @param {ValidationEntry}   [entry] - A validation entry.
+ * @param [entry] - A validation entry.
  *
- * @param {string}            [dataName='data'] - Optional name of data.
+ * @param [dataName='data'] - Optional name of data.
  *
- * @returns {boolean} True if validation passes otherwise an exception is thrown.
+ * @returns True if validation passes otherwise an exception is thrown.
  */
-export function validateEntryOrArray(data: object, accessor: string, entry: ValidationEntry, dataName: string = 'data')
+export function validateEntryOrArray(data: object, accessor: string, entry: ValidationEntry, dataName: string = 'data'):
+ boolean
 {
    const dataEntry = safeAccess(data, accessor);
 
-   let result;
+   let result: boolean;
 
    if (Array.isArray(dataEntry))
    {
@@ -801,17 +797,18 @@ export function validateEntryOrArray(data: object, accessor: string, entry: Vali
    return result;
 }
 
-// Module private ---------------------------------------------------------------------------------------------------
+// Module private ----------------------------------------------------------------------------------------------------
 
 /**
  * Private implementation of depth traversal.
  *
- * @param {any}         data - An object or array or any leaf.
+ * @param data - An object or array or any leaf.
  *
- * @param {Set<string>} [skipFreezeKeys] - An array of strings indicating keys of objects to not freeze.
+ * @param [skipFreezeKeys] - An array of strings indicating keys of objects to not freeze.
  *
- * @returns {*} The frozen object.
- * @ignore
+ * @returns The frozen object.
+ *
+ * @internal
  * @private
  */
 function _deepFreeze(data: any, skipFreezeKeys?: Set<string>): object | []
@@ -837,11 +834,14 @@ function _deepFreeze(data: any, skipFreezeKeys?: Set<string>): object | []
 /**
  * Internal implementation for `deepMerge`.
  *
- * @param {object}      target - Target object.
+ * @param target - Target object.
  *
- * @param {...object}   sourceObj - One or more source objects.
+ * @param sourceObj - One or more source objects.
  *
- * @returns {object}    Target object.
+ * @returns Target object.
+ *
+ * @internal
+ * @private
  */
 function _deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
@@ -875,15 +875,15 @@ function _deepMerge(target: object = {}, ...sourceObj: object[]): object
 /**
  * Private implementation of depth traversal.
  *
- * @param {any}      data - An object, array, or any leaf value
+ * @param data - An object, array, or any leaf value
  *
- * @param {Function} func - A callback function to process leaf values in children arrays or object members.
+ * @param func - A callback function to process leaf values in children arrays or object members.
  *
- * @param {boolean}  modify - If true then the result of the callback function is used to modify in place the
- *        given data.
+ * @param modify - If true then the result of the callback function is used to modify in place the given data.
  *
- * @returns {*} The data object.
- * @ignore
+ * @returns The data object.
+ *
+ * @internal
  * @private
  */
 function _depthTraverse(data: any, func: Function, modify: boolean = false): Record<string, unknown> | []
@@ -937,10 +937,11 @@ function _depthTraverse(data: any, func: Function, modify: boolean = false): Rec
 /**
  * Private implementation of `getAccessorList`.
  *
- * @param {object}   data - An object to traverse.
+ * @param data - An object to traverse.
  *
- * @returns {string[]} Accessor list.
- * @ignore
+ * @returns Accessor list.
+ *
+ * @internal
  * @private
  */
 function _getAccessorList(data: object): string[]
@@ -973,15 +974,16 @@ function _getAccessorList(data: object): string[]
 /**
  * Creates a new error of type `clazz` adding the field `_objectValidateError` set to true.
  *
- * @param {Error}    clazz - Error class to instantiate.
+ * @param clazz - Error class to instantiate.
  *
- * @param {string}   message - An error message.
+ * @param message - An error message.
  *
- * @returns {*} Error of the clazz.
- * @ignore
+ * @returns Error of the clazz.
+ *
+ * @internal
  * @private
  */
-function _validateError(clazz, message = void 0)
+function _validateError(clazz: any, message: string = void 0): any
 {
    const error = new clazz(message);
    error._objectValidateError = true;
