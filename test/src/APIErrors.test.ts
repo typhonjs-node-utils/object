@@ -1,4 +1,4 @@
-import * as ObjectUtil from '../../src/functions.js';
+import * as ObjectUtil from '../../src/functions';
 
 describe('API Errors:', () =>
 {
@@ -40,16 +40,5 @@ describe('API Errors:', () =>
       /** @ts-ignore */
       expect(() => ObjectUtil.safeSetAll({}, false)).throws(TypeError,
        `safeSetAll error: 'accessorValues' is not an 'object'.`);
-   });
-
-   it('validate:', () =>
-   {
-      /** @ts-ignore */
-      expect(() => ObjectUtil.validate(false, {})).throws(TypeError,
-       `validate error: 'data' is not an 'object'.`);
-
-      /** @ts-ignore */
-      expect(() => ObjectUtil.validate({}, false)).throws(TypeError,
-       `validate error: 'validationData' is not an 'object'.`);
    });
 });

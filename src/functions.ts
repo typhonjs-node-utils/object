@@ -19,7 +19,7 @@ export * from 'klona/full';
  *
  * @returns The frozen object.
  */
-export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): object | []
+export function deepFreeze<T extends object | []>(data: T, skipFreezeKeys?: Set<string>): T
 {
    /* c8 ignore next 1 */
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
@@ -30,7 +30,7 @@ export function deepFreeze(data: object | [], skipFreezeKeys?: Set<string>): obj
       throw new TypeError(`'skipFreezeKeys' is not a 'Set'.`);
    }
 
-   return _deepFreeze(data, skipFreezeKeys);
+   return _deepFreeze(data, skipFreezeKeys) as T;
 }
 
 /**
@@ -51,7 +51,7 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
       throw new TypeError(`deepMerge error: 'target' is not an 'object'.`);
    }
 
-   for (let cntr = 0; cntr < sourceObj.length; cntr++)
+   for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
    {
       if (Object.prototype.toString.call(sourceObj[cntr]) !== s_TAG_OBJECT)
       {
@@ -509,294 +509,6 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
    }
 }
 
-/**
- * Performs bulk validation of data given an object, `validationData`, which describes all entries to test.
- *
- * @param data - The data object to test.
- *
- * @param validationData - Key is the accessor / value is a validation entry.
- *
- * @param [dataName='data'] - Optional name of data.
- *
- * @returns True if validation passes otherwise an exception is thrown.
- */
-export function validate(data: object, validationData: Record<string, ValidationEntry> = {}, dataName: string = 'data'):
- boolean
-{
-   if (typeof data !== 'object') { throw new TypeError(`validate error: '${dataName}' is not an 'object'.`); }
-   if (typeof validationData !== 'object')
-   {
-      throw new TypeError(`validate error: 'validationData' is not an 'object'.`);
-   }
-
-   let result: boolean;
-
-   for (const key of Object.keys(validationData))
-   {
-      if (!Object.prototype.hasOwnProperty.call(validationData, key)) { continue; }
-
-      const entry: ValidationEntry = validationData[key];
-
-      switch (entry.test)
-      {
-         case 'array':
-            result = validateArray(data, key, entry, dataName);
-            break;
-
-         case 'entry':
-            result = validateEntry(data, key, entry, dataName);
-            break;
-
-         case 'entry|array':
-            result = validateEntryOrArray(data, key, entry, dataName);
-            break;
-      }
-   }
-
-   return result;
-}
-
-/**
- * Validates all array entries against potential type and expected tests.
- *
- * @param data - The data object to test.
- *
- * @param accessor - A string describing the entries to access.
- *
- * @param entry - Validation entry object
- *
- * @param [dataName='data'] - Optional name of data.
- *
- * @returns True if validation passes otherwise an exception is thrown.
- */
-export function validateArray(data: object, accessor: string, entry: ValidationEntry, dataName = 'data'): boolean
-{
-   const valEntry: ValidationEntry = Object.assign({ required: true, error: true }, entry);
-
-   const dataArray = safeAccess(data, accessor);
-
-   // A non-required entry is missing so return without validation.
-   if (!valEntry?.required && typeof dataArray === 'undefined') { return true; }
-
-   if (!Array.isArray(dataArray))
-   {
-      if (valEntry.error)
-      {
-         throw _validateError(TypeError, `'${dataName}.${accessor}' is not an 'array'.`);
-      }
-      else
-      {
-         return false;
-      }
-   }
-
-   if (typeof valEntry.type === 'string')
-   {
-      for (let cntr = 0; cntr < dataArray.length; cntr++)
-      {
-         if (!(typeof dataArray[cntr] === valEntry.type))
-         {
-            if (valEntry.error)
-            {
-               const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
-                dataArray[cntr];
-
-               throw _validateError(TypeError,
-                `'${dataName}.${accessor}[${cntr}]': '${dataEntryString}' is not a '${valEntry.type}'.`);
-            }
-            else
-            {
-               return false;
-            }
-         }
-      }
-   }
-
-   // If expected is a function then test all array entries against the test function. If expected is a Set then
-   // test all array entries for inclusion in the set. Otherwise, if expected is a string then test that all array
-   // entries as a `typeof` test against expected.
-   if (Array.isArray(valEntry.expected))
-   {
-      for (let cntr = 0; cntr < dataArray.length; cntr++)
-      {
-         if (!valEntry.expected.includes(dataArray[cntr]))
-         {
-            if (valEntry.error)
-            {
-               const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
-                dataArray[cntr];
-
-               throw _validateError(Error, `'${dataName}.${accessor}[${cntr}]': '${
-                dataEntryString}' is not an expected value: ${JSON.stringify(valEntry.expected)}.`);
-            }
-            else
-            {
-               return false;
-            }
-         }
-      }
-   }
-   else if (valEntry.expected instanceof Set)
-   {
-      for (let cntr = 0; cntr < dataArray.length; cntr++)
-      {
-         if (!valEntry.expected.has(dataArray[cntr]))
-         {
-            if (valEntry.error)
-            {
-               const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
-                dataArray[cntr];
-
-               throw _validateError(Error, `'${dataName}.${accessor}[${cntr}]': '${
-                dataEntryString}' is not an expected value: ${JSON.stringify(valEntry.expected)}.`);
-            }
-            else
-            {
-               return false;
-            }
-         }
-      }
-   }
-   else if (typeof valEntry.expected === 'function')
-   {
-      for (let cntr = 0; cntr < dataArray.length; cntr++)
-      {
-         try
-         {
-            const result = valEntry.expected(dataArray[cntr]);
-
-            if (typeof result === 'undefined' || !result) { throw new Error(valEntry.message); }
-         }
-         catch (err)
-         {
-            if (valEntry.error)
-            {
-               const dataEntryString = typeof dataArray[cntr] === 'object' ? JSON.stringify(dataArray[cntr]) :
-                dataArray[cntr];
-
-               throw _validateError(Error, `'${dataName}.${accessor}[${cntr}]': '${
-                dataEntryString}' failed validation: ${err.message}.`);
-            }
-            else
-            {
-               return false;
-            }
-         }
-      }
-   }
-
-   return true;
-}
-
-/**
- * Validates data entry with a typeof check and potentially tests against the values in any given expected set.
- *
- * @param data - The object data to validate.
- *
- * @param accessor - A string describing the entries to access.
- *
- * @param entry - Validation entry.
- *
- * @param [dataName='data'] - Optional name of data.
- *
- * @returns True if validation passes otherwise an exception is thrown.
- */
-export function validateEntry(data: object, accessor: string, entry: ValidationEntry,
- dataName: string = 'data'): boolean
-{
-   const valEntry: ValidationEntry = Object.assign({ required: true, error: true }, entry);
-
-   const dataEntry = safeAccess(data, accessor);
-
-   // A non-required entry is missing so return without validation.
-   if (!valEntry.required && typeof dataEntry === 'undefined') { return true; }
-
-   if (valEntry.type && typeof dataEntry !== valEntry.type)
-   {
-      if (valEntry.error)
-      {
-         throw _validateError(TypeError, `'${dataName}.${accessor}' is not a '${valEntry.type}'.`);
-      }
-      else
-      {
-         return false;
-      }
-   }
-
-   if ((valEntry.expected instanceof Set && !valEntry.expected.has(dataEntry)) ||
-    (Array.isArray(valEntry.expected) && !valEntry.expected.includes(dataEntry)))
-   {
-      if (valEntry.error)
-      {
-         const dataEntryString = typeof dataEntry === 'object' ? JSON.stringify(dataEntry) : dataEntry;
-
-         throw _validateError(Error, `'${dataName}.${accessor}': '${dataEntryString}' is not an expected value: ${
-          JSON.stringify(valEntry.expected)}.`);
-      }
-      else
-      {
-         return false;
-      }
-   }
-   else if (typeof valEntry.expected === 'function')
-   {
-      try
-      {
-         const result = valEntry.expected(dataEntry);
-
-         if (typeof result === 'undefined' || !result) { throw new Error(valEntry.message); }
-      }
-      catch (err)
-      {
-         if (valEntry.error)
-         {
-            const dataEntryString = typeof dataEntry === 'object' ? JSON.stringify(dataEntry) : dataEntry;
-
-            throw _validateError(Error, `'${dataName}.${accessor}': '${dataEntryString}' failed to validate: ${
-             err.message}.`);
-         }
-         else
-         {
-            return false;
-         }
-      }
-   }
-
-   return true;
-}
-
-/**
- * Dispatches validation of data entry to string or array validation depending on data entry type.
- *
- * @param data - The data object to test.
- *
- * @param accessor - A string describing the entries to access.
- *
- * @param [entry] - A validation entry.
- *
- * @param [dataName='data'] - Optional name of data.
- *
- * @returns True if validation passes otherwise an exception is thrown.
- */
-export function validateEntryOrArray(data: object, accessor: string, entry: ValidationEntry, dataName: string = 'data'):
- boolean
-{
-   const dataEntry = safeAccess(data, accessor);
-
-   let result: boolean;
-
-   if (Array.isArray(dataEntry))
-   {
-      result = validateArray(data, accessor, entry, dataName);
-   }
-   else
-   {
-      result = validateEntry(data, accessor, entry, dataName);
-   }
-
-   return result;
-}
-
 // Module private ----------------------------------------------------------------------------------------------------
 
 /**
@@ -972,63 +684,9 @@ function _getAccessorList(data: object): string[]
 }
 
 /**
- * Creates a new error of type `clazz` adding the field `_objectValidateError` set to true.
- *
- * @param clazz - Error class to instantiate.
- *
- * @param message - An error message.
- *
- * @returns Error of the clazz.
- *
- * @internal
- * @private
- */
-function _validateError(clazz: any, message: string = void 0): any
-{
-   const error = new clazz(message);
-   error._objectValidateError = true;
-   return error;
-}
-
-/**
  * Defines the operation to perform for `safeSet`.
  */
 export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
-
-/**
- * Provides data for a validation check.
- */
-export type ValidationEntry = {
-   /**
-    * Optionally tests with a typeof check.
-    */
-   type?: string;
-
-   /**
-    * The type of entry / variable to test.
-    */
-   test: 'array' | 'entry' | 'entry|array';
-
-   /**
-    * Optional array, function, or set of expected values to test against.
-    */
-   expected?: any[] | Function | Set<any>;
-
-   /**
-    * Optional message to include.
-    */
-   message?: string;
-
-   /**
-    * When false if the accessor is missing validation is skipped; default: true
-    */
-   required?: boolean;
-
-   /**
-    * When true and an error is thrown otherwise a boolean is returned; default: true
-    */
-   error?: boolean;
-};
 
 export type Primitive =
  | bigint
