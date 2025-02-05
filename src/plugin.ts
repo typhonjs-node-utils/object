@@ -63,8 +63,4 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual, void 0, { guard });
    eventbus.on('typhonjs:utils:object:safe:set', OU.safeSet, void 0, { guard });
    eventbus.on('typhonjs:utils:object:safe:set:all', OU.safeSetAll, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:validate', OU.validate, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:validate:array', OU.validateArray, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:validate:entry', OU.validateEntry, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:validate:entry|array', OU.validateEntryOrArray, void 0, { guard });
 }
