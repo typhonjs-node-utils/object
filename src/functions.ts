@@ -254,12 +254,9 @@ export function isObject(value: unknown): value is Record<string, unknown>
  *
  * @returns Is it a plain object.
  */
-export function isPlainObject(value: unknown): value is JSONObject
+export function isPlainObject(value: unknown): value is Record<string, unknown>
 {
-   if (Object.prototype.toString.call(value) !== s_TAG_OBJECT) { return false; }
-
-   const prototype = Object.getPrototypeOf(value);
-   return prototype === null || prototype === Object.prototype;
+   return Object.prototype.toString.call(value) === s_TAG_OBJECT;
 }
 
 /**
@@ -687,20 +684,3 @@ function _getAccessorList(data: object): string[]
  * Defines the operation to perform for `safeSet`.
  */
 export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
-
-export type Primitive =
- | bigint
- | boolean
- | null
- | number
- | string
- | symbol
- | undefined;
-
-export type JSONValue = Primitive | JSONObject | JSONArray;
-
-export interface JSONObject {
-   [key: string]: JSONValue;
-}
-
-export interface JSONArray extends Array<JSONValue> { }
