@@ -1,6 +1,8 @@
 /**
  * Provides common object manipulation utilities including depth traversal, obtaining accessors, safely setting values /
- * equality tests, and validation.
+ * equality tests.
+ *
+ * @packageDocumentation
  */
 
 const s_TAG_OBJECT = '[object Object]';

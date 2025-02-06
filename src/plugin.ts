@@ -1,6 +1,14 @@
+/**
+ * Provides a plugin for `@typhonjs-node-plugin/manager`.
+ *
+ * @packageDocumentation
+ */
+
 import * as OU from './functions.js';
 
 /**
+ * Provides a plugin for `@typhonjs-node-plugin/manager`.
+ *
  * Wires up object util functions on the plugin eventbus. The following event bindings are available:
  *
  * `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
@@ -21,14 +29,8 @@ import * as OU from './functions.js';
  * `typhonjs:utils:object:safe:equal`: Invokes `safeEqual`.
  * `typhonjs:utils:object:safe:set`: Invokes `safeSet`.
  * `typhonjs:utils:object:safe:set:all`: Invokes `safeSetAll`.
- * `typhonjs:utils:object:validate`: Invokes `validate`.
- * `typhonjs:utils:object:validate:array`: Invokes `validateArray`.
- * `typhonjs:utils:object:validate:entry`: Invokes `validateEntry`.
- * `typhonjs:utils:object:validate:entry|array`: Invokes `validateEntryOrArray`.
  *
  * @param {object} ev - PluginEvent - The plugin event.
- *
- * @ignore
  */
 export function onPluginLoad(ev)
 {
