@@ -22,6 +22,8 @@ export * from 'klona/full';
  * @param [options.skipKeys] - A Set of strings indicating keys of objects to not freeze.
  *
  * @returns The frozen object.
+ *
+ * @typeParam T - Type of data.
  */
 export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
@@ -35,31 +37,6 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
    }
 
    return _deepFreeze(data, skipKeys) as T;
-}
-
-/**
- * Seals all entries traversed that are objects including entries in arrays.
- *
- * @param data - An object or array.
- *
- * @param [options] - Options
- *
- * @param [options.skipKeys] - A Set of strings indicating keys of objects to not seal.
- *
- * @returns The sealed object.
- */
-export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
-{
-   /* c8 ignore next 1 */
-   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
-
-   /* c8 ignore next 4 */
-   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
-   {
-      throw new TypeError(`'skipKeys' is not a 'Set'.`);
-   }
-
-   return _deepSeal(data, skipKeys) as T;
 }
 
 /**
@@ -92,18 +69,51 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
 }
 
 /**
+ * Seals all entries traversed that are objects including entries in arrays.
+ *
+ * @param data - An object or array.
+ *
+ * @param [options] - Options
+ *
+ * @param [options.skipKeys] - A Set of strings indicating keys of objects to not seal.
+ *
+ * @returns The sealed object.
+ *
+ * @typeParam T - Type of data.
+ */
+export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
+{
+   /* c8 ignore next 1 */
+   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
+
+   /* c8 ignore next 4 */
+   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
+   {
+      throw new TypeError(`'skipKeys' is not a 'Set'.`);
+   }
+
+   return _deepSeal(data, skipKeys) as T;
+}
+
+/**
  * Performs a naive depth traversal of an object / array. The data structure _must not_ have circular references.
- * The result of the callback function is used to modify in place the given data.
+ * If the `modify` option is true the result of the callback function is used to modify in place the given data.
  *
  * @param data - An object or array.
  *
  * @param func - A callback function to process leaf values in children arrays or object members.
  *
- * @param [modify] - If true then the result of the callback function is used to modify in place the given data.
+ * @param [options] - Options.
+ *
+ * @param [options.modify] - If true then the result of the callback function is used to modify in place the given data.
  *
  * @returns The data object.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam R - Alternate return type; defaults to `T`.
  */
-export function depthTraverse(data: object | [], func: (arg0: any) => any, modify: boolean = false): object | []
+export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0: any) => any,
+ { modify = false }: { modify?: boolean } = {}): R
 {
    /* c8 ignore next 1 */
    if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
@@ -111,7 +121,7 @@ export function depthTraverse(data: object | [], func: (arg0: any) => any, modif
    /* c8 ignore next 1 */
    if (typeof func !== 'function') { throw new TypeError(`'func' is not a 'function'.`); }
 
-   return _depthTraverse(data, func, modify);
+   return _depthTraverse(data, func, modify) as R;
 }
 
 /**
