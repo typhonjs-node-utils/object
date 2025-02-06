@@ -17,22 +17,49 @@ export * from 'klona/full';
  *
  * @param data - An object or array.
  *
- * @param [skipFreezeKeys] - A Set of strings indicating keys of objects to not freeze.
+ * @param [options] - Options
+ *
+ * @param [options.skipKeys] - A Set of strings indicating keys of objects to not freeze.
  *
  * @returns The frozen object.
  */
-export function deepFreeze<T extends object | []>(data: T, skipFreezeKeys?: Set<string>): T
+export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
    /* c8 ignore next 1 */
-   if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
+   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
 
    /* c8 ignore next 4 */
-   if (skipFreezeKeys !== void 0 && !(skipFreezeKeys instanceof Set))
+   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
    {
-      throw new TypeError(`'skipFreezeKeys' is not a 'Set'.`);
+      throw new TypeError(`'skipKeys' is not a 'Set'.`);
    }
 
-   return _deepFreeze(data, skipFreezeKeys) as T;
+   return _deepFreeze(data, skipKeys) as T;
+}
+
+/**
+ * Seals all entries traversed that are objects including entries in arrays.
+ *
+ * @param data - An object or array.
+ *
+ * @param [options] - Options
+ *
+ * @param [options.skipKeys] - A Set of strings indicating keys of objects to not seal.
+ *
+ * @returns The sealed object.
+ */
+export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
+{
+   /* c8 ignore next 1 */
+   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
+
+   /* c8 ignore next 4 */
+   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
+   {
+      throw new TypeError(`'skipKeys' is not a 'Set'.`);
+   }
+
+   return _deepSeal(data, skipKeys) as T;
 }
 
 /**
@@ -515,26 +542,26 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
  *
  * @param data - An object or array or any leaf.
  *
- * @param [skipFreezeKeys] - An array of strings indicating keys of objects to not freeze.
+ * @param [skipKeys] - A Set of strings indicating keys of objects to not freeze.
  *
  * @returns The frozen object.
  *
  * @internal
  * @private
  */
-function _deepFreeze(data: any, skipFreezeKeys?: Set<string>): object | []
+function _deepFreeze(data: any, skipKeys?: Set<string>): object | []
 {
    if (Array.isArray(data))
    {
-      for (let cntr = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipFreezeKeys); }
+      for (let cntr = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipKeys); }
    }
    else if (isObject(data))
    {
       for (const key in data)
       {
-         if (Object.prototype.hasOwnProperty.call(data, key) && !skipFreezeKeys?.has?.(key))
+         if (Object.prototype.hasOwnProperty.call(data, key) && !skipKeys?.has?.(key))
          {
-            _deepFreeze(data[key], skipFreezeKeys);
+            _deepFreeze(data[key], skipKeys);
          }
       }
    }
@@ -581,6 +608,38 @@ function _deepMerge(target: object = {}, ...sourceObj: object[]): object
    }
 
    return target;
+}
+
+/**
+ * Private implementation of depth traversal.
+ *
+ * @param data - An object or array or any leaf.
+ *
+ * @param [skipKeys] - A Set of strings indicating keys of objects to not freeze.
+ *
+ * @returns The frozen object.
+ *
+ * @internal
+ * @private
+ */
+function _deepSeal(data: any, skipKeys?: Set<string>): object | []
+{
+   if (Array.isArray(data))
+   {
+      for (let cntr = 0; cntr < data.length; cntr++) { _deepSeal(data[cntr], skipKeys); }
+   }
+   else if (isObject(data))
+   {
+      for (const key in data)
+      {
+         if (Object.prototype.hasOwnProperty.call(data, key) && !skipKeys?.has?.(key))
+         {
+            _deepSeal(data[key], skipKeys);
+         }
+      }
+   }
+
+   return Object.seal(data);
 }
 
 /**
