@@ -449,19 +449,16 @@ export function safeBatchSet(data: object, accessors: string[], value: any, oper
  */
 export function safeEqual(source: object, target: object): boolean
 {
-   if (typeof source === 'undefined' || source === null || typeof target === 'undefined' || target === null)
+   if (!isObject(source) || !isObject(target)) { return false; }
+
+   const sourceAccessors: string[] = getAccessorList(source);
+
+   for (let cntr: number = 0; cntr < sourceAccessors.length; cntr++)
    {
-      return false;
-   }
+      const accessor: string = sourceAccessors[cntr];
 
-   const sourceAccessors = getAccessorList(source);
-
-   for (let cntr = 0; cntr < sourceAccessors.length; cntr++)
-   {
-      const accessor = sourceAccessors[cntr];
-
-      const sourceObjectValue = safeAccess(source, accessor);
-      const targetObjectValue = safeAccess(target, accessor);
+      const sourceObjectValue: unknown = safeAccess(source, accessor);
+      const targetObjectValue: unknown = safeAccess(target, accessor);
 
       if (sourceObjectValue !== targetObjectValue) { return false; }
    }
@@ -526,7 +523,7 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
                break;
 
             case 'set-undefined':
-               if (typeof data[access[cntr]] === 'undefined') { data[access[cntr]] = value; }
+               if (data[access[cntr]] === void 0) { data[access[cntr]] = value; }
                break;
 
             case 'sub':
@@ -537,7 +534,7 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
       else
       {
          // If createMissing is true and the next level of object access is undefined then create a new object entry.
-         if (createMissing && typeof data[access[cntr]] === 'undefined') { data[access[cntr]] = {}; }
+         if (createMissing && data[access[cntr]] === void 0) { data[access[cntr]] = {}; }
 
          // Abort if the next level is null or not an object and containing a value.
          if (data[access[cntr]] === null || typeof data[access[cntr]] !== 'object') { return false; }
