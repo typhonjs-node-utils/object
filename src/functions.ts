@@ -146,19 +146,23 @@ export function getAccessorList(data: object): string[]
  * @param accessor - Accessor to test.
  *
  * @returns Whether the component has the getter and setter for accessor.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam K - Accessor type.
  */
-export function hasAccessor(object: object, accessor: string): boolean
+export function hasAccessor<T extends object, K extends string>(object: T, accessor: K):
+ object is T & Record<K, unknown>
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.get !== void 0 && iDescriptor.set !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
+   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.get !== void 0 && descriptor.set !== void 0) { return true; }
    }
 
@@ -173,19 +177,22 @@ export function hasAccessor(object: object, accessor: string): boolean
  * @param accessor - Accessor to test.
  *
  * @returns Whether the component has the getter for accessor.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam K - Accessor type.
  */
-export function hasGetter(object: object, accessor: string): boolean
+export function hasGetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.get !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
+   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.get !== void 0) { return true; }
    }
 
@@ -195,13 +202,16 @@ export function hasGetter(object: object, accessor: string): boolean
 /**
  * Returns whether the target is or has the given prototype walking up the prototype chain.
  *
- * @param target - Any target to test.
+ * @param target - Any target class / constructor function to test.
  *
  * @param Prototype - Prototype function / class constructor to find.
  *
  * @returns Target matches prototype.
+ *
+ * @typeParam T - Prototype instance type.
  */
-export function hasPrototype(target: unknown, Prototype: new (...args: any[]) => any): boolean
+export function hasPrototype<T>(target: unknown, Prototype: new (...args: any[]) => T):
+ target is new (...args: any[]) => T
 {
    /* c8 ignore next */
    if (typeof target !== 'function') { return false; }
@@ -209,7 +219,7 @@ export function hasPrototype(target: unknown, Prototype: new (...args: any[]) =>
    if (target === Prototype) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let proto = Object.getPrototypeOf(target); proto; proto = Object.getPrototypeOf(proto))
+   for (let proto: any = Object.getPrototypeOf(target); proto; proto = Object.getPrototypeOf(proto))
    {
       if (proto === Prototype) { return true; }
    }
@@ -225,19 +235,22 @@ export function hasPrototype(target: unknown, Prototype: new (...args: any[]) =>
  * @param accessor - Accessor to test.
  *
  * @returns Whether the component has the setter for accessor.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam K - Accessor type.
  */
-export function hasSetter(object: object, accessor: string): boolean
+export function hasSetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.set !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
+   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.set !== void 0) { return true; }
    }
 
@@ -331,6 +344,18 @@ export function objectSize(object: any): number
 }
 
 /**
+ * Utility type for `safeAccess`. Infers compound accessor strings in object T.
+ */
+type DeepAccess<T, P extends string> =
+ P extends `${infer K}.${infer Rest}`
+  ? K extends keyof T
+   ? DeepAccess<T[K], Rest>
+   : undefined
+  : P extends keyof T
+   ? T[P]
+   : undefined;
+
+/**
  * Provides a way to safely access an objects data / entries given an accessor string which describes the
  * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
  * to walk.
@@ -342,24 +367,31 @@ export function objectSize(object: any): number
  * @param [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
  *
  * @returns The value referenced by the accessor.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam P - Accessor type.
+ * @typeParam R - Return value / Inferred deep access type or any provided default value type.
  */
-export function safeAccess(data: object, accessor: string, defaultValue?: any): any
+export function safeAccess<T extends object, P extends string, R = DeepAccess<T, P>>(data: T, accessor: P,
+ defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
+  DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
 {
-   if (typeof data !== 'object') { return defaultValue; }
-   if (typeof accessor !== 'string') { return defaultValue; }
+   if (typeof data !== 'object' || data === null) { return defaultValue as any; }
+   if (typeof accessor !== 'string') { return defaultValue as any; }
 
-   const access = accessor.split('.');
+   const keys: string[] = accessor.split('.');
+   let result: any = data;
 
    // Walk through the given object by the accessor indexes.
-   for (let cntr = 0; cntr < access.length; cntr++)
+   for (let cntr: number = 0; cntr < keys.length; cntr++)
    {
       // If the next level of object access is undefined or null then return the empty string.
-      if (typeof data[access[cntr]] === 'undefined' || data[access[cntr]] === null) { return defaultValue; }
+      if (result[keys[cntr]] === void 0 || result[keys[cntr]] === null) { return defaultValue as any; }
 
-      data = data[access[cntr]];
+      result = result[keys[cntr]];
    }
 
-   return data;
+   return result as any;
 }
 
 /**

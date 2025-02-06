@@ -497,7 +497,7 @@ describe('ObjectUtil:', () =>
 
    it('hasPrototype:', () =>
    {
-      class Base {}
+      class Base { static test: string = 'test'; }
 
       class Child extends Base{}
 
@@ -602,8 +602,7 @@ describe('ObjectUtil:', () =>
       const output = [];
       const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
 
-      for (const accessor of accessors)
-      { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
+      for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
 
       assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
