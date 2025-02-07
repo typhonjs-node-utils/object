@@ -6,9 +6,6 @@
  */
 
 const s_TAG_OBJECT = '[object Object]';
-const s_TAG_MAP = '[object Map]';
-const s_TAG_SET = '[object Set]';
-const s_TAG_STRING = '[object String]';
 
 export * from 'klona/full';
 
@@ -127,44 +124,68 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
 /**
  * Returns an iterator of accessor keys by traversing the given object.
  *
- * Note: {@link getAccessorList} is ~1.6 - 1.8 times faster. However, an iterator can better fit certain algorithms.
+ * Note: {@link getAccessorList} is ~1.6 - 1.8 times faster for small objects. However, an iterator can better fit
+ * certain algorithms.
+ *
+ * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
+ * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
+ * memory is used. Do consider switching to {@link getAccessorIterator} or {@link getAccessorAsyncIterator}.
  *
  * @param data - An object to traverse for accessor keys.
  *
+ * @param [options] - Options.
+ *
+ * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ *
+ * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ *
  * @returns Accessor iterator.
  */
-export function* getAccessorIterator(data: object): IterableIterator<string>
+export function* getAccessorIterator(data: object, { batchSize = 100000, inherited = false }:
+ { batchSize?: number, inherited?: boolean } = {}): IterableIterator<string>
 {
    if (typeof data !== 'object' || data === null)
    {
-      throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`);
+      throw new TypeError(`getAccessorIterator error: 'data' is not an object.`);
+   }
+
+   if (!Number.isInteger(batchSize) || batchSize <= 0)
+   {
+      throw new TypeError(`getAccessorIterator error: 'options.batchSize' is not a positive integer.`);
    }
 
    const thunks: (() => Generator<string, void, unknown>)[] = [];
+   let processedCount: number = 0;
 
    function* process(obj: object, prefix: string): Generator<string, void, unknown>
    {
       for (const key in obj)
       {
-         if (Object.prototype.hasOwnProperty.call(obj, key))
-         {
-            const fullKey: string = prefix ? `${prefix}.${key}` : key;
-            const value: any = obj[key];
+         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
 
-            if (Array.isArray(value))
-            {
-               // Yield array elements immediately.
-               for (let i: number = 0; i < value.length; i++) { yield `${fullKey}.${i}`; }
-            }
-            else if (typeof value === 'object' && value !== null)
-            {
-               // Defer objects to maintain DFS order.
-               thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
-            }
-            else
-            {
-               yield fullKey; // Yield primitive values immediately.
-            }
+         const fullKey: string = prefix ? `${prefix}.${key}` : key;
+         const value: any = obj[key];
+
+         if (Array.isArray(value))
+         {
+            // Yield array elements immediately.
+            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
+         }
+         else if (typeof value === 'object' && value !== null)
+         {
+            // Defer objects to maintain DFS order.
+            thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
+         }
+         else if (typeof value !== 'function')
+         {
+            yield fullKey; // Yield primitive values immediately.
+         }
+
+         processedCount++;
+         if (processedCount >= batchSize)
+         {
+            processedCount = 0;
+            yield* object_trampoline_generator(thunks); // Process a batch before continuing
          }
       }
    }
@@ -175,51 +196,83 @@ export function* getAccessorIterator(data: object): IterableIterator<string>
 /**
  * Returns a list of accessor keys by traversing the given object.
  *
- * Note: This function is ~1.6 - 1.8 times faster than {@link getAccessorIterator}. However, an iterator can better
+ * Note: This function is ~1.6 - 2.5 times faster than {@link getAccessorIterator}. However, an iterator can better
  * fit certain algorithms.
+ *
+ * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
+ * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
+ * memory is used. Do consider switching to {@link getAccessorIterator} or {@link getAccessorAsyncIterator}.
  *
  * @param data - An object to traverse for accessor keys.
  *
+ * @param [options] - Options.
+ *
+ * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ *
+ * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ *
  * @returns Accessor list.
  */
-export function getAccessorList(data: object): string[]
+export function getAccessorList(data: object, { batchSize = 100000, inherited = false }:
+ { batchSize?: number, inherited?: boolean } = {}): string[]
 {
    if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`);
    }
 
+   if (!Number.isInteger(batchSize) || batchSize <= 0)
+   {
+      throw new TypeError(`getAccessorList error: 'options.batchSize' is not a positive integer.`);
+   }
+
    const accessors: string[] = [];
+   const thunks: (() => void)[] = [];
+   let processedCount: number = 0;
 
    function process(obj: object, prefix: string, thunks: (() => void)[]): void
    {
       for (const key in obj)
       {
-         if (Object.prototype.hasOwnProperty.call(obj, key))
-         {
-            const fullKey: string = prefix ? `${prefix}.${key}` : key;
-            const value: any = obj[key];
+         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
 
-            if (Array.isArray(value))
-            {
-               // Process array elements immediately to preserve order.
-               for (let i: number = 0; i < value.length; i++) { accessors.push(`${fullKey}.${i}`); }
-            }
-            else if (typeof value === 'object' && value !== null)
-            {
-               // Push object traversal as a deferred function.
-               thunks.push((): void => process(value, fullKey, thunks));
-            }
-            else
-            {
-               // Process primitive values immediately.
-               accessors.push(fullKey);
-            }
+         const fullKey: string = prefix ? `${prefix}.${key}` : key;
+         const value: any = obj[key];
+
+         if (Array.isArray(value))
+         {
+            // Process array elements immediately to preserve order.
+            for (let i: number = 0; i < value.length; i++) { accessors.push(`${fullKey}.${i}`); }
+         }
+         else if (typeof value === 'object' && value !== null)
+         {
+            // Push object traversal as a deferred function.
+            thunks.push((): void => process(value, fullKey, thunks));
+         }
+         else if (typeof value !== 'function')
+         {
+            // Process primitive values immediately.
+            accessors.push(fullKey);
+         }
+
+         // Handle batch processing to avoid blocking large operations
+         processedCount++;
+         if (processedCount >= batchSize)
+         {
+            processedCount = 0;
+            processDeferred(); // Process some deferred items before continuing
          }
       }
    }
 
-   const thunks: (() => void)[] = [];
+   function processDeferred(): void
+   {
+      const length: number = Math.min(batchSize, thunks.length);
+
+      // Execute a deferred function (LIFO order).
+      for (let cntr: number = 0; cntr < length; cntr++) { thunks.pop()!(); }
+   }
+
    process(data, '', thunks);
    object_trampoline(thunks)
 
@@ -408,11 +461,11 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
  */
 export function objectKeys(object: object): string[]
 {
-   return isObject(object) ? Object.keys(object) : [];
+   return typeof object === 'object' && object !== null ? Object.keys(object) : [];
 }
 
 /**
- * Safely returns an objects size. Note for String objects unicode is not taken into consideration.
+ * Safely returns an objects size. Note for String objects Unicode is not taken into consideration.
  *
  * @param object - Any value, but size returned for object / Map / Set / arrays / strings.
  *
@@ -422,26 +475,14 @@ export function objectSize(object: any): number
 {
    if (object === void 0 || object === null || typeof object !== 'object') { return 0; }
 
-   const tag = Object.prototype.toString.call(object);
+   const tag: any = Object.prototype.toString.call(object);
 
-   if (tag === s_TAG_MAP || tag === s_TAG_SET) { return object.size; }
+   if (tag === '[object Map]' || tag === '[object Set]') { return object.size; }
 
-   if (tag === s_TAG_STRING) { return object.length; }
+   if (tag === '[object String]') { return object.length; }
 
    return Object.keys(object).length;
 }
-
-/**
- * Utility type for `safeAccess`. Infers compound accessor strings in object T.
- */
-type DeepAccess<T, P extends string> =
- P extends `${infer K}.${infer Rest}`
-  ? K extends keyof T
-   ? DeepAccess<T[K], Rest>
-   : undefined
-  : P extends keyof T
-   ? T[P]
-   : undefined;
 
 /**
  * Provides a way to safely access an objects data / entries given an accessor string which describes the
@@ -662,6 +703,11 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
    }
 }
 
+/**
+ * Defines the operation to perform for `safeSet`.
+ */
+export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
+
 // Module private ----------------------------------------------------------------------------------------------------
 
 /**
@@ -681,13 +727,13 @@ function object_trampoline(thunks: (() => void)[]): void
  *
  * @param thunks - Thunks to process.
  *
- * @param initial - Initial generator.
+ * @param [initial] - Initial generator.
  */
 function* object_trampoline_generator(thunks: (() => Generator<string, void, unknown>)[],
- initial: Generator<string, void, unknown>): IterableIterator<string>
+ initial?: Generator<string, void, unknown>): IterableIterator<string>
 {
    // Process the initial generator first.
-   yield* initial;
+   if (initial) { yield* initial; }
 
    while (thunks.length > 0) { yield* thunks.pop()!(); }
 }
@@ -860,6 +906,13 @@ function _depthTraverse(data: any, func: Function, modify: boolean = false): Rec
 }
 
 /**
- * Defines the operation to perform for `safeSet`.
+ * Utility type for `safeAccess`. Infers compound accessor strings in object T.
  */
-export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
+type DeepAccess<T, P extends string> =
+ P extends `${infer K}.${infer Rest}`
+  ? K extends keyof T
+   ? DeepAccess<T[K], Rest>
+   : undefined
+  : P extends keyof T
+   ? T[P]
+   : undefined;
