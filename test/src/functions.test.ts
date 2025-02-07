@@ -77,6 +77,7 @@ const s_OBJECT_NUM =
 const s_VERIFY_DEPTH_TRAVERSE = `[1,2,3,"a","b","c",4,5,6,"d","e","f",7,8,9,"g","h","i"]`;
 
 const s_VERIFY_ACCESSOR_LIST = `["a","b","c","array.0","array.1","array.2","level1.d","level1.e","level1.f","level1.array1.0","level1.array1.1","level1.array1.2","level1.level2.g","level1.level2.h","level1.level2.i","level1.level2.array2.0","level1.level2.array2.1","level1.level2.array2.2"]`;
+const s_VERIFY_ACCESSOR_LIST_DEPTH2 = `["a","b","c","array.0","array.1","array.2","level1.d","level1.e","level1.f","level1.array1.0","level1.array1.1","level1.array1.2"]`;
 
 const s_VERIFY_SAFESET_SET = `{"a":"aa","b":"aa","c":"aa","array":["aa","aa","aa"],"level1":{"d":"aa","e":"aa","f":"aa","array1":["aa","aa","aa"],"level2":{"g":"aa","h":"aa","i":"aa","array2":["aa","aa","aa"]}}}`;
 const s_VERIFY_SAFESET_ADD = `{"a":20,"b":20,"c":20,"array":[20,20,20],"level1":{"d":20,"e":20,"f":20,"array1":[20,20,20],"level2":{"g":20,"h":20,"i":20,"array2":[20,20,20]}}}`;
@@ -455,7 +456,27 @@ describe('ObjectUtil:', () =>
 
    it('getAccessorList:', () =>
    {
-      const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
+      let accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
+      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+
+      accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 1 });
+      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
+
+      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+   });
+
+   it('getAccessorIter:', () =>
+   {
+      const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED)];
+
+      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+   });
+
+   it('getAccessorAsyncIter:', async () =>
+   {
+      const accessors = [];
+      for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
 
       assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
