@@ -125,7 +125,58 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
 }
 
 /**
+ * Returns an iterator of accessor keys by traversing the given object.
+ *
+ * Note: {@link getAccessorList} is ~1.6 - 1.8 times faster. However, an iterator can better fit certain algorithms.
+ *
+ * @param data - An object to traverse for accessor keys.
+ *
+ * @returns Accessor iterator.
+ */
+export function* getAccessorIterator(data: object): IterableIterator<string>
+{
+   if (typeof data !== 'object' || data === null)
+   {
+      throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`);
+   }
+
+   const thunks: (() => Generator<string, void, unknown>)[] = [];
+
+   function* process(obj: object, prefix: string): Generator<string, void, unknown>
+   {
+      for (const key in obj)
+      {
+         if (Object.prototype.hasOwnProperty.call(obj, key))
+         {
+            const fullKey: string = prefix ? `${prefix}.${key}` : key;
+            const value: any = obj[key];
+
+            if (Array.isArray(value))
+            {
+               // Yield array elements immediately.
+               for (let i: number = 0; i < value.length; i++) { yield `${fullKey}.${i}`; }
+            }
+            else if (typeof value === 'object' && value !== null)
+            {
+               // Defer objects to maintain DFS order.
+               thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
+            }
+            else
+            {
+               yield fullKey; // Yield primitive values immediately.
+            }
+         }
+      }
+   }
+
+   yield* object_trampoline_generator(thunks, process(data, ''));
+}
+
+/**
  * Returns a list of accessor keys by traversing the given object.
+ *
+ * Note: This function is ~1.6 - 1.8 times faster than {@link getAccessorIterator}. However, an iterator can better
+ * fit certain algorithms.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -133,9 +184,46 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
  */
 export function getAccessorList(data: object): string[]
 {
-   if (typeof data !== 'object') { throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`); }
+   if (typeof data !== 'object' || data === null)
+   {
+      throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`);
+   }
 
-   return _getAccessorList(data);
+   const accessors: string[] = [];
+
+   function process(obj: object, prefix: string, thunks: (() => void)[]): void
+   {
+      for (const key in obj)
+      {
+         if (Object.prototype.hasOwnProperty.call(obj, key))
+         {
+            const fullKey: string = prefix ? `${prefix}.${key}` : key;
+            const value: any = obj[key];
+
+            if (Array.isArray(value))
+            {
+               // Process array elements immediately to preserve order.
+               for (let i: number = 0; i < value.length; i++) { accessors.push(`${fullKey}.${i}`); }
+            }
+            else if (typeof value === 'object' && value !== null)
+            {
+               // Push object traversal as a deferred function.
+               thunks.push((): void => process(value, fullKey, thunks));
+            }
+            else
+            {
+               // Process primitive values immediately.
+               accessors.push(fullKey);
+            }
+         }
+      }
+   }
+
+   const thunks: (() => void)[] = [];
+   process(data, '', thunks);
+   object_trampoline(thunks)
+
+   return accessors;
 }
 
 /**
@@ -577,6 +665,34 @@ export function safeSetAll(data: object, accessorValues: Record<string, any>, op
 // Module private ----------------------------------------------------------------------------------------------------
 
 /**
+ * Internal utility for shared trampoline function.
+ * Process last added function (LIFO order)
+ *
+ * @param thunks - Thunks to process.
+ */
+function object_trampoline(thunks: (() => void)[]): void
+{
+  while (thunks.length > 0) { thunks.pop()!(); }
+}
+
+/**
+ * Internal utility for shared trampoline function (generator).
+ * Process last added function (LIFO order)
+ *
+ * @param thunks - Thunks to process.
+ *
+ * @param initial - Initial generator.
+ */
+function* object_trampoline_generator(thunks: (() => Generator<string, void, unknown>)[],
+ initial: Generator<string, void, unknown>): IterableIterator<string>
+{
+   // Process the initial generator first.
+   yield* initial;
+
+   while (thunks.length > 0) { yield* thunks.pop()!(); }
+}
+
+/**
  * Private implementation of depth traversal.
  *
  * @param data - An object or array or any leaf.
@@ -741,43 +857,6 @@ function _depthTraverse(data: any, func: Function, modify: boolean = false): Rec
    }
 
    return data;
-}
-
-/**
- * Private implementation of `getAccessorList`.
- *
- * @param data - An object to traverse.
- *
- * @returns Accessor list.
- *
- * @internal
- * @private
- */
-function _getAccessorList(data: object): string[]
-{
-   const accessors = [];
-
-   for (const key in data)
-   {
-      if (Object.prototype.hasOwnProperty.call(data, key))
-      {
-         if (typeof data[key] === 'object')
-         {
-            const childKeys = _getAccessorList(data[key]);
-
-            childKeys.forEach((childKey) =>
-            {
-               accessors.push(Array.isArray(childKey) ? `${key}.${childKey.join('.')}` : `${key}.${childKey}`);
-            });
-         }
-         else
-         {
-            accessors.push(key);
-         }
-      }
-   }
-
-   return accessors;
 }
 
 /**
