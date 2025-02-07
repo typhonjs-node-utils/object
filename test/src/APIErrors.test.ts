@@ -122,10 +122,10 @@ describe('API Errors:', () =>
    {
       // @ts-expect-error
       expect(() => ObjectUtil.safeSet(false, 'foo', 'bar')).throws(TypeError,
-       `safeSet error: 'data' is not an 'object'.`);
+       `safeSet error: 'data' is not an object.`);
 
       // @ts-expect-error
       expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
-       `safeSet error: 'accessor' is not a 'string'.`);
+       `safeSet error: 'accessor' is not a string.`);
    });
 });

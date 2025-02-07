@@ -106,7 +106,7 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
  *
  * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
  *
@@ -184,7 +184,7 @@ export async function* getAccessorAsyncIter(data: object, { batchSize = 100000, 
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
  *
  * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
  *
@@ -261,7 +261,7 @@ export function* getAccessorIter(data: object, { batchSize = 100000, inherited =
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
  *
  * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
  *
@@ -604,7 +604,7 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
  *
  * @returns True if equal.
  */
@@ -643,8 +643,8 @@ export function safeEqual(source: object, target: object, options?: { batchSize?
 export function safeSet(data: object, accessor: string, value: any, operation: SafeSetOperation = 'set',
  createMissing: boolean = true): boolean
 {
-   if (typeof data !== 'object') { throw new TypeError(`safeSet error: 'data' is not an 'object'.`); }
-   if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a 'string'.`); }
+   if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
+   if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a string.`); }
 
    const access: string[] = accessor.split('.');
 
