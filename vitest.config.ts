@@ -5,7 +5,7 @@ import {
 export default defineConfig({
    test: {
       exclude: [...configDefaults.exclude],
-      include: ['./test/**/*.ts'],
+      include: ['./test/**/*.test.ts'],
       coverage: {
          include: ['src/**'],
          exclude: ['test/**', 'src/plugin.ts'], // TODO: Eventually test the plugin.
