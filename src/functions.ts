@@ -93,35 +93,6 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 }
 
 /**
- * Performs a naive depth traversal of an object / array. The data structure _must not_ have circular references.
- * If the `modify` option is true the result of the callback function is used to modify in place the given data.
- *
- * @param data - An object or array.
- *
- * @param func - A callback function to process leaf values in children arrays or object members.
- *
- * @param [options] - Options.
- *
- * @param [options.modify] - If true then the result of the callback function is used to modify in place the given data.
- *
- * @returns The data object.
- *
- * @typeParam T - Type of data.
- * @typeParam R - Alternate return type; defaults to `T`.
- */
-export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0: any) => any,
- { modify = false }: { modify?: boolean } = {}): R
-{
-   if (typeof data !== 'object') { throw new TypeError(`deepTraverse error: 'data' is not an object.`); }
-
-   if (typeof func !== 'function') { throw new TypeError(`deepTraverse error: 'func' is not a function.`); }
-
-   if (typeof modify !== 'boolean') { throw new TypeError(`deepTraverse error: 'options.modify' is not a boolean.`); }
-
-   return _depthTraverse(data, func, modify) as R;
-}
-
-/**
  * Returns an async iterator of accessor keys by traversing the given object.
  *
  * Note: {@link getAccessorIter} is ~3 times faster. However, an async iterator can better fit certain algorithms
@@ -621,48 +592,6 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
 }
 
 /**
- * Provides a way to safely batch set an objects data / entries given an array of accessor strings which describe the
- * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
- * to walk. If value is an object the accessor will be used to access a target value from `value` which is
- * subsequently set to `data` by the given operation. If `value` is not an object it will be used as the target
- * value to set across all accessors.
- *
- * @param data - An object to access entry data.
- *
- * @param accessors - A list of accessor strings describing the entries to access.
- *
- * @param value - A new value to set if an entry for accessor is found.
- *
- * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'set-undefined', 'sub'.
- *
- * @param [defaultAccessValue=0] - A new value to set if an entry for accessor is found.
- *
- * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
- */
-export function safeBatchSet(data: object, accessors: string[], value: any, operation: SafeSetOperation = 'set',
- defaultAccessValue: any = 0, createMissing: boolean = true): void
-{
-   if (typeof data !== 'object') { throw new TypeError(`safeBatchSet error: 'data' is not an 'object'.`); }
-   if (!Array.isArray(accessors)) { throw new TypeError(`safeBatchSet error: 'accessors' is not an 'array'.`); }
-
-   if (typeof value === 'object')
-   {
-      accessors.forEach((accessor) =>
-      {
-         const targetValue = safeAccess(value, accessor, defaultAccessValue);
-         safeSet(data, accessor, targetValue, operation, createMissing);
-      });
-   }
-   else
-   {
-      accessors.forEach((accessor) =>
-      {
-         safeSet(data, accessor, value, operation, createMissing);
-      });
-   }
-}
-
-/**
  * Compares a source object and values of entries against a target object. If the entries in the source object match
  * the target object then `true` is returned otherwise `false`. If either object is undefined or null then false
  * is returned.
@@ -770,34 +699,6 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
    }
 
    return true;
-}
-
-/**
- * Performs bulk setting of values to the given data object.
- *
- * @param data - The data object to set data.
- *
- * @param accessorValues - Object of accessor keys to values to set.
- *
- * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'sub'; default (`set`).
- *
- * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
- */
-export function safeSetAll(data: object, accessorValues: Record<string, any>, operation: SafeSetOperation = 'set',
- createMissing: boolean = true): void
-{
-   if (typeof data !== 'object') { throw new TypeError(`safeSetAll error: 'data' is not an 'object'.`); }
-   if (typeof accessorValues !== 'object')
-   {
-      throw new TypeError(`safeSetAll error: 'accessorValues' is not an 'object'.`);
-   }
-
-   for (const accessor of Object.keys(accessorValues))
-   {
-      if (!Object.prototype.hasOwnProperty.call(accessorValues, accessor)) { continue; }
-
-      safeSet(data, accessor, accessorValues[accessor], operation, createMissing);
-   }
 }
 
 /**
@@ -958,68 +859,6 @@ function _deepSeal(data: any, skipKeys?: Set<string>): object | []
    }
 
    return Object.seal(data);
-}
-
-/**
- * Private implementation of depth traversal.
- *
- * @param data - An object, array, or any leaf value
- *
- * @param func - A callback function to process leaf values in children arrays or object members.
- *
- * @param modify - If true then the result of the callback function is used to modify in place the given data.
- *
- * @returns The data object.
- *
- * @internal
- * @private
- */
-function _depthTraverse(data: any, func: Function, modify: boolean = false): Record<string, unknown> | []
-{
-   if (modify)
-   {
-      if (Array.isArray(data))
-      {
-         for (let cntr = 0; cntr < data.length; cntr++)
-         {
-            data[cntr] = _depthTraverse(data[cntr], func, modify);
-         }
-      }
-      else if (isObject(data))
-      {
-         for (const key in data)
-         {
-            if (Object.prototype.hasOwnProperty.call(data, key))
-            {
-               data[key] = _depthTraverse(data[key], func, modify);
-            }
-         }
-      }
-      else
-      {
-         data = func(data);
-      }
-   }
-   else
-   {
-      if (Array.isArray(data))
-      {
-         for (let cntr = 0; cntr < data.length; cntr++) { _depthTraverse(data[cntr], func, modify); }
-      }
-      else if (typeof data === 'object')
-      {
-         for (const key in data)
-         {
-            if (Object.prototype.hasOwnProperty.call(data, key)) { _depthTraverse(data[key], func, modify); }
-         }
-      }
-      else
-      {
-         func(data);
-      }
-   }
-
-   return data;
 }
 
 /**

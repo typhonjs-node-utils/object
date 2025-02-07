@@ -118,17 +118,6 @@ describe('API Errors:', () =>
        `getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
    });
 
-   it('safeBatchSet:', () =>
-   {
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeBatchSet(false, ['foo'], 'bar')).throws(TypeError,
-       `safeBatchSet error: 'data' is not an 'object'.`);
-
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeBatchSet({}, false, 'bar')).throws(TypeError,
-       `safeBatchSet error: 'accessors' is not an 'array'.`);
-   });
-
    it('safeSet:', () =>
    {
       // @ts-expect-error
@@ -138,16 +127,5 @@ describe('API Errors:', () =>
       // @ts-expect-error
       expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
        `safeSet error: 'accessor' is not a 'string'.`);
-   });
-
-   it('safeSetAll:', () =>
-   {
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeSetAll(false, {})).throws(TypeError,
-       `safeSetAll error: 'data' is not an 'object'.`);
-
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeSetAll({}, false)).throws(TypeError,
-       `safeSetAll error: 'accessorValues' is not an 'object'.`);
    });
 });

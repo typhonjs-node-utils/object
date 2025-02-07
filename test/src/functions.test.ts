@@ -424,16 +424,6 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
    });
 
-   it('depthTraverse:', () =>
-   {
-      const output = [];
-
-      ObjectUtil.depthTraverse(s_OBJECT_MIXED, (data) => output.push(data));
-
-      assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
-   });
-
    it('getAccessorAsyncIter:', async () =>
    {
       const accessors = [];
