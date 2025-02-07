@@ -600,18 +600,18 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @param target - Target object.
  *
+ * @param [options] - Options.
+ *
+ * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ *
  * @returns True if equal.
  */
-export function safeEqual(source: object, target: object): boolean
+export function safeEqual(source: object, target: object, options?: { batchSize?: number }): boolean
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
-   const sourceAccessors: string[] = getAccessorList(source);
-
-   for (let cntr: number = 0; cntr < sourceAccessors.length; cntr++)
+   for (const accessor of getAccessorIter(source, options))
    {
-      const accessor: string = sourceAccessors[cntr];
-
       const sourceObjectValue: unknown = safeAccess(source, accessor);
       const targetObjectValue: unknown = safeAccess(target, accessor);
 
