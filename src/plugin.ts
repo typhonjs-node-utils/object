@@ -25,6 +25,7 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
  * - `typhonjs:utils:object:is:object`: Invokes `isObject`.
  * - `typhonjs:utils:object:keys`: Invokes `objectKeys`.
+ * - `typhonjs:utils:object:klona`: Invokes `klona`.
  * - `typhonjs:utils:object:size`: Invokes `objectSize`.
  * - `typhonjs:utils:object:safe:access`: Invokes `safeAccess`.
  * - `typhonjs:utils:object:safe:equal`: Invokes `safeEqual`.
@@ -62,6 +63,7 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object:plain', OU.isPlainObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:klona', OU.klona, void 0, { guard });
    eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard });
    eventbus.on('typhonjs:utils:object:safe:access', OU.safeAccess, void 0, { guard });
    eventbus.on('typhonjs:utils:object:safe:equal', OU.safeEqual, void 0, { guard });
