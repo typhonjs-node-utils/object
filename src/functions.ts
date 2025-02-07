@@ -122,6 +122,84 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
 }
 
 /**
+ * Returns an async iterator of accessor keys by traversing the given object.
+ *
+ * Note: {@link getAccessorIter} is ~3 times faster. However, an async iterator can better fit certain algorithms
+ * especially for very large object traversal.
+ *
+ * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
+ * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
+ * memory is used.
+ *
+ * @param data - An object to traverse for accessor keys.
+ *
+ * @param [options] - Options.
+ *
+ * @param [options.batchSize] - To accommodate small to somewhat large objects processing is batched; default: `100000`.
+ *
+ * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ *
+ * @returns Accessor async iterator.
+ */
+export async function* getAccessorAsyncIter(data: object, { batchSize = 100000, inherited = false }:
+ { batchSize?: number, inherited?: boolean } = {}): AsyncIterableIterator<string>
+{
+   if (typeof data !== 'object' || data === null)
+   {
+      throw new TypeError(`getAccessorAsyncIter error: 'data' is not an object.`);
+   }
+
+   if (!Number.isInteger(batchSize) || batchSize <= 0)
+   {
+      throw new TypeError(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
+   }
+
+   if (typeof inherited !== 'boolean')
+   {
+      throw new TypeError(`getAccessorAsyncIter error: 'options.inherited' is not a boolean.`);
+   }
+
+   const thunks: (() => Promise<AsyncGenerator<string, void, unknown>>)[] = [];
+   let processedCount: number = 0;
+
+   async function* process(obj: object, prefix: string): AsyncGenerator<string, void, unknown>
+   {
+      for (const key in obj)
+      {
+         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
+
+         const fullKey: string = prefix ? `${prefix}.${key}` : key;
+         const value: any = obj[key];
+
+         if (Array.isArray(value))
+         {
+            // Yield array elements immediately.
+            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
+         }
+         else if (typeof value === 'object' && value !== null)
+         {
+            // Defer objects to maintain DFS order.
+            thunks.push((): Promise<AsyncGenerator<string, void, unknown>> => Promise.resolve(process(value, fullKey)));
+         }
+         else if (typeof value !== 'function')
+         {
+            yield fullKey; // Yield primitive values immediately.
+         }
+
+         processedCount++;
+         if (processedCount >= batchSize)
+         {
+            processedCount = 0;
+
+            yield* object_trampoline_async_generator(thunks); // Process a batch before continuing
+         }
+      }
+   }
+
+   yield* object_trampoline_async_generator(thunks, process(data, ''));
+}
+
+/**
  * Returns an iterator of accessor keys by traversing the given object.
  *
  * Note: {@link getAccessorList} is ~1.6 - 1.8 times faster for small objects. However, an iterator can better fit
@@ -129,7 +207,7 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
  *
  * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
  * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used. Do consider switching to {@link getAccessorIterator} or {@link getAccessorAsyncIterator}.
+ * memory is used. Do consider switching to {@link getAccessorIter} or {@link getAccessorAsyncIter}.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -141,17 +219,22 @@ export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0
  *
  * @returns Accessor iterator.
  */
-export function* getAccessorIterator(data: object, { batchSize = 100000, inherited = false }:
+export function* getAccessorIter(data: object, { batchSize = 100000, inherited = false }:
  { batchSize?: number, inherited?: boolean } = {}): IterableIterator<string>
 {
    if (typeof data !== 'object' || data === null)
    {
-      throw new TypeError(`getAccessorIterator error: 'data' is not an object.`);
+      throw new TypeError(`getAccessorIter error: 'data' is not an object.`);
    }
 
    if (!Number.isInteger(batchSize) || batchSize <= 0)
    {
-      throw new TypeError(`getAccessorIterator error: 'options.batchSize' is not a positive integer.`);
+      throw new TypeError(`getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+   }
+
+   if (typeof inherited !== 'boolean')
+   {
+      throw new TypeError(`getAccessorIter error: 'options.inherited' is not a boolean.`);
    }
 
    const thunks: (() => Generator<string, void, unknown>)[] = [];
@@ -196,12 +279,12 @@ export function* getAccessorIterator(data: object, { batchSize = 100000, inherit
 /**
  * Returns a list of accessor keys by traversing the given object.
  *
- * Note: This function is ~1.6 - 2.5 times faster than {@link getAccessorIterator}. However, an iterator can better
+ * Note: This function is ~1.6 - 2.5 times faster than {@link getAccessorIter}. However, an iterator can better
  * fit certain algorithms.
  *
  * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
  * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used. Do consider switching to {@link getAccessorIterator} or {@link getAccessorAsyncIterator}.
+ * memory is used. Do consider switching to {@link getAccessorIter} or {@link getAccessorAsyncIter}.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -213,25 +296,39 @@ export function* getAccessorIterator(data: object, { batchSize = 100000, inherit
  *
  * @returns Accessor list.
  */
-export function getAccessorList(data: object, { batchSize = 100000, inherited = false }:
- { batchSize?: number, inherited?: boolean } = {}): string[]
+export function getAccessorList(data: object, { batchSize = 100000, inherited = false, maxDepth = Infinity }:
+ { batchSize?: number, inherited?: boolean, maxDepth?: number } = {}): string[]
 {
    if (typeof data !== 'object' || data === null)
    {
-      throw new TypeError(`getAccessorList error: 'data' is not an 'object'.`);
+      throw new TypeError(`getAccessorList error: 'data' is not an object.`);
    }
 
-   if (!Number.isInteger(batchSize) || batchSize <= 0)
+   if (!(Number.isInteger(batchSize) && batchSize > 0))
    {
       throw new TypeError(`getAccessorList error: 'options.batchSize' is not a positive integer.`);
+   }
+
+   if (!(Number.isInteger(maxDepth) && maxDepth > 0) && maxDepth !== Infinity)
+   {
+      throw new TypeError(`getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
+   }
+
+   if (typeof inherited !== 'boolean')
+   {
+      throw new TypeError(`getAccessorList error: 'options.inherited' is not a boolean.`);
    }
 
    const accessors: string[] = [];
    const thunks: (() => void)[] = [];
    let processedCount: number = 0;
 
-   function process(obj: object, prefix: string, thunks: (() => void)[]): void
+   function process(obj: object, prefix: string, depth: number): void
    {
+      depth++;
+
+      if (depth > maxDepth) { return; }
+
       for (const key in obj)
       {
          if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
@@ -247,7 +344,7 @@ export function getAccessorList(data: object, { batchSize = 100000, inherited = 
          else if (typeof value === 'object' && value !== null)
          {
             // Push object traversal as a deferred function.
-            thunks.push((): void => process(value, fullKey, thunks));
+            thunks.push((): void => process(value, fullKey, depth));
          }
          else if (typeof value !== 'function')
          {
@@ -273,7 +370,7 @@ export function getAccessorList(data: object, { batchSize = 100000, inherited = 
       for (let cntr: number = 0; cntr < length; cntr++) { thunks.pop()!(); }
    }
 
-   process(data, '', thunks);
+   process(data, '', 0);
    object_trampoline(thunks)
 
    return accessors;
@@ -718,6 +815,7 @@ export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' 
  */
 function object_trampoline(thunks: (() => void)[]): void
 {
+   // Execute deferred functions (LIFO order).
   while (thunks.length > 0) { thunks.pop()!(); }
 }
 
@@ -732,10 +830,29 @@ function object_trampoline(thunks: (() => void)[]): void
 function* object_trampoline_generator(thunks: (() => Generator<string, void, unknown>)[],
  initial?: Generator<string, void, unknown>): IterableIterator<string>
 {
-   // Process the initial generator first.
+   // Process any initial generator first.
    if (initial) { yield* initial; }
 
+   // Execute deferred functions (LIFO order).
    while (thunks.length > 0) { yield* thunks.pop()!(); }
+}
+
+/**
+ * Internal utility for shared trampoline function (async generator).
+ * Process last added function (LIFO order)
+ *
+ * @param thunks - Thunks to process.
+ *
+ * @param [initial] - Initial generator.
+ */
+async function* object_trampoline_async_generator(thunks: (() => Promise<AsyncGenerator<string, void, unknown>>)[],
+ initial?: AsyncGenerator<string, void, unknown>): AsyncIterableIterator<string>
+{
+   // Process any initial generator first.
+   if (initial) { yield* initial; }
+
+   // Execute deferred async functions (LIFO order).
+   while (thunks.length > 0) { yield* await thunks.pop()!(); }
 }
 
 /**
