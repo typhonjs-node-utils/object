@@ -2,11 +2,68 @@ import * as ObjectUtil from '../../src/functions';
 
 describe('API Errors:', () =>
 {
+   describe('deepFreeze:', () =>
+   {
+      it('error - data not object', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepFreeze('bad'), TypeError,
+          `deepFreeze error: 'data' is not an object or array.`);
+      });
+
+      it('error - options.skipKeys is not a Set', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepFreeze({}, { skipKeys: 'bad' }), TypeError,
+          `deepFreeze error: 'options.skipKeys' is not a Set.`);
+      });
+   });
+
+   describe('deepMerge:', () =>
+   {
+      it('error - target not object', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepMerge('bad', {}), TypeError,
+          `deepMerge error: 'target' is not an object.`);
+      });
+
+      it('error - source not object (string)', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepMerge({}, 'bad'), TypeError,
+          `deepMerge error: 'sourceObj[0]' is not an object.`);
+      });
+
+      it('error - source not object (array)', () =>
+      {
+         assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
+          `deepMerge error: 'sourceObj[0]' is not an object.`);
+      });
+   });
+
+   describe('deepSeal:', () =>
+   {
+      it('error - data not object', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepSeal('bad'), TypeError,
+          `deepSeal error: 'data' is not an object or array.`);
+      });
+
+      it('error - options.skipKeys is not a Set', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deepSeal({}, { skipKeys: 'bad' }), TypeError,
+          `deepSeal error: 'options.skipKeys' is not a Set.`);
+      });
+   });
+
    it('getAccessorAsyncIter:', async () =>
    {
       await expect((async () =>
       {
-         /** @ts-expect-error */
+         // @ts-expect-error
          for await (const _ of ObjectUtil.getAccessorAsyncIter(false)) { }
       })()).rejects.toThrow(`getAccessorAsyncIter error: 'data' is not an object.`);
 
@@ -28,7 +85,7 @@ describe('API Errors:', () =>
 
    it('getAccessorIter:', () =>
    {
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => [...ObjectUtil.getAccessorIter(false)]).throws(TypeError,
        `getAccessorIter error: 'data' is not an object.`);
 
@@ -44,7 +101,7 @@ describe('API Errors:', () =>
 
    it('getAccessorList:', () =>
    {
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.getAccessorList(false)).throws(TypeError,
        `getAccessorList error: 'data' is not an object.`);
 
@@ -63,33 +120,33 @@ describe('API Errors:', () =>
 
    it('safeBatchSet:', () =>
    {
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeBatchSet(false, ['foo'], 'bar')).throws(TypeError,
        `safeBatchSet error: 'data' is not an 'object'.`);
 
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeBatchSet({}, false, 'bar')).throws(TypeError,
        `safeBatchSet error: 'accessors' is not an 'array'.`);
    });
 
    it('safeSet:', () =>
    {
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeSet(false, 'foo', 'bar')).throws(TypeError,
        `safeSet error: 'data' is not an 'object'.`);
 
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
        `safeSet error: 'accessor' is not a 'string'.`);
    });
 
    it('safeSetAll:', () =>
    {
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeSetAll(false, {})).throws(TypeError,
        `safeSetAll error: 'data' is not an 'object'.`);
 
-      /** @ts-expect-error */
+      // @ts-expect-error
       expect(() => ObjectUtil.safeSetAll({}, false)).throws(TypeError,
        `safeSetAll error: 'accessorValues' is not an 'object'.`);
    });

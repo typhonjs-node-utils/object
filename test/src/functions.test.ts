@@ -323,26 +323,6 @@ describe('ObjectUtil:', () =>
          // @ts-expect-error
          assert.deepEqual(target, result);
       });
-
-      it('error - target not object', () =>
-      {
-         // @ts-expect-error
-         assert.throws(() => ObjectUtil.deepMerge('bad', {}), TypeError,
-          `deepMerge error: 'target' is not an 'object'.`);
-      });
-
-      it('error - source not object (string)', () =>
-      {
-         // @ts-expect-error
-         assert.throws(() => ObjectUtil.deepMerge({}, 'bad'), TypeError,
-          `deepMerge error: 'sourceObj[0]' is not an 'object'.`);
-      });
-
-      it('error - source not object (array)', () =>
-      {
-         assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
-          `deepMerge error: 'sourceObj[0]' is not an 'object'.`);
-      });
    });
 
    it('deepSeal w/ skipKeys:', () =>
@@ -454,14 +434,12 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
-   it('getAccessorList:', () =>
+   it('getAccessorAsyncIter:', async () =>
    {
-      let accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
+      const accessors = [];
+      for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
+
       assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-
-      accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 1 });
-      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
-
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
@@ -473,12 +451,14 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
-   it('getAccessorAsyncIter:', async () =>
+   it('getAccessorList:', () =>
    {
-      const accessors = [];
-      for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
-
+      let accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
       assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+
+      accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 2 });
+      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
+
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 

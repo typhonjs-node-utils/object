@@ -5,8 +5,6 @@
  * @packageDocumentation
  */
 
-const s_TAG_OBJECT = '[object Object]';
-
 export * from 'klona/full';
 
 /**
@@ -24,13 +22,14 @@ export * from 'klona/full';
  */
 export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
-   /* c8 ignore next 1 */
-   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
-
-   /* c8 ignore next 4 */
-   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
+   if (!isObject(data) && !Array.isArray(data))
    {
-      throw new TypeError(`'skipKeys' is not a 'Set'.`);
+      throw new TypeError(`deepFreeze error: 'data' is not an object or array.`);
+   }
+
+   if (skipKeys !== void 0 && Object.prototype.toString.call(skipKeys) !== '[object Set]')
+   {
+      throw new TypeError(`deepFreeze error: 'options.skipKeys' is not a Set.`);
    }
 
    return _deepFreeze(data, skipKeys) as T;
@@ -49,16 +48,16 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
  */
 export function deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
-   if (Object.prototype.toString.call(target) !== s_TAG_OBJECT)
+   if (Object.prototype.toString.call(target) !== '[object Object]')
    {
-      throw new TypeError(`deepMerge error: 'target' is not an 'object'.`);
+      throw new TypeError(`deepMerge error: 'target' is not an object.`);
    }
 
    for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
    {
-      if (Object.prototype.toString.call(sourceObj[cntr]) !== s_TAG_OBJECT)
+      if (Object.prototype.toString.call(sourceObj[cntr]) !== '[object Object]')
       {
-         throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an 'object'.`);
+         throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an object.`);
       }
    }
 
@@ -80,13 +79,14 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
  */
 export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
-   /* c8 ignore next 1 */
-   if (!isObject(data) && !Array.isArray(data)) { throw new TypeError(`'data' is not an 'object' or 'array'.`); }
-
-   /* c8 ignore next 4 */
-   if (skipKeys !== void 0 && !(skipKeys instanceof Set))
+   if (!isObject(data) && !Array.isArray(data))
    {
-      throw new TypeError(`'skipKeys' is not a 'Set'.`);
+      throw new TypeError(`deepSeal error: 'data' is not an object or array.`);
+   }
+
+   if (skipKeys !== void 0 && Object.prototype.toString.call(skipKeys) !== '[object Set]')
+   {
+      throw new TypeError(`deepSeal error: 'options.skipKeys' is not a Set.`);
    }
 
    return _deepSeal(data, skipKeys) as T;
@@ -112,11 +112,11 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 export function depthTraverse<T extends object | [], R = T>(data: T, func: (arg0: any) => any,
  { modify = false }: { modify?: boolean } = {}): R
 {
-   /* c8 ignore next 1 */
-   if (typeof data !== 'object') { throw new TypeError(`'data' is not an 'object'.`); }
+   if (typeof data !== 'object') { throw new TypeError(`deepTraverse error: 'data' is not an object.`); }
 
-   /* c8 ignore next 1 */
-   if (typeof func !== 'function') { throw new TypeError(`'func' is not a 'function'.`); }
+   if (typeof func !== 'function') { throw new TypeError(`deepTraverse error: 'func' is not a function.`); }
+
+   if (typeof modify !== 'boolean') { throw new TypeError(`deepTraverse error: 'options.modify' is not a boolean.`); }
 
    return _depthTraverse(data, func, modify) as R;
 }
@@ -546,7 +546,7 @@ export function isObject(value: unknown): value is Record<string, unknown>
  */
 export function isPlainObject(value: unknown): value is Record<string, unknown>
 {
-   return Object.prototype.toString.call(value) === s_TAG_OBJECT;
+   return Object.prototype.toString.call(value) === '[object Object]';
 }
 
 /**
