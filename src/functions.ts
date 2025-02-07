@@ -22,7 +22,7 @@ export * from 'klona/full';
  */
 export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
-   if (!isObject(data) && !Array.isArray(data))
+   if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`deepFreeze error: 'data' is not an object or array.`);
    }
@@ -79,7 +79,7 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
  */
 export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
 {
-   if (!isObject(data) && !Array.isArray(data))
+   if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`deepSeal error: 'data' is not an object or array.`);
    }
@@ -604,7 +604,7 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  */
 export function safeEqual(source: object, target: object): boolean
 {
-   if (!isObject(source) || !isObject(target)) { return false; }
+   if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
    const sourceAccessors: string[] = getAccessorList(source);
 
@@ -772,9 +772,9 @@ function _deepFreeze(data: any, skipKeys?: Set<string>): object | []
 {
    if (Array.isArray(data))
    {
-      for (let cntr = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipKeys); }
+      for (let cntr: number = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipKeys); }
    }
-   else if (isObject(data))
+   else if (typeof data === 'object' && data !== null)
    {
       for (const key in data)
       {
@@ -803,9 +803,9 @@ function _deepFreeze(data: any, skipKeys?: Set<string>): object | []
 function _deepMerge(target: object = {}, ...sourceObj: object[]): object
 {
    // Iterate and merge all source objects into target.
-   for (let cntr = 0; cntr < sourceObj.length; cntr++)
+   for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
    {
-      const obj = sourceObj[cntr];
+      const obj: object = sourceObj[cntr];
 
       for (const prop in obj)
       {
@@ -845,9 +845,9 @@ function _deepSeal(data: any, skipKeys?: Set<string>): object | []
 {
    if (Array.isArray(data))
    {
-      for (let cntr = 0; cntr < data.length; cntr++) { _deepSeal(data[cntr], skipKeys); }
+      for (let cntr: number = 0; cntr < data.length; cntr++) { _deepSeal(data[cntr], skipKeys); }
    }
-   else if (isObject(data))
+   else if (typeof data === 'object' && data !== null)
    {
       for (const key in data)
       {
