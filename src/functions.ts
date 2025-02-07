@@ -596,6 +596,8 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  * the target object then `true` is returned otherwise `false`. If either object is undefined or null then false
  * is returned.
  *
+ * Note: The source and target should be JSON objects.
+ *
  * @param source - Source object.
  *
  * @param target - Target object.
@@ -644,15 +646,15 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
    if (typeof data !== 'object') { throw new TypeError(`safeSet error: 'data' is not an 'object'.`); }
    if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a 'string'.`); }
 
-   const access = accessor.split('.');
+   const access: string[] = accessor.split('.');
 
    // Walk through the given object by the accessor indexes.
-   for (let cntr = 0; cntr < access.length; cntr++)
+   for (let cntr: number = 0; cntr < access.length; cntr++)
    {
       // If data is an array perform validation that the accessor is a positive integer otherwise quit.
       if (Array.isArray(data))
       {
-         const number = (+access[cntr]);
+         const number: number = (+access[cntr]);
 
          if (!Number.isInteger(number) || number < 0) { return false; }
       }
