@@ -424,26 +424,6 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
    });
 
-   describe('getAccessorAsyncIter:', () =>
-   {
-      it('all accessors', async () =>
-      {
-         const accessors = [];
-         for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-
-      it('small batch size', async () =>
-      {
-         const accessors = [];
-         for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED, { batchSize: 1 }))
-         {
-            accessors.push(key);
-         }
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-   });
-
    describe('getAccessorIter:', () =>
    {
       it('all accessors', () =>
