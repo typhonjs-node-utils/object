@@ -14,7 +14,6 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
  * - `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * - `typhonjs:utils:object:deep:seal`: Invokes `deepSeal`.
- * - `typhonjs:utils:object:get:accessor:iter:async`: Invokes `getAccessorAsyncIter`.
  * - `typhonjs:utils:object:get:accessor:iter`: Invokes `getAccessorIter`.
  * - `typhonjs:utils:object:get:accessor:list`: Invokes `getAccessorList`.
  * - `typhonjs:utils:object:has:accessor`: Invokes `hasAccessor`.
@@ -51,7 +50,6 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
-   eventbus.on('typhonjs:utils:object:get:accessor:iter:async', OU.getAccessorAsyncIter, void 0, { guard });
    eventbus.on('typhonjs:utils:object:get:accessor:iter', OU.getAccessorIter, void 0, { guard });
    eventbus.on('typhonjs:utils:object:get:accessor:list', OU.getAccessorList, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:accessor', OU.hasAccessor, void 0, { guard });
