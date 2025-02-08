@@ -32,7 +32,37 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
       throw new TypeError(`deepFreeze error: 'options.skipKeys' is not a Set.`);
    }
 
-   return _deepFreeze(data, skipKeys) as T;
+   const stack: any[] = [data];
+
+   while (stack.length > 0)
+   {
+      const obj: any = stack.pop();
+
+      if (typeof obj !== 'object' || obj === null || Object.isFrozen(obj)) { continue; }
+
+      // Collect nested properties before freezing.
+      const children: any[] = [];
+
+      if (Array.isArray(obj))
+      {
+         for (let cntr: number = 0; cntr < obj.length; cntr++) { children.push(obj[cntr]); }
+      }
+      else
+      {
+         for (const key in obj)
+         {
+            if (Object.prototype.hasOwnProperty.call(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
+         }
+      }
+
+      // Freeze after collecting children to avoid modifying a frozen object.
+      Object.freeze(obj);
+
+      // Push collected children onto the stack for further processing.
+      stack.push(...children);
+   }
+
+   return data;
 }
 
 /**
@@ -89,85 +119,37 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
       throw new TypeError(`deepSeal error: 'options.skipKeys' is not a Set.`);
    }
 
-   return _deepSeal(data, skipKeys) as T;
-}
+   const stack: any[] = [data];
 
-/**
- * Returns an async iterator of accessor keys by traversing the given object.
- *
- * Note: {@link getAccessorIter} is ~3 times faster. However, an async iterator can better fit certain algorithms
- * especially for very large object traversal.
- *
- * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
- * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used.
- *
- * @param data - An object to traverse for accessor keys.
- *
- * @param [options] - Options.
- *
- * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
- *
- * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
- *
- * @returns Accessor async iterator.
- */
-export async function* getAccessorAsyncIter(data: object, { batchSize = 100000, inherited = false }:
- { batchSize?: number, inherited?: boolean } = {}): AsyncIterableIterator<string>
-{
-   if (typeof data !== 'object' || data === null)
+   while (stack.length > 0)
    {
-      throw new TypeError(`getAccessorAsyncIter error: 'data' is not an object.`);
-   }
+      const obj: any = stack.pop();
 
-   if (!Number.isInteger(batchSize) || batchSize <= 0)
-   {
-      throw new TypeError(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
-   }
+      if (typeof obj !== 'object' || obj === null || Object.isSealed(obj)) { continue; }
 
-   if (typeof inherited !== 'boolean')
-   {
-      throw new TypeError(`getAccessorAsyncIter error: 'options.inherited' is not a boolean.`);
-   }
+      // Collect nested properties before freezing.
+      const children: any[] = [];
 
-   const thunks: (() => Promise<AsyncGenerator<string, void, unknown>>)[] = [];
-   let processedCount: number = 0;
-
-   async function* process(obj: object, prefix: string): AsyncGenerator<string, void, unknown>
-   {
-      for (const key in obj)
+      if (Array.isArray(obj))
       {
-         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
-
-         const fullKey: string = prefix ? `${prefix}.${key}` : key;
-         const value: any = obj[key];
-
-         if (Array.isArray(value))
+         for (let cntr: number = 0; cntr < obj.length; cntr++) { children.push(obj[cntr]); }
+      }
+      else
+      {
+         for (const key in obj)
          {
-            // Yield array elements immediately.
-            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
-         }
-         else if (typeof value === 'object' && value !== null)
-         {
-            // Defer objects to maintain DFS order.
-            thunks.push((): Promise<AsyncGenerator<string, void, unknown>> => Promise.resolve(process(value, fullKey)));
-         }
-         else if (typeof value !== 'function')
-         {
-            yield fullKey; // Yield primitive values immediately.
-         }
-
-         processedCount++;
-         if (processedCount >= batchSize)
-         {
-            processedCount = 0;
-
-            yield* object_trampoline_async_generator(thunks); // Process a batch before continuing
+            if (Object.prototype.hasOwnProperty.call(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
          }
       }
+
+      // Freeze after collecting children to avoid modifying a frozen object.
+      Object.seal(obj);
+
+      // Push collected children onto the stack for further processing.
+      stack.push(...children);
    }
 
-   yield* object_trampoline_async_generator(thunks, process(data, ''));
+   return data;
 }
 
 /**
@@ -178,7 +160,7 @@ export async function* getAccessorAsyncIter(data: object, { batchSize = 100000, 
  *
  * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
  * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used. Do consider switching to {@link getAccessorIter} or {@link getAccessorAsyncIter}.
+ * memory is used.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -255,7 +237,7 @@ export function* getAccessorIter(data: object, { batchSize = 100000, inherited =
  *
  * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
  * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used. Do consider switching to {@link getAccessorIter} or {@link getAccessorAsyncIter}.
+ * memory is used. Do consider switching to {@link getAccessorIter}.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -738,56 +720,6 @@ function* object_trampoline_generator(thunks: (() => Generator<string, void, unk
 }
 
 /**
- * Internal utility for shared trampoline function (async generator).
- * Process last added function (LIFO order)
- *
- * @param thunks - Thunks to process.
- *
- * @param [initial] - Initial generator.
- */
-async function* object_trampoline_async_generator(thunks: (() => Promise<AsyncGenerator<string, void, unknown>>)[],
- initial?: AsyncGenerator<string, void, unknown>): AsyncIterableIterator<string>
-{
-   // Process any initial generator first.
-   if (initial) { yield* initial; }
-
-   // Execute deferred async functions (LIFO order).
-   while (thunks.length > 0) { yield* await thunks.pop()!(); }
-}
-
-/**
- * Private implementation of depth traversal.
- *
- * @param data - An object or array or any leaf.
- *
- * @param [skipKeys] - A Set of strings indicating keys of objects to not freeze.
- *
- * @returns The frozen object.
- *
- * @internal
- * @private
- */
-function _deepFreeze(data: any, skipKeys?: Set<string>): object | []
-{
-   if (Array.isArray(data))
-   {
-      for (let cntr: number = 0; cntr < data.length; cntr++) { _deepFreeze(data[cntr], skipKeys); }
-   }
-   else if (typeof data === 'object' && data !== null)
-   {
-      for (const key in data)
-      {
-         if (Object.prototype.hasOwnProperty.call(data, key) && !skipKeys?.has?.(key))
-         {
-            _deepFreeze(data[key], skipKeys);
-         }
-      }
-   }
-
-   return Object.freeze(data);
-}
-
-/**
  * Internal implementation for `deepMerge`.
  *
  * @param target - Target object.
@@ -826,38 +758,6 @@ function _deepMerge(target: object = {}, ...sourceObj: object[]): object
    }
 
    return target;
-}
-
-/**
- * Private implementation of depth traversal.
- *
- * @param data - An object or array or any leaf.
- *
- * @param [skipKeys] - A Set of strings indicating keys of objects to not freeze.
- *
- * @returns The frozen object.
- *
- * @internal
- * @private
- */
-function _deepSeal(data: any, skipKeys?: Set<string>): object | []
-{
-   if (Array.isArray(data))
-   {
-      for (let cntr: number = 0; cntr < data.length; cntr++) { _deepSeal(data[cntr], skipKeys); }
-   }
-   else if (typeof data === 'object' && data !== null)
-   {
-      for (const key in data)
-      {
-         if (Object.prototype.hasOwnProperty.call(data, key) && !skipKeys?.has?.(key))
-         {
-            _deepSeal(data[key], skipKeys);
-         }
-      }
-   }
-
-   return Object.seal(data);
 }
 
 /**
