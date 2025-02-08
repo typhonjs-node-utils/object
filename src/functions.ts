@@ -328,17 +328,14 @@ export function getAccessorList(data: object, { batchSize = 100000, inherited = 
          if (processedCount >= batchSize)
          {
             processedCount = 0;
-            processDeferred(); // Process some deferred items before continuing
+
+            // Process some deferred items before continuing.
+            const length: number = Math.min(batchSize, thunks.length);
+
+            // Execute a deferred function (LIFO order).
+            for (let cntr: number = 0; cntr < length; cntr++) { thunks.pop()!(); }
          }
       }
-   }
-
-   function processDeferred(): void
-   {
-      const length: number = Math.min(batchSize, thunks.length);
-
-      // Execute a deferred function (LIFO order).
-      for (let cntr: number = 0; cntr < length; cntr++) { thunks.pop()!(); }
    }
 
    process(data, '', 0);
