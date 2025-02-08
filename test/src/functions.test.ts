@@ -424,32 +424,60 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
    });
 
-   it('getAccessorAsyncIter:', async () =>
+   describe('getAccessorAsyncIter:', () =>
    {
-      const accessors = [];
-      for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
+      it('all accessors', async () =>
+      {
+         const accessors = [];
+         for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED)) { accessors.push(key); }
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
 
-      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+      it('small batch size', async () =>
+      {
+         const accessors = [];
+         for await (const key of ObjectUtil.getAccessorAsyncIter(s_OBJECT_MIXED, { batchSize: 1 }))
+         {
+            accessors.push(key);
+         }
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
    });
 
-   it('getAccessorIter:', () =>
+   describe('getAccessorIter:', () =>
    {
-      const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED)];
+      it('all accessors', () =>
+      {
+         const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED)];
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
 
-      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+      it('small batch size', () =>
+      {
+         const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED, { batchSize: 1 })];
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
    });
 
-   it('getAccessorList:', () =>
+   describe('getAccessorList:', () =>
    {
-      let accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
-      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      it('all accessors', () =>
+      {
+         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
 
-      accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 2 });
-      assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
+      it('accessors (maxDepth 2)', () =>
+      {
+         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 2 });
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
+      });
 
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+      it('small batch size', () =>
+      {
+         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { batchSize: 1 });
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
    });
 
    it('hasAccessor:', () =>
@@ -614,17 +642,9 @@ describe('ObjectUtil:', () =>
    {
       const accessors = ObjectUtil.getAccessorList(s_OBJECT_NUM);
 
-      let objectNumCopy;
+      let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);
 
-      beforeEach(() => { objectNumCopy = JSON.parse(JSON.stringify(s_OBJECT_NUM)); });
-
-      it('set', () =>
-      {
-         for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 'aa'); }
-
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
-      });
+      beforeEach(() => { objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM); });
 
       it('add', () =>
       {
@@ -656,6 +676,24 @@ describe('ObjectUtil:', () =>
          { ObjectUtil.safeSet(objectNumCopy, accessor, 10, 'sub'); }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
+      });
+
+      it('set', () =>
+      {
+         for (const accessor of accessors)
+         { ObjectUtil.safeSet(objectNumCopy, accessor, 'aa'); }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
+      });
+
+      it('set-undefined', () =>
+      {
+         // Add new undefined property.
+         (objectNumCopy as any).d = void 0;
+
+         ObjectUtil.safeSet(objectNumCopy, 'd', true, 'set-undefined');
+
+         assert.isTrue((objectNumCopy as any).d);
       });
 
       it('no array accessor / string', () =>

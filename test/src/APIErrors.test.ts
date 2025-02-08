@@ -59,73 +59,118 @@ describe('API Errors:', () =>
       });
    });
 
-   it('getAccessorAsyncIter:', async () =>
+   describe('getAccessorAsyncIter:', async () =>
    {
-      await expect((async () =>
+      it('error - data not object', async () =>
+      {
+         await expect((async () =>
+         {
+            // @ts-expect-error
+            for await (const _ of ObjectUtil.getAccessorAsyncIter(false)) { }
+         })()).rejects.toThrow(`getAccessorAsyncIter error: 'data' is not an object.`);
+      });
+
+      it('error - options.batchSize is not a positive integer (null)', async () =>
+      {
+         await expect((async () =>
+         {
+            for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { batchSize: null })) { }
+         })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
+      });
+
+      it('error - options.batchSize is not a positive integer (-1)', async () =>
+      {
+         await expect((async () =>
+         {
+            for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { batchSize: -1 })) { }
+         })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
+      });
+
+      it('error - options.inherited is not a boolean', async () =>
+      {
+         await expect((async () =>
+         {
+            for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { inherited: null })) { }
+         })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.inherited' is not a boolean.`);
+      });
+   });
+
+   describe('getAccessorIter:', () =>
+   {
+      it('error - data not object', () =>
       {
          // @ts-expect-error
-         for await (const _ of ObjectUtil.getAccessorAsyncIter(false)) { }
-      })()).rejects.toThrow(`getAccessorAsyncIter error: 'data' is not an object.`);
+         expect(() => [...ObjectUtil.getAccessorIter(false)]).throws(TypeError,
+          `getAccessorIter error: 'data' is not an object.`);
+      });
 
-      await expect((async () =>
+      it('error - options.batchSize is not a positive integer (null)', () =>
       {
-         for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { batchSize: null })) { }
-      })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
+         expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: null })]).throws(TypeError,
+          `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+      });
 
-      await expect((async () =>
+      it('error - options.batchSize is not a positive integer (-1)', () =>
       {
-         for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { batchSize: -1 })) { }
-      })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.batchSize' is not a positive integer.`);
+         expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: -1 })]).throws(TypeError,
+          `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+      });
 
-      await expect((async () =>
+      it('error - options.inherited is not a boolean', () =>
       {
-         for await (const _ of ObjectUtil.getAccessorAsyncIter({}, { inherited: null })) { }
-      })()).rejects.toThrow(`getAccessorAsyncIter error: 'options.inherited' is not a boolean.`);
+         expect(() => [...ObjectUtil.getAccessorIter({}, { inherited: null })]).throws(TypeError,
+          `getAccessorIter error: 'options.inherited' is not a boolean.`);
+      });
    });
 
-   it('getAccessorIter:', () =>
+   describe('getAccessorList:', () =>
    {
-      // @ts-expect-error
-      expect(() => [...ObjectUtil.getAccessorIter(false)]).throws(TypeError,
-       `getAccessorIter error: 'data' is not an object.`);
+      it('error - data not object', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.getAccessorList(false)).throws(TypeError,
+          `getAccessorList error: 'data' is not an object.`);
+      });
 
-      expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: null })]).throws(TypeError,
-       `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+      it('error - options.batchSize is not a positive integer (null)', () =>
+      {
+         expect(() => ObjectUtil.getAccessorList({}, { batchSize: null })).throws(TypeError,
+          `getAccessorList error: 'options.batchSize' is not a positive integer.`);
+      });
 
-      expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: -1 })]).throws(TypeError,
-       `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+      it('error - options.batchSize is not a positive integer (-1)', () =>
+      {
+         expect(() => ObjectUtil.getAccessorList({}, { batchSize: -1 })).throws(TypeError,
+          `getAccessorList error: 'options.batchSize' is not a positive integer.`);
+      });
 
-      expect(() => [...ObjectUtil.getAccessorIter({}, { inherited: null })]).throws(TypeError,
-       `getAccessorIter error: 'options.inherited' is not a boolean.`);
+      it('error - options.inherited is not a boolean', () =>
+      {
+         expect(() => ObjectUtil.getAccessorList({}, { inherited: null })).throws(TypeError,
+          `getAccessorList error: 'options.inherited' is not a boolean.`);
+      });
+
+      it('error - options.maxDepth is not a positive integer or Infinity', () =>
+      {
+         expect(() => ObjectUtil.getAccessorList({}, { maxDepth: null })).throws(TypeError,
+          `getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
+      });
    });
 
-   it('getAccessorList:', () =>
+   describe('safeSet:', () =>
    {
-      // @ts-expect-error
-      expect(() => ObjectUtil.getAccessorList(false)).throws(TypeError,
-       `getAccessorList error: 'data' is not an object.`);
+      it('error - data not object', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet(false, 'foo', 'bar')).throws(TypeError,
+          `safeSet error: 'data' is not an object.`);
+      });
 
-      expect(() => ObjectUtil.getAccessorList({}, { batchSize: null })).throws(TypeError,
-       `getAccessorList error: 'options.batchSize' is not a positive integer.`);
-
-      expect(() => ObjectUtil.getAccessorList({}, { batchSize: -1 })).throws(TypeError,
-       `getAccessorList error: 'options.batchSize' is not a positive integer.`);
-
-      expect(() => ObjectUtil.getAccessorList({}, { inherited: null })).throws(TypeError,
-       `getAccessorList error: 'options.inherited' is not a boolean.`);
-
-      expect(() => ObjectUtil.getAccessorList({}, { maxDepth: null })).throws(TypeError,
-       `getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
-   });
-
-   it('safeSet:', () =>
-   {
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeSet(false, 'foo', 'bar')).throws(TypeError,
-       `safeSet error: 'data' is not an object.`);
-
-      // @ts-expect-error
-      expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
-       `safeSet error: 'accessor' is not a string.`);
+      it('error - accessor is not a string', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
+          `safeSet error: 'accessor' is not a string.`);
+      });
    });
 });
