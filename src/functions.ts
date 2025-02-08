@@ -83,6 +83,11 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
       throw new TypeError(`deepMerge error: 'target' is not an object.`);
    }
 
+   if (sourceObj.length === 0)
+   {
+      throw new TypeError(`deepMerge error: 'sourceObj' is not an object.`);
+   }
+
    for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
    {
       if (Object.prototype.toString.call(sourceObj[cntr]) !== '[object Object]')
@@ -91,7 +96,87 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
       }
    }
 
-   return _deepMerge(target, ...sourceObj);
+   // When merging a single source object there is an implementation that is twice as fast as multiple source objects.
+   if (sourceObj.length === 1)
+   {
+      const stack: { target: any, source: any }[] = [];
+
+      for (const obj of sourceObj) { stack.push({ target, source: obj }); }
+
+      while (stack.length > 0)
+      {
+         const { target, source } = stack.pop()!; // LIFO but maintains correct merge order.
+
+         for (const prop in source)
+         {
+            if (Object.prototype.hasOwnProperty.call(source, prop))
+            {
+               // Handle the special property starting with '-=' to delete keys.
+               if (prop.startsWith('-='))
+               {
+                  delete target[prop.slice(2)];
+                  continue;
+               }
+
+               const sourceValue: any = source[prop];
+               const targetValue: any = target[prop];
+
+               // If both values are plain objects, enqueue for further merging.
+               if (Object.prototype.hasOwnProperty.call(target, prop) && targetValue?.constructor === Object &&
+                sourceValue?.constructor === Object)
+               {
+                  stack.push({ target: targetValue, source: sourceValue });
+               }
+               else
+               {
+                  target[prop] = sourceValue;
+               }
+            }
+         }
+      }
+   }
+   else // Stack implementation for multiple source objects.
+   {
+      const stack: { target: any, sources: any[] }[] = [{ target, sources: sourceObj }];
+
+      while (stack.length > 0)
+      {
+         const { target, sources } = stack.pop()!;
+
+         for (const source of sources)
+         {
+            for (const prop in source)
+            {
+               if (Object.prototype.hasOwnProperty.call(source, prop))
+               {
+                  // Handle special property starting with '-=' to delete keys
+                  if (prop.startsWith('-='))
+                  {
+                     delete target[prop.slice(2)];
+                     continue;
+                  }
+
+                  const sourceValue: any = source[prop];
+                  const targetValue: any = target[prop];
+
+                  // If both values are plain objects, push for further merging with a new object.
+                  if (Object.prototype.hasOwnProperty.call(target, prop) && targetValue?.constructor === Object &&
+                   sourceValue?.constructor === Object)
+                  {
+                     target[prop] = Object.assign({}, targetValue); // Copy existing target data.
+                     stack.push({ target: target[prop], sources: [sourceValue] });
+                  }
+                  else
+                  {
+                     target[prop] = sourceValue;
+                  }
+               }
+            }
+         }
+      }
+   }
+
+   return target;
 }
 
 /**
@@ -311,17 +396,16 @@ export function getAccessorList(data: object, { batchSize = 100000, inherited = 
          {
             processedCount = 0;
 
-            // Process some deferred items before continuing.
-            const length: number = Math.min(batchSize, thunks.length);
-
-            // Execute a deferred function (LIFO order).
-            for (let cntr: number = 0; cntr < length; cntr++) { thunks.pop()!(); }
+            // Execute deferred functions (LIFO order).
+            while (thunks.length > 0) { thunks.pop()!(); }
          }
       }
    }
 
    process(data, '', 0);
-   object_trampoline(thunks)
+
+   // Execute deferred functions (LIFO order).
+   while (thunks.length > 0) { thunks.pop()!(); }
 
    return accessors;
 }
@@ -690,18 +774,6 @@ export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' 
 // Module private ----------------------------------------------------------------------------------------------------
 
 /**
- * Internal utility for shared trampoline function.
- * Process last added function (LIFO order)
- *
- * @param thunks - Thunks to process.
- */
-function object_trampoline(thunks: (() => void)[]): void
-{
-   // Execute deferred functions (LIFO order).
-  while (thunks.length > 0) { thunks.pop()!(); }
-}
-
-/**
  * Internal utility for shared trampoline function (generator).
  * Process last added function (LIFO order)
  *
@@ -717,47 +789,6 @@ function* object_trampoline_generator(thunks: (() => Generator<string, void, unk
 
    // Execute deferred functions (LIFO order).
    while (thunks.length > 0) { yield* thunks.pop()!(); }
-}
-
-/**
- * Internal implementation for `deepMerge`.
- *
- * @param target - Target object.
- *
- * @param sourceObj - One or more source objects.
- *
- * @returns Target object.
- *
- * @internal
- * @private
- */
-function _deepMerge(target: object = {}, ...sourceObj: object[]): object
-{
-   // Iterate and merge all source objects into target.
-   for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
-   {
-      const obj: object = sourceObj[cntr];
-
-      for (const prop in obj)
-      {
-         if (Object.prototype.hasOwnProperty.call(obj, prop))
-         {
-            // Handle the special property starting with '-=' to delete keys.
-            if (prop.startsWith('-='))
-            {
-               delete target[prop.slice(2)];
-               continue;
-            }
-
-            // If target already has prop and both target[prop] and obj[prop] are object literals then merge them
-            // otherwise assign obj[prop] to target[prop].
-            target[prop] = Object.prototype.hasOwnProperty.call(target, prop) && target[prop]?.constructor === Object &&
-            obj[prop]?.constructor === Object ? _deepMerge({}, target[prop], obj[prop]) : obj[prop];
-         }
-      }
-   }
-
-   return target;
 }
 
 /**

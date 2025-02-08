@@ -28,6 +28,12 @@ describe('API Errors:', () =>
           `deepMerge error: 'target' is not an object.`);
       });
 
+      it('error - no source object', () =>
+      {
+         assert.throws(() => ObjectUtil.deepMerge({}), TypeError,
+          `deepMerge error: 'sourceObj' is not an object.`);
+      });
+
       it('error - source not object (string)', () =>
       {
          // @ts-expect-error
