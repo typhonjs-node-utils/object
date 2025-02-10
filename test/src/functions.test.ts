@@ -448,42 +448,6 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
    });
 
-   describe('getAccessorIter:', () =>
-   {
-      it('all accessors', () =>
-      {
-         const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED)];
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-
-      it('small batch size', () =>
-      {
-         const accessors = [...ObjectUtil.getAccessorIter(s_OBJECT_MIXED, { batchSize: 1 })];
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-   });
-
-   describe('getAccessorList:', () =>
-   {
-      it('all accessors', () =>
-      {
-         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-
-      it('accessors (maxDepth 2)', () =>
-      {
-         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { maxDepth: 2 });
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_DEPTH2));
-      });
-
-      it('small batch size', () =>
-      {
-         const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED, { batchSize: 1 });
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
-   });
-
    it('hasAccessor:', () =>
    {
       const data = {
@@ -623,7 +587,7 @@ describe('ObjectUtil:', () =>
    it('safeAccess:', () =>
    {
       const output = [];
-      const accessors = ObjectUtil.getAccessorList(s_OBJECT_MIXED);
+      const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
 
       for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
 
@@ -642,9 +606,24 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
    });
 
+   describe('safeKeyIterator:', () =>
+   {
+      it('all accessors', () =>
+      {
+         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
+
+      it('small batch size', () =>
+      {
+         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED, { batchSize: 1 })];
+         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
+      });
+   });
+
    describe('safeAccess:', () =>
    {
-      const accessors = ObjectUtil.getAccessorList(s_OBJECT_NUM);
+      const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)];
 
       let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);
 

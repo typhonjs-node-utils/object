@@ -238,179 +238,6 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 }
 
 /**
- * Returns an iterator of accessor keys by traversing the given object.
- *
- * Note: {@link getAccessorList} is ~1.6 - 1.8 times faster for small objects. However, an iterator can better fit
- * certain algorithms.
- *
- * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
- * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used.
- *
- * @param data - An object to traverse for accessor keys.
- *
- * @param [options] - Options.
- *
- * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
- *
- * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
- *
- * @returns Accessor iterator.
- */
-export function* getAccessorIter(data: object, { batchSize = 100000, inherited = false }:
- { batchSize?: number, inherited?: boolean } = {}): IterableIterator<string>
-{
-   if (typeof data !== 'object' || data === null)
-   {
-      throw new TypeError(`getAccessorIter error: 'data' is not an object.`);
-   }
-
-   if (!Number.isInteger(batchSize) || batchSize <= 0)
-   {
-      throw new TypeError(`getAccessorIter error: 'options.batchSize' is not a positive integer.`);
-   }
-
-   if (typeof inherited !== 'boolean')
-   {
-      throw new TypeError(`getAccessorIter error: 'options.inherited' is not a boolean.`);
-   }
-
-   const thunks: (() => Generator<string, void, unknown>)[] = [];
-   let processedCount: number = 0;
-
-   function* process(obj: object, prefix: string): Generator<string, void, unknown>
-   {
-      for (const key in obj)
-      {
-         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
-
-         const fullKey: string = prefix ? `${prefix}.${key}` : key;
-         const value: any = obj[key];
-
-         if (Array.isArray(value))
-         {
-            // Yield array elements immediately.
-            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
-         }
-         else if (typeof value === 'object' && value !== null)
-         {
-            // Defer objects to maintain DFS order.
-            thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
-         }
-         else if (typeof value !== 'function')
-         {
-            yield fullKey; // Yield primitive values immediately.
-         }
-
-         processedCount++;
-         if (processedCount >= batchSize)
-         {
-            processedCount = 0;
-            yield* object_trampoline_generator(thunks); // Process a batch before continuing
-         }
-      }
-   }
-
-   yield* object_trampoline_generator(thunks, process(data, ''));
-}
-
-/**
- * Returns a list of accessor keys by traversing the given object.
- *
- * Note: This function is ~1.6 - 2.5 times faster than {@link getAccessorIter}. However, an iterator can better
- * fit certain algorithms.
- *
- * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
- * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used. Do consider switching to {@link getAccessorIter}.
- *
- * @param data - An object to traverse for accessor keys.
- *
- * @param [options] - Options.
- *
- * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
- *
- * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
- *
- * @returns Accessor list.
- */
-export function getAccessorList(data: object, { batchSize = 100000, inherited = false, maxDepth = Infinity }:
- { batchSize?: number, inherited?: boolean, maxDepth?: number } = {}): string[]
-{
-   if (typeof data !== 'object' || data === null)
-   {
-      throw new TypeError(`getAccessorList error: 'data' is not an object.`);
-   }
-
-   if (!(Number.isInteger(batchSize) && batchSize > 0))
-   {
-      throw new TypeError(`getAccessorList error: 'options.batchSize' is not a positive integer.`);
-   }
-
-   if (!(Number.isInteger(maxDepth) && maxDepth > 0) && maxDepth !== Infinity)
-   {
-      throw new TypeError(`getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
-   }
-
-   if (typeof inherited !== 'boolean')
-   {
-      throw new TypeError(`getAccessorList error: 'options.inherited' is not a boolean.`);
-   }
-
-   const accessors: string[] = [];
-   const thunks: (() => void)[] = [];
-   let processedCount: number = 0;
-
-   function process(obj: object, prefix: string, depth: number): void
-   {
-      depth++;
-
-      if (depth > maxDepth) { return; }
-
-      for (const key in obj)
-      {
-         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
-
-         const fullKey: string = prefix ? `${prefix}.${key}` : key;
-         const value: any = obj[key];
-
-         if (Array.isArray(value))
-         {
-            // Process array elements immediately to preserve order.
-            for (let i: number = 0; i < value.length; i++) { accessors.push(`${fullKey}.${i}`); }
-         }
-         else if (typeof value === 'object' && value !== null)
-         {
-            // Push object traversal as a deferred function.
-            thunks.push((): void => process(value, fullKey, depth));
-         }
-         else if (typeof value !== 'function')
-         {
-            // Process primitive values immediately.
-            accessors.push(fullKey);
-         }
-
-         // Handle batch processing to avoid blocking large operations
-         processedCount++;
-         if (processedCount >= batchSize)
-         {
-            processedCount = 0;
-
-            // Execute deferred functions (LIFO order).
-            while (thunks.length > 0) { thunks.pop()!(); }
-         }
-      }
-   }
-
-   process(data, '', 0);
-
-   // Execute deferred functions (LIFO order).
-   while (thunks.length > 0) { thunks.pop()!(); }
-
-   return accessors;
-}
-
-/**
  * Provides a method to determine if the passed in Svelte component has a getter & setter accessor.
  *
  * @param object - An object.
@@ -675,7 +502,7 @@ export function safeEqual(source: object, target: object, options?: { batchSize?
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
-   for (const accessor of getAccessorIter(source, options))
+   for (const accessor of safeKeyIterator(source, options))
    {
       const sourceObjectValue: unknown = safeAccess(source, accessor);
       const targetObjectValue: unknown = safeAccess(target, accessor);
@@ -684,6 +511,80 @@ export function safeEqual(source: object, target: object, options?: { batchSize?
    }
 
    return true;
+}
+
+/**
+ * Returns an iterator of keys useful with {@link safeAccess} and {@link safeSet} by traversing the given object.
+ *
+ * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
+ * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
+ * memory is used.
+ *
+ * @param data - An object to traverse for accessor keys.
+ *
+ * @param [options] - Options.
+ *
+ * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
+ *
+ * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ *
+ * @returns Accessor iterator.
+ */
+export function* safeKeyIterator(data: object, { batchSize = 100000, inherited = false }:
+ { batchSize?: number, inherited?: boolean } = {}): IterableIterator<string>
+{
+   if (typeof data !== 'object' || data === null)
+   {
+      throw new TypeError(`safeKeyIterator error: 'data' is not an object.`);
+   }
+
+   if (!Number.isInteger(batchSize) || batchSize <= 0)
+   {
+      throw new TypeError(`safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
+   }
+
+   if (typeof inherited !== 'boolean')
+   {
+      throw new TypeError(`safeKeyIterator error: 'options.inherited' is not a boolean.`);
+   }
+
+   const thunks: (() => Generator<string, void, unknown>)[] = [];
+   let processedCount: number = 0;
+
+   function* process(obj: object, prefix: string): Generator<string, void, unknown>
+   {
+      for (const key in obj)
+      {
+         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
+
+         const fullKey: string = prefix ? `${prefix}.${key}` : key;
+         const value: any = obj[key];
+
+         if (Array.isArray(value))
+         {
+            // Yield array elements immediately.
+            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
+         }
+         else if (typeof value === 'object' && value !== null)
+         {
+            // Defer objects to maintain DFS order.
+            thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
+         }
+         else if (typeof value !== 'function')
+         {
+            yield fullKey; // Yield primitive values immediately.
+         }
+
+         processedCount++;
+         if (processedCount >= batchSize)
+         {
+            processedCount = 0;
+            yield* object_trampoline_generator(thunks); // Process a batch before continuing
+         }
+      }
+   }
+
+   yield* object_trampoline_generator(thunks, process(data, ''));
 }
 
 /**

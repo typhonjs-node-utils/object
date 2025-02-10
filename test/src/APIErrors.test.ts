@@ -65,65 +65,31 @@ describe('API Errors:', () =>
       });
    });
 
-   describe('getAccessorIter:', () =>
+   describe('safeKeyIterator:', () =>
    {
       it('error - data not object', () =>
       {
          // @ts-expect-error
-         expect(() => [...ObjectUtil.getAccessorIter(false)]).throws(TypeError,
-          `getAccessorIter error: 'data' is not an object.`);
+         expect(() => [...ObjectUtil.safeKeyIterator(false)]).throws(TypeError,
+          `safeKeyIterator error: 'data' is not an object.`);
       });
 
       it('error - options.batchSize is not a positive integer (null)', () =>
       {
-         expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: null })]).throws(TypeError,
-          `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+         expect(() => [...ObjectUtil.safeKeyIterator({}, { batchSize: null })]).throws(TypeError,
+          `safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
       });
 
       it('error - options.batchSize is not a positive integer (-1)', () =>
       {
-         expect(() => [...ObjectUtil.getAccessorIter({}, { batchSize: -1 })]).throws(TypeError,
-          `getAccessorIter error: 'options.batchSize' is not a positive integer.`);
+         expect(() => [...ObjectUtil.safeKeyIterator({}, { batchSize: -1 })]).throws(TypeError,
+          `safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
       });
 
       it('error - options.inherited is not a boolean', () =>
       {
-         expect(() => [...ObjectUtil.getAccessorIter({}, { inherited: null })]).throws(TypeError,
-          `getAccessorIter error: 'options.inherited' is not a boolean.`);
-      });
-   });
-
-   describe('getAccessorList:', () =>
-   {
-      it('error - data not object', () =>
-      {
-         // @ts-expect-error
-         expect(() => ObjectUtil.getAccessorList(false)).throws(TypeError,
-          `getAccessorList error: 'data' is not an object.`);
-      });
-
-      it('error - options.batchSize is not a positive integer (null)', () =>
-      {
-         expect(() => ObjectUtil.getAccessorList({}, { batchSize: null })).throws(TypeError,
-          `getAccessorList error: 'options.batchSize' is not a positive integer.`);
-      });
-
-      it('error - options.batchSize is not a positive integer (-1)', () =>
-      {
-         expect(() => ObjectUtil.getAccessorList({}, { batchSize: -1 })).throws(TypeError,
-          `getAccessorList error: 'options.batchSize' is not a positive integer.`);
-      });
-
-      it('error - options.inherited is not a boolean', () =>
-      {
-         expect(() => ObjectUtil.getAccessorList({}, { inherited: null })).throws(TypeError,
-          `getAccessorList error: 'options.inherited' is not a boolean.`);
-      });
-
-      it('error - options.maxDepth is not a positive integer or Infinity', () =>
-      {
-         expect(() => ObjectUtil.getAccessorList({}, { maxDepth: null })).throws(TypeError,
-          `getAccessorList error: 'options.maxDepth' is not a positive integer or Infinity.`);
+         expect(() => [...ObjectUtil.safeKeyIterator({}, { inherited: null })]).throws(TypeError,
+          `safeKeyIterator error: 'options.inherited' is not a boolean.`);
       });
    });
 
