@@ -195,10 +195,10 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge(target, { a: 1, b: { b1: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('basic objects:', () =>
@@ -208,10 +208,10 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('basic objects (copy):', () =>
@@ -222,8 +222,62 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge({}, target, { a: 1 }, { b: { b1: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.notEqual(target, targetMod);
+
          assert.deepEqual(target, initial);
+         assert.deepEqual(targetMod, result);
+      });
+
+      it('basic object (explicit type):', () =>
+      {
+         type Target = { a: boolean, b: { b1: boolean } };
+         type Result = { a: number, b: { b1: number } };
+
+         const target = { a: true, b: { b1: true } };
+         const result = { a: 1, b: { b1: 2 } };
+
+         const targetMod: Result = ObjectUtil.deepMerge<Target, Result>(target, { a: 1, b: { b1: 2 } });
+
+         // @ts-expect-error - Type differences
+         assert.equal(target, targetMod);
+
+         assert.deepEqual(targetMod, result);
+      });
+
+      it('basic objects (explicit types):', () =>
+      {
+         type Target = { a: boolean, b: { b1: boolean } };
+         type Source1 = { a: number };
+         type Source2 = { b: { b1: number } };
+         type Result = { a: number, b: { b1: number } };
+
+         const target = { a: true, b: { b1: true } };
+         const result = { a: 1, b: { b1: 2 } };
+
+         const targetMod: Result = ObjectUtil.deepMerge<Target, Source1, Source2>(target, { a: 1 }, { b: { b1: 2 } });
+
+         // @ts-expect-error - Type differences
+         assert.equal(target, targetMod);
+
+         assert.deepEqual(targetMod, result);
+      });
+
+      it('basic objects (explicit types - array):', () =>
+      {
+         type Target = { a: boolean, b: { b1: boolean } };
+         type Source1 = { a: number };
+         type Source2 = { b: { b1: number } };
+         type Result = { a: number, b: { b1: number } };
+
+         const target = { a: true, b: { b1: true } };
+         const result = { a: 1, b: { b1: 2 } };
+
+         const targetMod: Result = ObjectUtil.deepMerge<Target, [Source1, Source2]>(target, { a: 1 }, { b: { b1: 2 } });
+
+         // @ts-expect-error - Type differences
+         assert.equal(target, targetMod);
+
          assert.deepEqual(targetMod, result);
       });
 
@@ -234,10 +288,10 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } }, { c: false });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('overwrite property:', () =>
@@ -247,6 +301,7 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b1: 2 } }, { c: { c1: [1, 2] } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
          // @ts-expect-error
@@ -260,10 +315,10 @@ describe('ObjectUtil:', () =>
 
          const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { b2: 2 } }, { c: { c2: 1 } }, { c: { c2: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('merge objects (extended primitive override):', () =>
@@ -274,10 +329,10 @@ describe('ObjectUtil:', () =>
          const targetMod = ObjectUtil.deepMerge(target, { a: { a2: true } }, { a: 1 }, { b: { b2: 2 } },
           { c: { c2: 1 } }, { c: { c2: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('instantiated class:', () =>
@@ -285,32 +340,31 @@ describe('ObjectUtil:', () =>
          const target = { a: true, b: { b1: true } };
          const result = { a: 1, b: { b1: 2 } };
 
-         // @ts-expect-error
-         class Test { constructor() { this.a = 1; } }
+         class Test { a: number; constructor() { this.a = 1; } }
 
          const targetMod = ObjectUtil.deepMerge(target, new Test(), { b: { b1: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
 
-         // @ts-expect-error
-         assert.deepEqual(target, result);
+         assert.deepEqual(targetMod, result);
       });
 
       it('instantiated classes:', () =>
       {
-         // @ts-expect-error
-         class Target { constructor() { this.a = true; this.b = { b1: true }; } }
+         class Target { a: boolean; b: { b1: boolean }; constructor() { this.a = true; this.b = { b1: true }; } }
 
-         // @ts-expect-error
-         class Test { constructor() { this.a = 1; } }
+         class Test { a: number; constructor() { this.a = 1; } }
 
          const target = new Target();
          const result = { a: 1, b: { b1: 2 } };
 
          const targetMod = ObjectUtil.deepMerge(target, new Test(), { b: { b1: 2 } });
 
+         // @ts-expect-error - Type differences
          assert.equal(target, targetMod);
-         assert.deepEqual(target, result);
+
+         assert.deepEqual(targetMod, result);
       });
    });
 

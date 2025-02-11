@@ -67,8 +67,9 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
 
 /**
  * Recursively deep merges all source objects into the target object in place. Like `Object.assign` if you provide `{}`
- * as the target a copy is produced. If the target and source property are object literals they are merged.
- * Deleting keys is supported by specifying a property starting with `-=`.
+ * as the target a shallow copy is produced. If the target and source property are object literals they are merged.
+ *
+ * Note: The output type is inferred, but you may provide explicit generic types as well.
  *
  * @param target - Target object.
  *
@@ -76,7 +77,16 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
  *
  * @returns Target object.
  */
-export function deepMerge(target: object = {}, ...sourceObj: object[]): object
+export function deepMerge<T extends object, U extends object>(target: T, sourceObj: U):
+ DeepMerge<T, [U]>;
+
+export function deepMerge<T extends object, U extends object, V extends object>(target: T, sourceObj1: U,
+ sourceObj2: V): DeepMerge<T, [U, V]>;
+
+export function deepMerge<T extends object, U extends object[]>(target: T, ...sourceObj: U):
+ DeepMerge<T, U>
+
+export function deepMerge(target: object, ...sourceObj: object[]): object
 {
    if (Object.prototype.toString.call(target) !== '[object Object]')
    {
@@ -298,7 +308,7 @@ export function hasGetter<T extends object, K extends string>(object: T, accesso
 export function hasPrototype<T>(target: unknown, Prototype: new (...args: any[]) => T):
  target is new (...args: any[]) => T
 {
-   /* c8 ignore next */
+
    if (typeof target !== 'function') { return false; }
 
    if (target === Prototype) { return true; }
@@ -678,6 +688,8 @@ function* object_trampoline_generator(thunks: (() => Generator<string, void, unk
    while (thunks.length > 0) { yield* thunks.pop()!(); }
 }
 
+// Utility types -----------------------------------------------------------------------------------------------------
+
 /**
  * Utility type for `safeAccess`. Infers compound accessor strings in object T.
  */
@@ -689,3 +701,19 @@ type DeepAccess<T, P extends string> =
   : P extends keyof T
    ? T[P]
    : undefined;
+
+/**
+ * Recursively merges multiple object types ensuring correct property resolution.
+ *
+ * This utility takes a target object `T` and applies a sequence of merges from `U` progressively combining their
+ * properties while respecting key precedence. Later objects overwrite earlier ones, similar to `Object.assign`.
+ *
+ * @typeParam T - The base object type.
+ * @typeParam U - A tuple of objects to be deeply merged with `T`.
+ */
+type DeepMerge<T extends object, U extends object[]> =
+ U extends [infer First, ...infer Rest]
+  ? DeepMerge<{ [K in keyof (Omit<T, keyof First> & First)]: (Omit<T, keyof First> & First)[K] },
+   Rest extends object[] ? Rest : []>
+  : T;
+
