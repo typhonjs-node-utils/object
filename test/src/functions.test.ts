@@ -710,6 +710,18 @@ describe('ObjectUtil:', () =>
          const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
          assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
       });
+
+      it('hasOwnOnly', () =>
+      {
+         class Test {}
+         Object.defineProperty(Test.prototype, 'a', {
+            value: 1,
+            enumerable: true
+         });
+
+         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: true })], []);
+         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: false })], ['a']);
+      });
    });
 
    describe('safeAccess:', () =>

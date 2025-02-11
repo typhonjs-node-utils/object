@@ -74,10 +74,10 @@ describe('API Errors:', () =>
           `safeKeyIterator error: 'data' is not an object.`);
       });
 
-      it('error - options.inherited is not a boolean', () =>
+      it('error - options.hasOwnOnly is not a boolean', () =>
       {
-         expect(() => [...ObjectUtil.safeKeyIterator({}, { inherited: null })]).throws(TypeError,
-          `safeKeyIterator error: 'options.inherited' is not a boolean.`);
+         expect(() => [...ObjectUtil.safeKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
+          `safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
       });
    });
 

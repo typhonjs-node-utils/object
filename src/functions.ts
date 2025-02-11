@@ -489,11 +489,11 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @param [options] - Options.
  *
- * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
  * @returns True if equal.
  */
-export function safeEqual(source: object, target: object, options?: { inherited?: boolean }): boolean
+export function safeEqual(source: object, target: object, options?: { hasOwnOnly?: boolean }): boolean
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
@@ -519,11 +519,11 @@ export function safeEqual(source: object, target: object, options?: { inherited?
  *
  * @param [options] - Options.
  *
- * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
+ * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
  * @returns Accessor iterator.
  */
-export function* safeKeyIterator(data: object, { inherited = false }: { inherited?: boolean } = {}):
+export function* safeKeyIterator(data: object, { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}):
  IterableIterator<string>
 {
    if (typeof data !== 'object' || data === null)
@@ -531,9 +531,9 @@ export function* safeKeyIterator(data: object, { inherited = false }: { inherite
       throw new TypeError(`safeKeyIterator error: 'data' is not an object.`);
    }
 
-   if (typeof inherited !== 'boolean')
+   if (typeof hasOwnOnly !== 'boolean')
    {
-      throw new TypeError(`safeKeyIterator error: 'options.inherited' is not a boolean.`);
+      throw new TypeError(`safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
    const stack: { obj: object; prefix: string }[] = [{ obj: data, prefix: '' }];
@@ -544,7 +544,7 @@ export function* safeKeyIterator(data: object, { inherited = false }: { inherite
 
       for (const key in obj)
       {
-         if (!inherited && !Object.hasOwn(obj, key)) { continue; }
+         if (hasOwnOnly && !Object.hasOwn(obj, key)) { continue; }
 
          const fullKey: string = prefix ? `${prefix}.${key}` : key;
          const value: any = obj[key];
