@@ -546,10 +546,13 @@ describe('ObjectUtil:', () =>
 
       class Child extends Base{}
 
+      // @ts-expect-error
       assert.isFalse(ObjectUtil.hasPrototype({}, Base));
+      // @ts-expect-error
+      assert.isFalse(ObjectUtil.hasPrototype(() => void 0, Base));
+
       assert.isFalse(ObjectUtil.hasPrototype(null, Base));
       assert.isFalse(ObjectUtil.hasPrototype(void 0, Base));
-      assert.isFalse(ObjectUtil.hasPrototype(() => void 0, Base));
 
       assert.isTrue(ObjectUtil.hasPrototype(Base, Base));
       assert.isTrue(ObjectUtil.hasPrototype(Child, Base));
