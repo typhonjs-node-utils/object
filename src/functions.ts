@@ -111,13 +111,6 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
          {
             if (Object.prototype.hasOwnProperty.call(source, prop))
             {
-               // Handle the special property starting with '-=' to delete keys.
-               if (prop.startsWith('-='))
-               {
-                  delete target[prop.slice(2)];
-                  continue;
-               }
-
                const sourceValue: any = source[prop];
                const targetValue: any = target[prop];
 
@@ -149,13 +142,6 @@ export function deepMerge(target: object = {}, ...sourceObj: object[]): object
             {
                if (Object.prototype.hasOwnProperty.call(source, prop))
                {
-                  // Handle special property starting with '-=' to delete keys
-                  if (prop.startsWith('-='))
-                  {
-                     delete target[prop.slice(2)];
-                     continue;
-                  }
-
                   const sourceValue: any = source[prop];
                   const targetValue: any = target[prop];
 

@@ -312,41 +312,6 @@ describe('ObjectUtil:', () =>
          assert.equal(target, targetMod);
          assert.deepEqual(target, result);
       });
-
-      it('delete props (single):', () =>
-      {
-         const target = { a: true, b: true };
-         const result = {};
-
-         const targetMod = ObjectUtil.deepMerge(target, { '-=a': null, '-=b': null });
-
-         assert.equal(target, targetMod);
-         assert.deepEqual(target, result);
-      });
-
-      it('delete props (multiple):', () =>
-      {
-         const target = { a: true, b: true };
-         const result = {};
-
-         const targetMod = ObjectUtil.deepMerge(target, { '-=a': null }, { '-=b': null });
-
-         assert.equal(target, targetMod);
-         assert.deepEqual(target, result);
-      });
-
-      it('delete nested prop:', () =>
-      {
-         const target = { a: true, b: { b1: true } };
-         const result = { a: 1, b: {} };
-
-         const targetMod = ObjectUtil.deepMerge(target, { a: 1 }, { b: { '-=b1': null } });
-
-         assert.equal(target, targetMod);
-
-         // @ts-expect-error
-         assert.deepEqual(target, result);
-      });
    });
 
    it('deepSeal w/ skipKeys:', () =>
