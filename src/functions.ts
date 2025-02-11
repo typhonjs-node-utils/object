@@ -51,7 +51,7 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
       {
          for (const key in obj)
          {
-            if (Object.prototype.hasOwnProperty.call(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
+            if (Object.hasOwn(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
          }
       }
 
@@ -119,13 +119,13 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
          for (const prop in source)
          {
-            if (Object.prototype.hasOwnProperty.call(source, prop))
+            if (Object.hasOwn(source, prop))
             {
                const sourceValue: any = source[prop];
                const targetValue: any = target[prop];
 
                // If both values are plain objects, enqueue for further merging.
-               if (Object.prototype.hasOwnProperty.call(target, prop) && targetValue?.constructor === Object &&
+               if (Object.hasOwn(target, prop) && targetValue?.constructor === Object &&
                 sourceValue?.constructor === Object)
                {
                   stack.push({ target: targetValue, source: sourceValue });
@@ -150,13 +150,13 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
          {
             for (const prop in source)
             {
-               if (Object.prototype.hasOwnProperty.call(source, prop))
+               if (Object.hasOwn(source, prop))
                {
                   const sourceValue: any = source[prop];
                   const targetValue: any = target[prop];
 
                   // If both values are plain objects, push for further merging with a new object.
-                  if (Object.prototype.hasOwnProperty.call(target, prop) && targetValue?.constructor === Object &&
+                  if (Object.hasOwn(target, prop) && targetValue?.constructor === Object &&
                    sourceValue?.constructor === Object)
                   {
                      target[prop] = Object.assign({}, targetValue); // Copy existing target data.
@@ -219,7 +219,7 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
       {
          for (const key in obj)
          {
-            if (Object.prototype.hasOwnProperty.call(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
+            if (Object.hasOwn(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
          }
       }
 
@@ -544,7 +544,7 @@ export function* safeKeyIterator(data: object, { inherited = false }: { inherite
 
       for (const key in obj)
       {
-         if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
+         if (!inherited && !Object.hasOwn(obj, key)) { continue; }
 
          const fullKey: string = prefix ? `${prefix}.${key}` : key;
          const value: any = obj[key];
