@@ -467,38 +467,77 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
    });
 
-   it('hasAccessor:', () =>
+   describe('hasAccessor:', () =>
    {
-      const data = {
-         get test() { return 0; },
-         get bad() { return 1; },
+      it('top level', () =>
+      {
+         const data = {
+            get test() { return 0; },
+            get bad() { return 1; },
 
-         set test(val) { } // eslint-disable-line no-unused-vars
-      }
+            set test(val) { } // eslint-disable-line no-unused-vars
+         }
 
-      assert.isFalse(ObjectUtil.hasAccessor({}, 'nope'));
-      assert.isFalse(ObjectUtil.hasAccessor(null, 'nope'));
-      assert.isFalse(ObjectUtil.hasAccessor(void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasAccessor(() => void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasAccessor(data, 'bad'));
+         assert.isFalse(ObjectUtil.hasAccessor({}, 'nope'));
+         assert.isFalse(ObjectUtil.hasAccessor(null, 'nope'));
+         assert.isFalse(ObjectUtil.hasAccessor(void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasAccessor(() => void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasAccessor(data, 'bad'));
 
-      assert.isTrue(ObjectUtil.hasAccessor(data, 'test'));
+         assert.isTrue(ObjectUtil.hasAccessor(data, 'test'));
+      });
+
+      it('inherited', () =>
+      {
+         class Base {
+            get test() { return 0; }
+            get bad() { return 1; }
+            set test(val) { }
+         }
+
+         class Top extends Base {}
+
+         const instance = new Top();
+
+         assert.isFalse(ObjectUtil.hasAccessor(instance, 'nope'));
+         assert.isFalse(ObjectUtil.hasAccessor(instance, 'bad'));
+
+         assert.isTrue(ObjectUtil.hasAccessor(instance, 'test'));
+      });
    });
 
-   it('hasGetter:', () =>
+   describe('hasGetter:', () =>
    {
-      const data = {
-         get test() { return 0; },
-         bad() { return 1; }
-      }
+      it('top level', () =>
+      {
+         const data = {
+            get test() { return 0; },
+            bad() { return 1; }
+         }
 
-      assert.isFalse(ObjectUtil.hasGetter({}, 'nope'));
-      assert.isFalse(ObjectUtil.hasGetter(null, 'nope'));
-      assert.isFalse(ObjectUtil.hasGetter(void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasGetter(() => void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasGetter(data, 'bad'));
+         assert.isFalse(ObjectUtil.hasGetter({}, 'nope'));
+         assert.isFalse(ObjectUtil.hasGetter(null, 'nope'));
+         assert.isFalse(ObjectUtil.hasGetter(void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasGetter(() => void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasGetter(data, 'bad'));
 
-      assert.isTrue(ObjectUtil.hasGetter(data, 'test'));
+         assert.isTrue(ObjectUtil.hasGetter(data, 'test'));
+      });
+
+      it('inherited', () =>
+      {
+         class Base {
+            get test() { return 0; }
+         }
+
+         class Top extends Base {}
+
+         const instance = new Top();
+
+         assert.isFalse(ObjectUtil.hasGetter(instance, 'nope'));
+
+         assert.isTrue(ObjectUtil.hasGetter(instance, 'test'));
+      });
    });
 
    it('hasPrototype:', () =>
@@ -516,22 +555,43 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.hasPrototype(Child, Base));
    });
 
-   it('hasSetter:', () =>
+   describe('hasSetter:', () =>
    {
-      const data = {
-         get test() { return 0; },
-         get bad() { return 1; },
+      it('top level', () =>
+      {
+         const data = {
+            get test() { return 0; },
+            get bad() { return 1; },
 
-         set test(val) { } // eslint-disable-line no-unused-vars
-      }
+            set test(val) { } // eslint-disable-line no-unused-vars
+         }
 
-      assert.isFalse(ObjectUtil.hasSetter({}, 'nope'));
-      assert.isFalse(ObjectUtil.hasSetter(null, 'nope'));
-      assert.isFalse(ObjectUtil.hasSetter(void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasSetter(() => void 0, 'nope'));
-      assert.isFalse(ObjectUtil.hasSetter(data, 'bad'));
+         assert.isFalse(ObjectUtil.hasSetter({}, 'nope'));
+         assert.isFalse(ObjectUtil.hasSetter(null, 'nope'));
+         assert.isFalse(ObjectUtil.hasSetter(void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasSetter(() => void 0, 'nope'));
+         assert.isFalse(ObjectUtil.hasSetter(data, 'bad'));
 
-      assert.isTrue(ObjectUtil.hasSetter(data, 'test'));
+         assert.isTrue(ObjectUtil.hasSetter(data, 'test'));
+      });
+
+      it('inherited', () =>
+      {
+         class Base {
+            get test() { return 0; }
+            get bad() { return 1; }
+            set test(val) { }
+         }
+
+         class Top extends Base {}
+
+         const instance = new Top();
+
+         assert.isFalse(ObjectUtil.hasSetter(instance, 'nope'));
+         assert.isFalse(ObjectUtil.hasSetter(instance, 'bad'));
+
+         assert.isTrue(ObjectUtil.hasSetter(instance, 'test'));
+      });
    });
 
    it('isIterable:', () =>
@@ -603,26 +663,41 @@ describe('ObjectUtil:', () =>
       assert.strictEqual(ObjectUtil.objectSize(new String('test')), 4);
    });
 
-   it('safeAccess:', () =>
+   describe('safeAccess:', () =>
    {
-      const output = [];
-      const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
+      it('all mixed accessors', () =>
+      {
+         const output = [];
+         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
 
-      for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
+         for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
 
-      assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+         assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
+         assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+      });
+
+      it('default value conditions', () =>
+      {
+         assert.equal(ObjectUtil.safeAccess(null, '', 'defaultValue'), 'defaultValue');
+         assert.equal(ObjectUtil.safeAccess({}, null, 'defaultValue'), 'defaultValue');
+         assert.equal(ObjectUtil.safeAccess({ a: null }, 'a', 'defaultValue'), 'defaultValue');
+      });
    });
 
-   it('safeEqual:', () =>
+   describe('safeEqual:', () =>
    {
-      assert.isTrue(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG));
+      it('bad data', () =>
+      {
+         assert.isFalse(ObjectUtil.safeEqual(null, null));
+      });
 
-      assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, { a: 2 }));
+      it('equality tests', () =>
+      {
+         assert.isTrue(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG));
 
-      assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ONE_MOD));
-
-      assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+         assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, { a: 2 }));
+         assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ONE_MOD));
+      });
    });
 
    describe('safeKeyIterator:', () =>
