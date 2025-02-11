@@ -632,12 +632,6 @@ describe('ObjectUtil:', () =>
          const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
          assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
       });
-
-      it('small batch size', () =>
-      {
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED, { batchSize: 1 })];
-         assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
-      });
    });
 
    describe('safeAccess:', () =>

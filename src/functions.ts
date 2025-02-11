@@ -308,7 +308,6 @@ export function hasGetter<T extends object, K extends string>(object: T, accesso
 export function hasPrototype<T>(target: unknown, Prototype: new (...args: any[]) => T):
  target is new (...args: any[]) => T
 {
-
    if (typeof target !== 'function') { return false; }
 
    if (target === Prototype) { return true; }
@@ -490,11 +489,11 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
+ * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
  *
  * @returns True if equal.
  */
-export function safeEqual(source: object, target: object, options?: { batchSize?: number }): boolean
+export function safeEqual(source: object, target: object, options?: { inherited?: boolean }): boolean
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
@@ -520,23 +519,16 @@ export function safeEqual(source: object, target: object, options?: { batchSize?
  *
  * @param [options] - Options.
  *
- * @param [options.batchSize] - To accommodate small to large objects processing is batched; default: `100000`.
- *
  * @param [options.inherited] - Set to `true` to include inherited properties; default: `false`.
  *
  * @returns Accessor iterator.
  */
-export function* safeKeyIterator(data: object, { batchSize = 100000, inherited = false }:
- { batchSize?: number, inherited?: boolean } = {}): IterableIterator<string>
+export function* safeKeyIterator(data: object, { inherited = false }: { inherited?: boolean } = {}):
+ IterableIterator<string>
 {
    if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`safeKeyIterator error: 'data' is not an object.`);
-   }
-
-   if (!Number.isInteger(batchSize) || batchSize <= 0)
-   {
-      throw new TypeError(`safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
    }
 
    if (typeof inherited !== 'boolean')
@@ -544,11 +536,12 @@ export function* safeKeyIterator(data: object, { batchSize = 100000, inherited =
       throw new TypeError(`safeKeyIterator error: 'options.inherited' is not a boolean.`);
    }
 
-   const thunks: (() => Generator<string, void, unknown>)[] = [];
-   let processedCount: number = 0;
+   const stack: { obj: object; prefix: string }[] = [{ obj: data, prefix: '' }];
 
-   function* process(obj: object, prefix: string): Generator<string, void, unknown>
+   while (stack.length > 0)
    {
+      const { obj, prefix } = stack.pop()!;
+
       for (const key in obj)
       {
          if (!inherited && !Object.prototype.hasOwnProperty.call(obj, key)) { continue; }
@@ -558,29 +551,18 @@ export function* safeKeyIterator(data: object, { batchSize = 100000, inherited =
 
          if (Array.isArray(value))
          {
-            // Yield array elements immediately.
             for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
          }
          else if (typeof value === 'object' && value !== null)
          {
-            // Defer objects to maintain DFS order.
-            thunks.push((): Generator<string, void, unknown> => process(value, fullKey));
+            stack.push({ obj: value, prefix: fullKey }); // Push to stack for DFS traversal.
          }
          else if (typeof value !== 'function')
          {
-            yield fullKey; // Yield primitive values immediately.
-         }
-
-         processedCount++;
-         if (processedCount >= batchSize)
-         {
-            processedCount = 0;
-            yield* object_trampoline_generator(thunks); // Process a batch before continuing
+            yield fullKey;
          }
       }
    }
-
-   yield* object_trampoline_generator(thunks, process(data, ''));
 }
 
 /**
@@ -667,26 +649,6 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
  * Defines the operation to perform for `safeSet`.
  */
 export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
-
-// Module private ----------------------------------------------------------------------------------------------------
-
-/**
- * Internal utility for shared trampoline function (generator).
- * Process last added function (LIFO order)
- *
- * @param thunks - Thunks to process.
- *
- * @param [initial] - Initial generator.
- */
-function* object_trampoline_generator(thunks: (() => Generator<string, void, unknown>)[],
- initial?: Generator<string, void, unknown>): IterableIterator<string>
-{
-   // Process any initial generator first.
-   if (initial) { yield* initial; }
-
-   // Execute deferred functions (LIFO order).
-   while (thunks.length > 0) { yield* thunks.pop()!(); }
-}
 
 // Utility types -----------------------------------------------------------------------------------------------------
 

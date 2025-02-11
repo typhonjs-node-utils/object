@@ -74,18 +74,6 @@ describe('API Errors:', () =>
           `safeKeyIterator error: 'data' is not an object.`);
       });
 
-      it('error - options.batchSize is not a positive integer (null)', () =>
-      {
-         expect(() => [...ObjectUtil.safeKeyIterator({}, { batchSize: null })]).throws(TypeError,
-          `safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
-      });
-
-      it('error - options.batchSize is not a positive integer (-1)', () =>
-      {
-         expect(() => [...ObjectUtil.safeKeyIterator({}, { batchSize: -1 })]).throws(TypeError,
-          `safeKeyIterator error: 'options.batchSize' is not a positive integer.`);
-      });
-
       it('error - options.inherited is not a boolean', () =>
       {
          expect(() => [...ObjectUtil.safeKeyIterator({}, { inherited: null })]).throws(TypeError,
