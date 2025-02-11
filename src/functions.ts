@@ -299,14 +299,14 @@ export function hasGetter<T extends object, K extends string>(object: T, accesso
  *
  * @param target - Any target class / constructor function to test.
  *
- * @param Prototype - Prototype function / class constructor to find.
+ * @param Prototype - Class / constructor function to find.
  *
  * @returns Target matches prototype.
  *
- * @typeParam T - Prototype instance type.
+ * @typeParam T - Prototype class / constructor.
  */
-export function hasPrototype<T>(target: unknown, Prototype: new (...args: any[]) => T):
- target is new (...args: any[]) => T
+export function hasPrototype<T extends new (...args: any[]) => any>(target: new (...args: any[]) => any, Prototype: T):
+ target is T
 {
    if (typeof target !== 'function') { return false; }
 
