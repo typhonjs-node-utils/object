@@ -234,16 +234,16 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 }
 
 /**
- * Provides a method to determine if the passed in Svelte component has a getter & setter accessor.
+ * Determine if the given object has a getter & setter accessor.
  *
  * @param object - An object.
  *
  * @param accessor - Accessor to test.
  *
- * @returns Whether the component has the getter and setter for accessor.
+ * @returns Whether the given object has the getter and setter for accessor.
  *
  * @typeParam T - Type of data.
- * @typeParam K - Accessor type.
+ * @typeParam K - Accessor key.
  */
 export function hasAccessor<T extends object, K extends string>(object: T, accessor: K):
  object is T & Record<K, unknown>
@@ -265,16 +265,16 @@ export function hasAccessor<T extends object, K extends string>(object: T, acces
 }
 
 /**
- * Provides a method to determine if the passed in Svelte component has a getter accessor.
+ * Determine if the given object has a getter accessor.
  *
  * @param object - An object.
  *
  * @param accessor - Accessor to test.
  *
- * @returns Whether the component has the getter for accessor.
+ * @returns Whether the given object has the getter for accessor.
  *
  * @typeParam T - Type of data.
- * @typeParam K - Accessor type.
+ * @typeParam K - Accessor key.
  */
 export function hasGetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
 {
@@ -322,16 +322,16 @@ export function hasPrototype<T>(target: unknown, Prototype: new (...args: any[])
 }
 
 /**
- * Provides a method to determine if the passed in Svelte component has a setter accessor.
+ * Determine if the given object has a setter accessor.
  *
  * @param object - An object.
  *
  * @param accessor - Accessor to test.
  *
- * @returns Whether the component has the setter for accessor.
+ * @returns Whether the given object has the setter for accessor.
  *
  * @typeParam T - Type of data.
- * @typeParam K - Accessor type.
+ * @typeParam K - Accessor key.
  */
 export function hasSetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
 {
@@ -467,7 +467,7 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < keys.length; cntr++)
    {
-      // If the next level of object access is undefined or null then return the empty string.
+      // If the next level of object access is undefined or null then return the default value.
       if (result[keys[cntr]] === void 0 || result[keys[cntr]] === null) { return defaultValue as any; }
 
       result = result[keys[cntr]];
