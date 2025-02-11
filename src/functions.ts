@@ -582,8 +582,8 @@ export function* safeKeyIterator(data: object, { inherited = false }: { inherite
  *
  * @returns True if successful.
  */
-export function safeSet(data: object, accessor: string, value: any, operation: SafeSetOperation = 'set',
- createMissing: boolean = true): boolean
+export function safeSet(data: object, accessor: string, value: any, operation: 'add' | 'div' | 'mult' | 'set' |
+ 'set-undefined' | 'sub' = 'set', createMissing: boolean = true): boolean
 {
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
    if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a string.`); }
@@ -644,11 +644,6 @@ export function safeSet(data: object, accessor: string, value: any, operation: S
 
    return true;
 }
-
-/**
- * Defines the operation to perform for `safeSet`.
- */
-export type SafeSetOperation = 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub';
 
 // Utility types -----------------------------------------------------------------------------------------------------
 
