@@ -489,11 +489,14 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @param [options] - Options.
  *
+ * @param [options.arrayIndex] - Set to `false` to exclude equality testing for array contents; default: `true`.
+ *
  * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
  * @returns True if equal.
  */
-export function safeEqual(source: object, target: object, options?: { hasOwnOnly?: boolean }): boolean
+export function safeEqual(source: object, target: object, options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }):
+ boolean
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
@@ -509,26 +512,29 @@ export function safeEqual(source: object, target: object, options?: { hasOwnOnly
 }
 
 /**
- * Returns an iterator of keys useful with {@link safeAccess} and {@link safeSet} by traversing the given object.
- *
- * Note: The default `batchSize` is a fair tradeoff for memory and performance for small to somewhat large objects.
- * However, as object size increases from very large to massive then raise the `batchSize`. The larger the value more
- * memory is used.
+ * Returns an iterator of safe keys useful with {@link safeAccess} and {@link safeSet} by traversing the given object.
  *
  * @param data - An object to traverse for accessor keys.
  *
  * @param [options] - Options.
  *
+ * @param [options.arrayIndex] - Set to `false` to exclude safe keys for array indexing; default: `true`.
+ *
  * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
- * @returns Accessor iterator.
+ * @returns Safe key iterator.
  */
-export function* safeKeyIterator(data: object, { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}):
- IterableIterator<string>
+export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly = true }:
+ { arrayIndex?: boolean, hasOwnOnly?: boolean } = {}): IterableIterator<string>
 {
    if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`safeKeyIterator error: 'data' is not an object.`);
+   }
+
+   if (typeof arrayIndex !== 'boolean')
+   {
+      throw new TypeError(`safeKeyIterator error: 'options.arrayIndex' is not a boolean.`);
    }
 
    if (typeof hasOwnOnly !== 'boolean')
@@ -551,6 +557,8 @@ export function* safeKeyIterator(data: object, { hasOwnOnly = true }: { hasOwnOn
 
          if (Array.isArray(value))
          {
+            if (!arrayIndex) { continue; }
+
             for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
          }
          else if (typeof value === 'object' && value !== null)
