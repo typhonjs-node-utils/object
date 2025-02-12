@@ -96,5 +96,26 @@ describe('API Errors:', () =>
          expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
           `safeSet error: 'accessor' is not a string.`);
       });
+
+      it('error - options.createMissing is not a boolean', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { createMissing: 'bad' })).throws(TypeError,
+          `safeSet error: 'options.createMissing' is not a boolean.`);
+      });
+
+      it('error - options.operation is not a string', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { operation: false })).throws(TypeError,
+          `safeSet error: 'options.operation' is not a string.`);
+      });
+
+      it('error - Unknown options.operation', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { operation: 'bad' })).throws(Error,
+          `safeSet error: Unknown 'options.operation'.`);
+      });
    });
 });

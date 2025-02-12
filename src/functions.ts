@@ -576,19 +576,38 @@ export function* safeKeyIterator(data: object, { hasOwnOnly = true }: { hasOwnOn
  *
  * @param value - A new value to set if an entry for accessor is found.
  *
- * @param [operation='set'] - Operation to perform including: 'add', 'div', 'mult', 'set', 'set-undefined', 'sub'.
+ * @param [options] - Options.
  *
- * @param [createMissing=true] - If true missing accessor entries will be created as objects automatically.
+ * @param [options.operation] - Operation to perform including: `add`, `div`, `mult`, `set`, `set-undefined`, `sub`;
+ *        default: `set`.
+ *
+ * @param [options.createMissing] - If `true` missing accessor entries will be created as objects automatically;
+ *        default: `false`.
  *
  * @returns True if successful.
  */
-export function safeSet(data: object, accessor: string, value: any, operation: 'add' | 'div' | 'mult' | 'set' |
- 'set-undefined' | 'sub' = 'set', createMissing: boolean = true): boolean
+export function safeSet(data: object, accessor: string, value: any, { operation = 'set', createMissing = false }:
+ { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
    if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a string.`); }
+   if (typeof operation !== 'string') { throw new TypeError(`safeSet error: 'options.operation' is not a string.`); }
+   if (operation !== 'add' && operation !== 'div' && operation !== 'mult' && operation !== 'set' &&
+    operation !== 'set-undefined' && operation !== 'sub')
+   {
+      throw new Error(`safeSet error: Unknown 'options.operation'.`);
+   }
+   if (typeof createMissing !== 'boolean')
+   {
+      throw new TypeError(`safeSet error: 'options.createMissing' is not a boolean.`);
+   }
 
    const access: string[] = accessor.split('.');
+
+   let result = false;
+
+   // Verify first level missing property.
+   if (access.length === 1 && !createMissing && !(access[0] in data)) { return false; }
 
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < access.length; cntr++)
@@ -607,26 +626,32 @@ export function safeSet(data: object, accessor: string, value: any, operation: '
          {
             case 'add':
                data[access[cntr]] += value;
+               result = true;
                break;
 
             case 'div':
                data[access[cntr]] /= value;
+               result = true;
                break;
 
             case 'mult':
                data[access[cntr]] *= value;
+               result = true;
                break;
 
             case 'set':
                data[access[cntr]] = value;
+               result = true;
                break;
 
             case 'set-undefined':
                if (data[access[cntr]] === void 0) { data[access[cntr]] = value; }
+               result = true;
                break;
 
             case 'sub':
                data[access[cntr]] -= value;
+               result = true;
                break;
          }
       }
@@ -642,7 +667,7 @@ export function safeSet(data: object, accessor: string, value: any, operation: '
       }
    }
 
-   return true;
+   return result;
 }
 
 // Utility types -----------------------------------------------------------------------------------------------------

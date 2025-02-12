@@ -724,7 +724,7 @@ describe('ObjectUtil:', () =>
       });
    });
 
-   describe('safeAccess:', () =>
+   describe('safeSet:', () =>
    {
       const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)];
 
@@ -735,7 +735,10 @@ describe('ObjectUtil:', () =>
       it('add', () =>
       {
          for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 10, 'add'); }
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'add' });
+            assert.isTrue(result);
+         }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD));
       });
@@ -743,7 +746,10 @@ describe('ObjectUtil:', () =>
       it('div', () =>
       {
          for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 10, 'div'); }
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'div' });
+            assert.isTrue(result);
+         }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV));
       });
@@ -751,7 +757,10 @@ describe('ObjectUtil:', () =>
       it('mult', () =>
       {
          for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 10, 'mult'); }
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'mult' });
+            assert.isTrue(result);
+         }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT));
       });
@@ -759,7 +768,10 @@ describe('ObjectUtil:', () =>
       it('sub', () =>
       {
          for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 10, 'sub'); }
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'sub' });
+            assert.isTrue(result);
+         }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
       });
@@ -767,7 +779,10 @@ describe('ObjectUtil:', () =>
       it('set', () =>
       {
          for (const accessor of accessors)
-         { ObjectUtil.safeSet(objectNumCopy, accessor, 'aa'); }
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 'aa');
+            assert.isTrue(result);
+         }
 
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
       });
@@ -777,23 +792,67 @@ describe('ObjectUtil:', () =>
          // Add new undefined property.
          (objectNumCopy as any).d = void 0;
 
-         ObjectUtil.safeSet(objectNumCopy, 'd', true, 'set-undefined');
+         const result = ObjectUtil.safeSet(objectNumCopy, 'd', true, { operation: 'set-undefined' });
 
+         assert.isTrue(result);
          assert.isTrue((objectNumCopy as any).d);
       });
 
       it('no array accessor / string', () =>
       {
-         ObjectUtil.safeSet(objectNumCopy, 'level1.level2.array2.bogus', 'bogus');
+         const result = ObjectUtil.safeSet(objectNumCopy, 'level1.level2.array2.bogus', 'bogus');
 
+         assert.isFalse(result);
          assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
       });
 
       it('no array accessor / negative number', () =>
       {
-         ObjectUtil.safeSet(objectNumCopy, 'level1.level2.array2.-1', 'bogus');
+         const result = ObjectUtil.safeSet(objectNumCopy, 'level1.level2.array2.-1', 'bogus');
 
+         assert.isFalse(result);
          assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
+      });
+
+      it('does not create missing property (top level)', () =>
+      {
+         assert.isUndefined((objectNumCopy as any)._new);
+
+         const result = ObjectUtil.safeSet(objectNumCopy, '_new', true);
+
+         assert.isFalse(result);
+         assert.isUndefined((objectNumCopy as any)._new);
+      });
+
+      it('does not create missing property (2nd level)', () =>
+      {
+         assert.isUndefined((objectNumCopy as any)._new);
+
+         const result = ObjectUtil.safeSet(objectNumCopy, '_new._new', true);
+
+         assert.isFalse(result);
+         assert.isUndefined((objectNumCopy as any)._new);
+      });
+
+      it('does create missing property (top level)', () =>
+      {
+         assert.isUndefined((objectNumCopy as any)._new);
+
+         const result = ObjectUtil.safeSet(objectNumCopy, '_new', true, { createMissing: true });
+
+         assert.isTrue(result);
+         assert.isTrue((objectNumCopy as any)._new);
+      });
+
+      it('does create missing property (2nd level)', () =>
+      {
+         assert.isUndefined((objectNumCopy as any)._new);
+
+         const result = ObjectUtil.safeSet(objectNumCopy, '_new._new', true, { createMissing: true });
+
+         assert.isTrue(result);
+         assert.isObject((objectNumCopy as any)._new);
+         assert.isTrue((objectNumCopy as any)._new._new);
       });
    });
 });
