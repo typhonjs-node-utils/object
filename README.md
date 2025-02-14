@@ -12,7 +12,3 @@
 Provides common object manipulation utility functions and TypeScript type guards.
 
 [API documentation](https://typhonjs-node-utils.github.io/object/)
-
-## Roadmap
-
-- 100% Test coverage.
