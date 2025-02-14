@@ -1,13 +1,14 @@
 {
   "name": "@typhonjs-utils/object",
   "description": "Provides common object manipulation utility functions and TypeScript type guards.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "license": "MPL-2.0",
   "author": "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)",
   "contributors": [
     "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
   ],
   "type": "module",
+  "main": "./dist/functions.js",
   "exports": {
     ".": {
       "types": "./dist/functions.d.ts",
