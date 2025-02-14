@@ -1,6 +1,5 @@
 /**
- * Provides common object manipulation utilities including depth traversal, obtaining accessors, safely setting values /
- * equality tests.
+ * Provides common object manipulation utility functions and TypeScript type guards.
  *
  * @packageDocumentation
  */
@@ -513,6 +512,8 @@ export function safeEqual(source: object, target: object, options?: { arrayIndex
 
 /**
  * Returns an iterator of safe keys useful with {@link safeAccess} and {@link safeSet} by traversing the given object.
+ *
+ * Note: Keys are only generated for JSON objects; {@link Map} and {@link Set} are not indexed.
  *
  * @param data - An object to traverse for accessor keys.
  *
