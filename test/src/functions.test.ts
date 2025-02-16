@@ -632,10 +632,13 @@ describe('ObjectUtil:', () =>
 
    it('isPlainObject', () =>
    {
+      class Test {}
+
       assert.isFalse(ObjectUtil.isPlainObject(false));
       assert.isFalse(ObjectUtil.isPlainObject(null));
       assert.isFalse(ObjectUtil.isPlainObject(void 0));
       assert.isFalse(ObjectUtil.isPlainObject(new String('test')));
+      assert.isFalse(ObjectUtil.isPlainObject(new Test()));
 
       assert.isTrue(ObjectUtil.isPlainObject({}));
       assert.isTrue(ObjectUtil.isPlainObject(Object.create(null)));
