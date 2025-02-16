@@ -1,4 +1,7 @@
 # Changelog
+## 0.4.0 release (minor)
+- Fix regression in  `isPlainObject`.
+
 ## 0.3.0 release (minor)
 - Added `main` field to package.json (required by `esm-d-ts` for test cases using this package without `node resolve`).
 
