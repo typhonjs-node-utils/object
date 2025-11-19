@@ -304,7 +304,7 @@ export async function ensureNonEmptyAsyncIterable<T>(value: AsyncIterable<T> | I
  *
  * @param value - The value to inspect.
  *
- * @returns A restartable iterable containing all values, or `false` if the input was not iterable or contained no
+ * @returns A restartable iterable containing all values, or `undefined` if the input was not iterable or contained no
  *          items.
  *
  * @example
