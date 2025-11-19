@@ -1,4 +1,11 @@
-import * as ObjectUtil from '../../src/functions';
+import { expectTypeOf } from 'vitest';
+
+import * as ObjectUtil  from '../../src/functions';
+
+/**
+ * For visual no-op type erasure tests.
+ */
+interface NoOpObj { a?: number }
 
 const s_OBJECT_DEEP =
 {
@@ -527,10 +534,14 @@ describe('ObjectUtil:', () =>
             set test(val) { } // eslint-disable-line no-unused-vars
          }
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasAccessor({}, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasAccessor(() => void 0, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasAccessor(data, 'nope'));
          assert.isFalse(ObjectUtil.hasAccessor(null, 'nope'));
          assert.isFalse(ObjectUtil.hasAccessor(void 0, 'nope'));
-         assert.isFalse(ObjectUtil.hasAccessor(() => void 0, 'nope'));
          assert.isFalse(ObjectUtil.hasAccessor(data, 'bad'));
 
          assert.isTrue(ObjectUtil.hasAccessor(data, 'test'));
@@ -548,6 +559,7 @@ describe('ObjectUtil:', () =>
 
          const instance = new Top();
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasAccessor(instance, 'nope'));
          assert.isFalse(ObjectUtil.hasAccessor(instance, 'bad'));
 
@@ -564,10 +576,14 @@ describe('ObjectUtil:', () =>
             bad() { return 1; }
          }
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasGetter({}, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasGetter(() => void 0, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasGetter(data, 'nope'));
          assert.isFalse(ObjectUtil.hasGetter(null, 'nope'));
          assert.isFalse(ObjectUtil.hasGetter(void 0, 'nope'));
-         assert.isFalse(ObjectUtil.hasGetter(() => void 0, 'nope'));
          assert.isFalse(ObjectUtil.hasGetter(data, 'bad'));
 
          assert.isTrue(ObjectUtil.hasGetter(data, 'test'));
@@ -583,6 +599,7 @@ describe('ObjectUtil:', () =>
 
          const instance = new Top();
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasGetter(instance, 'nope'));
 
          assert.isTrue(ObjectUtil.hasGetter(instance, 'test'));
@@ -599,7 +616,6 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.hasPrototype({}, Base));
       // @ts-expect-error
       assert.isFalse(ObjectUtil.hasPrototype(() => void 0, Base));
-
       assert.isFalse(ObjectUtil.hasPrototype(null, Base));
       assert.isFalse(ObjectUtil.hasPrototype(void 0, Base));
 
@@ -618,10 +634,14 @@ describe('ObjectUtil:', () =>
             set test(val) { } // eslint-disable-line no-unused-vars
          }
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasSetter({}, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasSetter(() => void 0, 'nope'));
+         // @ts-expect-error
+         assert.isFalse(ObjectUtil.hasSetter(data, 'nope'));
          assert.isFalse(ObjectUtil.hasSetter(null, 'nope'));
          assert.isFalse(ObjectUtil.hasSetter(void 0, 'nope'));
-         assert.isFalse(ObjectUtil.hasSetter(() => void 0, 'nope'));
          assert.isFalse(ObjectUtil.hasSetter(data, 'bad'));
 
          assert.isTrue(ObjectUtil.hasSetter(data, 'test'));
@@ -639,6 +659,7 @@ describe('ObjectUtil:', () =>
 
          const instance = new Top();
 
+         // @ts-expect-error
          assert.isFalse(ObjectUtil.hasSetter(instance, 'nope'));
          assert.isFalse(ObjectUtil.hasSetter(instance, 'bad'));
 
@@ -677,6 +698,10 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isObject(void 0));
 
       assert.isTrue(ObjectUtil.isObject({}));
+
+      // No-op visual type erasure check.
+      const val: NoOpObj = { a: 123 };
+      if (ObjectUtil.isObject(val)) { expectTypeOf(val).toEqualTypeOf<NoOpObj>(); }
    });
 
    it('isPlainObject', () =>
@@ -692,22 +717,10 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.isPlainObject({}));
       assert.isTrue(ObjectUtil.isPlainObject(Object.create(null)));
       assert.isTrue(ObjectUtil.isPlainObject(new Object())); // eslint-disable-line no-new-object
-   });
 
-   it('isPlainObjectEmpty', () =>
-   {
-      class Test {}
-
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty(false));
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty(null));
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty(void 0));
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty(new String('test')));
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty(new Test()));
-      assert.isFalse(ObjectUtil.isPlainObjectEmpty({ foo: 'bar ' }));
-
-      assert.isTrue(ObjectUtil.isPlainObjectEmpty({}));
-      assert.isTrue(ObjectUtil.isPlainObjectEmpty(Object.create(null)));
-      assert.isTrue(ObjectUtil.isPlainObjectEmpty(new Object())); // eslint-disable-line no-new-object
+      // No-op visual type erasure check.
+      const val: NoOpObj = { a: 123 };
+      if (ObjectUtil.isPlainObject(val)) { expectTypeOf(val).toEqualTypeOf<NoOpObj>(); }
    });
 
    it('objectKeys', () =>
@@ -718,6 +731,9 @@ describe('ObjectUtil:', () =>
       assert.deepEqual(ObjectUtil.objectKeys(void 0), []);
       assert.deepEqual(ObjectUtil.objectKeys({}), []);
       assert.deepEqual(ObjectUtil.objectKeys({ value: true }), ['value']);
+
+      // No-op visual type erasure check.
+      expectTypeOf(ObjectUtil.objectKeys({ a: 123 })).toEqualTypeOf<'a'[]>();
    });
 
    it('objectSize', () =>

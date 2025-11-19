@@ -352,8 +352,8 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
  * @typeParam T - Type of data.
  * @typeParam K - Accessor key.
  */
-export function hasAccessor<T extends object, K extends string>(object: T, accessor: K):
- object is T & Record<K, unknown>
+export function hasAccessor<T extends object, K extends keyof T>(object: T, accessor: K):
+ object is T & { [P in K]: T[P] }
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
@@ -383,7 +383,7 @@ export function hasAccessor<T extends object, K extends string>(object: T, acces
  * @typeParam T - Type of data.
  * @typeParam K - Accessor key.
  */
-export function hasGetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
+export function hasGetter<T extends object, K extends keyof T>(object: T, accessor: K): object is T & { [P in K]: T[P] }
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
@@ -440,7 +440,7 @@ export function hasPrototype<T extends new (...args: any[]) => any>(target: new 
  * @typeParam T - Type of data.
  * @typeParam K - Accessor key.
  */
-export function hasSetter<T extends object, K extends string>(object: T, accessor: K): object is T & Record<K, unknown>
+export function hasSetter<T extends object, K extends keyof T>(object: T, accessor: K): object is T & { [P in K]: T[P] }
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
@@ -465,7 +465,7 @@ export function hasSetter<T extends object, K extends string>(object: T, accesso
  *
  * @returns Whether value is async iterable.
  */
-export function isAsyncIterable(value: unknown): value is AsyncIterable<any>
+export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T>
 {
    return value !== void 0 && value !== null && typeof (value as any)[Symbol.asyncIterator] === 'function';
 }
@@ -477,7 +477,7 @@ export function isAsyncIterable(value: unknown): value is AsyncIterable<any>
  *
  * @returns Whether object is iterable.
  */
-export function isIterable(value: unknown): value is Iterable<any>
+export function isIterable<T>(value: unknown): value is Iterable<T>
 {
    return value !== void 0 && value !== null && typeof (value as any)[Symbol.iterator] === 'function';
 }
@@ -489,7 +489,7 @@ export function isIterable(value: unknown): value is Iterable<any>
  *
  * @returns Is it an object.
  */
-export function isObject(value: unknown): value is Record<string, unknown>
+export function isObject<T extends object>(value: T | unknown): value is T
 {
    return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -503,28 +503,12 @@ export function isObject(value: unknown): value is Record<string, unknown>
  *
  * @returns Is it a plain object.
  */
-export function isPlainObject(value: unknown): value is Record<string, unknown>
+export function isPlainObject<T extends object>(value: unknown): value is T
 {
    if (Object.prototype.toString.call(value) !== '[object Object]') { return false; }
 
    const prototype: any = Object.getPrototypeOf(value);
    return prototype === null || prototype === Object.prototype;
-}
-
-/**
- * Test for an empty plain object.
- *
- * A strict check: only plain objects ({}) qualify, and only if they have no own enumerable keys.
- *
- * @returns `true` if the value is a plain object with no enumerable properties.
- */
-export function isPlainObjectEmpty(value: unknown): value is Record<string, never>
-{
-   if (!isPlainObject(value)) { return false; }
-
-   for (const key in value) { return false; }
-
-   return true;
 }
 
 /**
@@ -534,9 +518,9 @@ export function isPlainObjectEmpty(value: unknown): value is Record<string, neve
  *
  * @returns Object keys or empty array.
  */
-export function objectKeys(object: object): string[]
+export function objectKeys<T extends object>(object: T): (keyof T)[]
 {
-   return typeof object === 'object' && object !== null ? Object.keys(object) : [];
+   return typeof object === 'object' && object !== null ? Object.keys(object) as (keyof T)[] : [];
 }
 
 /**
@@ -550,7 +534,7 @@ export function objectSize(object: any): number
 {
    if (object === void 0 || object === null || typeof object !== 'object') { return 0; }
 
-   const tag: any = Object.prototype.toString.call(object);
+   const tag: string = Object.prototype.toString.call(object);
 
    if (tag === '[object Map]' || tag === '[object Set]') { return object.size; }
 
@@ -617,8 +601,8 @@ export function safeAccess<T extends object, P extends string, R = DeepAccess<T,
  *
  * @returns True if equal.
  */
-export function safeEqual(source: object, target: object, options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }):
- boolean
+export function safeEqual<T extends object>(source: T, target: object,
+ options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }): target is T
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
