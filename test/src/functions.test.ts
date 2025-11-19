@@ -1,4 +1,4 @@
-import * as ObjectUtil from '../../src/functions.js';
+import * as ObjectUtil from '../../src/functions';
 
 const s_OBJECT_DEEP =
 {
@@ -149,14 +149,14 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2][0]));
 
       // Make sure pushing to arrays fails.
-                                                                                    // @ts-expect-error
+                                                                              // @ts-expect-error
       assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
       assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
       assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
       assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.array[2].push(1); });
-                                                                                    // @ts-expect-error
+                                                                              // @ts-expect-error
       assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
       assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
@@ -430,14 +430,14 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2][0]));
 
       // Make sure pushing to arrays fails.
-                                                                                    // @ts-expect-error
+                                                                              // @ts-expect-error
       assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
       assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
       assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
       assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.array[2].push(1); });
-                                                                                    // @ts-expect-error
+                                                                              // @ts-expect-error
       assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
       assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
       assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
@@ -465,6 +465,55 @@ describe('ObjectUtil:', () =>
       assert.isTrue(Object.isSealed(testObj.level1.skipKey.s2));
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey));
       assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
+   });
+
+
+   it('ensureNonEmptyAsyncIterable:', async () =>
+   {
+      // @ts-expect-error
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable(false));
+
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable((async function *generator() {})()));
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable(null));
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable(void 0));
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable([]));
+      assert.isUndefined(await ObjectUtil.ensureNonEmptyAsyncIterable((function *generator() {})()));
+
+      const asyncIter1 = await ObjectUtil.ensureNonEmptyAsyncIterable(
+       (async function *generator() { yield 1; yield 2; })());
+
+      const asyncIter2 = await ObjectUtil.ensureNonEmptyAsyncIterable((function *generator() { yield 1; yield 2; })());
+
+      const asyncIter3 = await ObjectUtil.ensureNonEmptyAsyncIterable([1, 2]);
+
+      const result1 = [];
+      const result2 = [];
+      const result3 = [];
+
+      for await (const v of asyncIter1) { result1.push(v); }
+      for await (const v of asyncIter2) { result2.push(v); }
+      for await (const v of asyncIter3) { result3.push(v); }
+
+      assert.deepEqual(result1, [1, 2]);
+      assert.deepEqual(result2, [1, 2]);
+      assert.deepEqual(result3, [1, 2]);
+   });
+
+   it('ensureNonEmptyIterable:', () =>
+   {
+      // @ts-expect-error
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable(false));
+
+      // @ts-expect-error
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable((async function *generator() {})()));
+
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable(null));
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable(void 0));
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable([]));
+      assert.isUndefined(ObjectUtil.ensureNonEmptyIterable((function *generator() {})()));
+
+      assert.deepEqual([...ObjectUtil.ensureNonEmptyIterable((function *generator() { yield 1; yield 2; })())], [1, 2]);
+      assert.deepEqual([...ObjectUtil.ensureNonEmptyIterable([1, 2])], [1, 2]);
    });
 
    describe('hasAccessor:', () =>
@@ -602,9 +651,9 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isIterable(false));
       assert.isFalse(ObjectUtil.isIterable(null));
       assert.isFalse(ObjectUtil.isIterable({}));
-      assert.isFalse(ObjectUtil.isIterable(''));
       assert.isFalse(ObjectUtil.isIterable((async function *generator() {})()));
 
+      assert.isTrue(ObjectUtil.isIterable('123'));
       assert.isTrue(ObjectUtil.isIterable(new Set('a')));
       assert.isTrue(ObjectUtil.isIterable((function *generator() {})()));
    });
@@ -643,6 +692,22 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.isPlainObject({}));
       assert.isTrue(ObjectUtil.isPlainObject(Object.create(null)));
       assert.isTrue(ObjectUtil.isPlainObject(new Object())); // eslint-disable-line no-new-object
+   });
+
+   it('isPlainObjectEmpty', () =>
+   {
+      class Test {}
+
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty(false));
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty(null));
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty(void 0));
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty(new String('test')));
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty(new Test()));
+      assert.isFalse(ObjectUtil.isPlainObjectEmpty({ foo: 'bar ' }));
+
+      assert.isTrue(ObjectUtil.isPlainObjectEmpty({}));
+      assert.isTrue(ObjectUtil.isPlainObjectEmpty(Object.create(null)));
+      assert.isTrue(ObjectUtil.isPlainObjectEmpty(new Object())); // eslint-disable-line no-new-object
    });
 
    it('objectKeys', () =>

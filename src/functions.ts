@@ -233,6 +233,114 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 }
 
 /**
+ * Ensures that a value is a *non-empty async iterable*.
+ * ```
+ * - If the value is not async iterable, `undefined` is returned.
+ * - If the async iterable yields no items, `undefined` is returned.
+ * - If it yields at least one item, a fresh async iterable is returned which yields the first peeked item followed by
+ * the rest, preserving behavior for one-shot async generators.
+ * ```
+ *
+ * Supports both AsyncIterable<T> and (optionally) synchronous Iterable<T>.
+ *
+ * @param value - The value to test as an async iterable.
+ *
+ * @returns A non-empty async iterable, or `undefined`.
+ */
+export async function ensureNonEmptyAsyncIterable<T>(value: AsyncIterable<T> | Iterable<T> | null | undefined):
+ Promise<AsyncIterable<T> | undefined>
+{
+   // First detect async-iterable-like values.
+   const asyncIteratorFn = value?.[Symbol.asyncIterator];
+   const syncIteratorFn  = value?.[Symbol.iterator];
+
+   if (asyncIteratorFn)
+   {
+      const iter = asyncIteratorFn.call(value);
+      const first = await iter.next();
+
+      if (first.done) { return void 0; }
+
+      return (async function* (): AsyncGenerator<T, void, unknown>
+      {
+         // Yield peeked first value.
+         yield first.value;
+
+         // Manually consume the underlying async iterator.
+         for (let r = await iter.next(); !r.done; r = await iter.next()) { yield r.value; }
+      })();
+   }
+   else if (syncIteratorFn)
+   {
+      // Allow synchronous iterables to be lifted into async context.
+      const iter = syncIteratorFn.call(value);
+      const first = iter.next();
+
+      if (first.done) { return void 0; }
+
+      return (async function* (): AsyncGenerator<T, void, unknown>
+      {
+         yield first.value;
+
+         for (let r = iter.next(); !r.done; r = iter.next()) { yield r.value; }
+      })();
+   }
+
+   return void 0;
+}
+
+/**
+ * Ensures that a given value is a *non-empty iterable*.
+ * ```
+ * - If the value is not iterable → returns `undefined`.
+ * - If the value is an iterable but contains no entries → returns `undefined`.
+ * - If the value is a non-empty iterable → returns a fresh iterable (generator) that yields the first peeked value
+ * followed by the remaining values. This guarantees restartable iteration even when the original iterable is a
+ * one-shot generator.
+ * ```
+ *
+ * This function is ideal when you need a safe, non-empty iterable for iteration but cannot consume or trust the
+ * original iterable’s internal iterator state.
+ *
+ * @param value - The value to inspect.
+ *
+ * @returns A restartable iterable containing all values, or `false` if the input was not iterable or contained no
+ *          items.
+ *
+ * @example
+ * const iter = ensureNonEmptyIterable(['a', 'b']);
+ * // `iter` is an iterable yielding 'a', 'b'.
+ *
+ * const empty = ensureNonEmptyIterable([]);
+ * // `undefined`
+ *
+ * const gen = ensureNonEmptyIterable((function*(){ yield 1; yield 2; })());
+ * // Safe: returns an iterable yielding 1, 2 without consuming the generator.
+ */
+export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined): Iterable<T> | undefined
+{
+   if (!isIterable(value)) { return void 0; }
+
+   // Peek at the first value without committing to iteration on restartable iterables.
+   const iter = value[Symbol.iterator]();
+
+   const first = iter.next();
+
+   // Empty iterable.
+   if (first.done) { return void 0; }
+
+   // Non-empty: return a generator that includes the first peeked value.
+   return (function* ()
+   {
+      // Include first consumed value.
+      yield first.value;
+
+      // Yield remaining values from original iterator.
+      for (let r = iter.next(); !r.done; r = iter.next()) { yield r.value; }
+   })();
+}
+
+/**
  * Determine if the given object has a getter & setter accessor.
  *
  * @param object - An object.
@@ -359,9 +467,7 @@ export function hasSetter<T extends object, K extends string>(object: T, accesso
  */
 export function isAsyncIterable(value: unknown): value is AsyncIterable<any>
 {
-   if (typeof value !== 'object' || value === null || value === void 0) { return false; }
-
-   return Symbol.asyncIterator in value;
+   return value !== void 0 && value !== null && typeof (value as any)[Symbol.asyncIterator] === 'function';
 }
 
 /**
@@ -373,9 +479,7 @@ export function isAsyncIterable(value: unknown): value is AsyncIterable<any>
  */
 export function isIterable(value: unknown): value is Iterable<any>
 {
-   if (value === null || value === void 0 || typeof value !== 'object') { return false; }
-
-   return Symbol.iterator in value;
+   return value !== void 0 && value !== null && typeof (value as any)[Symbol.iterator] === 'function';
 }
 
 /**
@@ -405,6 +509,22 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
 
    const prototype: any = Object.getPrototypeOf(value);
    return prototype === null || prototype === Object.prototype;
+}
+
+/**
+ * Test for an empty plain object.
+ *
+ * A strict check: only plain objects ({}) qualify, and only if they have no own enumerable keys.
+ *
+ * @returns `true` if the value is a plain object with no enumerable properties.
+ */
+export function isPlainObjectEmpty(value: unknown): value is Record<string, never>
+{
+   if (!isPlainObject(value)) { return false; }
+
+   for (const key in value) { return false; }
+
+   return true;
 }
 
 /**

@@ -14,6 +14,8 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
  * - `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * - `typhonjs:utils:object:deep:seal`: Invokes `deepSeal`.
+ * - `typhonjs:utils:object:ensure:non:empty:iterable:async`: Invokes `ensureNonEmptyAsyncIterable`.
+ * - `typhonjs:utils:object:ensure:non:empty:iterable`: Invokes `ensureNonEmptyIterable`.
  * - `typhonjs:utils:object:has:accessor`: Invokes `hasAccessor`.
  * - `typhonjs:utils:object:has:getter`: Invokes `hasGetter`.
  * - `typhonjs:utils:object:has:prototype`: Invokes `hasPrototype`.
@@ -21,6 +23,8 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:is:iterable:async`: Invokes `isAsyncIterable`.
  * - `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
  * - `typhonjs:utils:object:is:object`: Invokes `isObject`.
+ * - `typhonjs:utils:object:is:object:plain`: Invokes `isPlainObject`.
+ * - `typhonjs:utils:object:is:object:plain:empty`: Invokes `isPlainObjectEmpty`.
  * - `typhonjs:utils:object:keys`: Invokes `objectKeys`.
  * - `typhonjs:utils:object:klona`: Invokes `klona`.
  * - `typhonjs:utils:object:size`: Invokes `objectSize`.
@@ -49,6 +53,10 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:ensure:non:empty:iterable:async', OU.ensureNonEmptyAsyncIterable, void 0,
+    { guard });
+   eventbus.on('typhonjs:utils:object:ensure:non:empty:iterable', OU.ensureNonEmptyIterable, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:accessor', OU.hasAccessor, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:getter', OU.hasGetter, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:prototype', OU.hasPrototype, void 0, { guard });
@@ -57,6 +65,7 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object:plain', OU.isPlainObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:object:plain:empty', OU.isPlainObjectEmpty, void 0, { guard });
    eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard });
    eventbus.on('typhonjs:utils:object:klona', OU.klona, void 0, { guard });
    eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard });
