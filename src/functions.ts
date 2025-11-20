@@ -459,7 +459,7 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
 }
 
 /**
- * Tests for whether an object is async iterable.
+ * Tests for whether an _object_ is async iterable.
  *
  * @param value - Any value.
  *
