@@ -673,8 +673,9 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isIterable(null));
       assert.isFalse(ObjectUtil.isIterable({}));
       assert.isFalse(ObjectUtil.isIterable((async function *generator() {})()));
+      assert.isFalse(ObjectUtil.isIterable('123')); // While a string is iterable it is not an iterable list / object.
+      assert.isFalse(ObjectUtil.isIterable(function *generator() {})); // The generator function itself is not iterable.
 
-      assert.isTrue(ObjectUtil.isIterable('123'));
       assert.isTrue(ObjectUtil.isIterable(new Set('a')));
       assert.isTrue(ObjectUtil.isIterable((function *generator() {})()));
    });
@@ -687,6 +688,10 @@ describe('ObjectUtil:', () =>
       assert.isFalse(ObjectUtil.isAsyncIterable(''));
       assert.isFalse(ObjectUtil.isAsyncIterable(new Set('a')));
       assert.isFalse(ObjectUtil.isAsyncIterable((function *generator() {})()));
+      assert.isFalse(ObjectUtil.isAsyncIterable(function *generator() {}));
+
+      // The generator function itself is not iterable.
+      assert.isFalse(ObjectUtil.isAsyncIterable(async function *generator() {}));
 
       assert.isTrue(ObjectUtil.isAsyncIterable((async function *generator() {})()));
    });

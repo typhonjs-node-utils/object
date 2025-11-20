@@ -467,11 +467,13 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
  */
 export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T>
 {
-   return value !== void 0 && value !== null && typeof (value as any)[Symbol.asyncIterator] === 'function';
+   return value !== null && typeof value === 'object' && typeof (value as any)[Symbol.asyncIterator] === 'function';
 }
 
 /**
- * Tests for whether an object is iterable.
+ * Tests for whether an _object_ is iterable.
+ *
+ * Note: Excludes `strings` in iterable test even though they are technically iterable.
  *
  * @param value - Any value.
  *
@@ -479,7 +481,7 @@ export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T>
  */
 export function isIterable<T>(value: unknown): value is Iterable<T>
 {
-   return value !== void 0 && value !== null && typeof (value as any)[Symbol.iterator] === 'function';
+   return value !== null && typeof value === 'object' && typeof (value as any)[Symbol.iterator] === 'function';
 }
 
 /**
