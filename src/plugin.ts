@@ -11,6 +11,7 @@ import * as OU from './functions.js';
  *
  * Wires up object util functions on the plugin eventbus. The following event bindings are available:
  * ```
+ * - `typhonjs:utils:object:assert`: Invokes `assertObject`.
  * - `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
  * - `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * - `typhonjs:utils:object:deep:seal`: Invokes `deepSeal`.
@@ -24,6 +25,7 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:is:iterable`: Invokes `isIterable`.
  * - `typhonjs:utils:object:is:object`: Invokes `isObject`.
  * - `typhonjs:utils:object:is:object:plain`: Invokes `isPlainObject`.
+ * - `typhonjs:utils:object:is:record`: Invokes `isRecord`.
  * - `typhonjs:utils:object:keys`: Invokes `objectKeys`.
  * - `typhonjs:utils:object:klona`: Invokes `klona`.
  * - `typhonjs:utils:object:size`: Invokes `objectSize`.
@@ -49,6 +51,7 @@ export function onPluginLoad(ev)
       if (typeof options.guard === 'boolean') { guard = options.guard; }
    }
 
+   eventbus.on('typhonjs:utils:object:assert', OU.assertObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
@@ -64,6 +67,7 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:is:iterable', OU.isIterable, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object', OU.isObject, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:object:plain', OU.isPlainObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:is:record', OU.isRecord, void 0, { guard });
    eventbus.on('typhonjs:utils:object:keys', OU.objectKeys, void 0, { guard });
    eventbus.on('typhonjs:utils:object:klona', OU.klona, void 0, { guard });
    eventbus.on('typhonjs:utils:object:size', OU.objectSize, void 0, { guard });

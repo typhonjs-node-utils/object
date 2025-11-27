@@ -94,6 +94,21 @@ const s_VERIFY_SAFESET_SUB = `{"a":0,"b":0,"c":0,"array":[0,0,0],"level1":{"d":0
 
 describe('ObjectUtil:', () =>
 {
+   it('assertObject', () =>
+   {
+      assert.throws(() => ObjectUtil.assertObject(false), 'Expected an object.');
+      assert.throws(() => ObjectUtil.assertObject(null), 'Expected an object.');
+      assert.throws(() => ObjectUtil.assertObject(void 0), 'Expected an object.');
+      assert.throws(() => ObjectUtil.assertObject([]), 'Expected an object.');
+
+      assert.throws(() => ObjectUtil.assertObject(void 0, 'Custom error message'), 'Custom error message');
+
+      // No-op visual type erasure check.
+      const val: NoOpObj = { a: 123 };
+      ObjectUtil.assertObject(val);
+      expectTypeOf(val).toEqualTypeOf<NoOpObj>();
+   });
+
    it('deepFreeze w/ skipKeys:', () =>
    {
       const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
@@ -726,6 +741,25 @@ describe('ObjectUtil:', () =>
       // No-op visual type erasure check.
       const val: NoOpObj = { a: 123 };
       if (ObjectUtil.isPlainObject(val)) { expectTypeOf(val).toEqualTypeOf<NoOpObj>(); }
+   });
+
+   it('isRecord', () =>
+   {
+      class Test {}
+
+      assert.isFalse(ObjectUtil.isRecord(false));
+      assert.isFalse(ObjectUtil.isRecord(null));
+      assert.isFalse(ObjectUtil.isRecord(void 0));
+      assert.isFalse(ObjectUtil.isRecord('test'));
+
+      assert.isTrue(ObjectUtil.isRecord(new Test()));
+      assert.isTrue(ObjectUtil.isRecord({}));
+      assert.isTrue(ObjectUtil.isRecord(Object.create(null)));
+      assert.isTrue(ObjectUtil.isRecord(new Object())); // eslint-disable-line no-new-object
+
+      // No-op visual type check.
+      const val: NoOpObj = { a: 123 };
+      if (ObjectUtil.isRecord(val)) { expectTypeOf(val).toEqualTypeOf<Record<string, unknown>>(); }
    });
 
    it('objectKeys', () =>
