@@ -3,6 +3,7 @@
 - Improved `isObject` / `isPlainObject` type guard / types passthrough.
 - Added: 
   - `assertObject`  
+  - `assertPlainObject`  
   - `ensureNonEmptyAsyncIterable` 
   - `ensureNonEmptyIterable` 
   - `isRecord` 
