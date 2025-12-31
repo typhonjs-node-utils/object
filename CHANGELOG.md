@@ -1,4 +1,12 @@
 # Changelog
+## 0.5.0 release (major)
+- Improved `isObject` / `isPlainObject` type guard / types passthrough.
+- Added: 
+  - `assertObject`  
+  - `ensureNonEmptyAsyncIterable` 
+  - `ensureNonEmptyIterable` 
+  - `isRecord` 
+
 ## 0.4.0 release (minor)
 - Fix regression in  `isPlainObject`.
 
