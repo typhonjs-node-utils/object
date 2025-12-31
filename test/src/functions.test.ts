@@ -103,9 +103,30 @@ describe('ObjectUtil:', () =>
 
       assert.throws(() => ObjectUtil.assertObject(void 0, 'Custom error message'), 'Custom error message');
 
+      class Test { a: number = 123; }
+
+      // No-op visual type erasure check.
+      const val: Test = new Test();
+      ObjectUtil.assertObject(val);
+      expectTypeOf(val).toEqualTypeOf<Test>();
+   });
+
+   it('assertPlainObject', () =>
+   {
+      assert.throws(() => ObjectUtil.assertPlainObject(false), 'Expected a plain object.');
+      assert.throws(() => ObjectUtil.assertPlainObject(null), 'Expected a plain object.');
+      assert.throws(() => ObjectUtil.assertPlainObject(void 0), 'Expected a plain object.');
+      assert.throws(() => ObjectUtil.assertPlainObject([]), 'Expected a plain object.');
+      assert.throws(() => ObjectUtil.assertPlainObject(new Map()), 'Expected a plain object.');
+
+      assert.throws(() => ObjectUtil.assertPlainObject(void 0, 'Custom error message'), 'Custom error message');
+
+      class Foo {}
+      assert.throws(() => ObjectUtil.assertPlainObject(new Foo()), 'Expected a plain object.');
+
       // No-op visual type erasure check.
       const val: NoOpObj = { a: 123 };
-      ObjectUtil.assertObject(val);
+      ObjectUtil.assertPlainObject(val);
       expectTypeOf(val).toEqualTypeOf<NoOpObj>();
    });
 

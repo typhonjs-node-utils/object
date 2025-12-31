@@ -33,9 +33,45 @@ export * from 'klona/full';
  *
  * @param errorMsg - Optional message used for the thrown TypeError.
  */
-export function assertObject(value: unknown, errorMsg: string = 'Expected an object.'): asserts value is object
+export function assertObject<T>(value: T, errorMsg: string = 'Expected an object.'): asserts value is T & object
 {
    if (value === null || typeof value !== 'object' || Array.isArray(value)) { throw new TypeError(errorMsg); }
+}
+
+/**
+ * Asserts that a value is a plain object, not null, and not an array.
+ *
+ * Unlike {@link isPlainObject}, this function does **not** narrow the value to a generic indexable structure. Instead,
+ * it preserves the **existing** static type of the variable. This makes it ideal for validating option objects or
+ * interface-based inputs where all properties may be optional.
+ *
+ * Use this function when:
+ * ```
+ *   - You expect a value to be a plain object at runtime, **and**
+ *   - You want to keep its compile-time type intact after validation.
+ * ```
+ *
+ * @example
+ * interface Options { flag?: boolean; value?: number; }
+ *
+ * function run(opts: Options = {}) {
+ *   assertPlainObject(opts, `'opts' is not a plain object.`); // `opts` remains `Options`, not widened or reduced.
+ *   opts.value;                                               // Fully typed access remains available.
+ * }
+ *
+ * @throws {TypeError} if the value is null, non-object, or an array.
+ *
+ * @param value - The value to validate.
+ *
+ * @param errorMsg - Optional message used for the thrown TypeError.
+ */
+export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a plain object.'):
+ asserts value is T & object
+{
+   if (Object.prototype.toString.call(value) !== '[object Object]') { throw new TypeError(errorMsg); }
+
+   const prototype: any = Object.getPrototypeOf(value);
+   if (prototype !== null && prototype !== Object.prototype) { throw new TypeError(errorMsg); }
 }
 
 /**
