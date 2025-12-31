@@ -11,7 +11,9 @@ import * as OU from './functions.js';
  *
  * Wires up object util functions on the plugin eventbus. The following event bindings are available:
  * ```
- * - `typhonjs:utils:object:assert`: Invokes `assertObject`.
+ * - `typhonjs:utils:object:assert:object`: Invokes `assertObject`.
+ * - `typhonjs:utils:object:assert:object:plain`: Invokes `assertPlainObject`.
+ * - `typhonjs:utils:object:assert:record`: Invokes `assertRecord`.
  * - `typhonjs:utils:object:deep:freeze`: Invokes `deepFreeze`.
  * - `typhonjs:utils:object:deep:merge`: Invokes `deepMerge`.
  * - `typhonjs:utils:object:deep:seal`: Invokes `deepSeal`.
@@ -51,7 +53,9 @@ export function onPluginLoad(ev)
       if (typeof options.guard === 'boolean') { guard = options.guard; }
    }
 
-   eventbus.on('typhonjs:utils:object:assert', OU.assertObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:assert:object', OU.assertObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:assert:object:plain', OU.assertPlainObject, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:assert:object:record', OU.assertRecord, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:freeze', OU.deepFreeze, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:merge', OU.deepMerge, void 0, { guard });
    eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
