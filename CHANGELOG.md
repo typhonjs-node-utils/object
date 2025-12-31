@@ -4,6 +4,7 @@
 - Added: 
   - `assertObject`  
   - `assertPlainObject`  
+  - `assertRecord`  
   - `ensureNonEmptyAsyncIterable` 
   - `ensureNonEmptyIterable` 
   - `isRecord` 
