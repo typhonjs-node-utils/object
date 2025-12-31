@@ -101,10 +101,10 @@ export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a pl
  *
  * @param errorMsg - Optional message used for the thrown TypeError.
  */
-export function assertRecord<T>(value: T, message: string = 'Expected a record object.'):
+export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record object.'):
  asserts value is T & Record<string, unknown>
 {
-   if (typeof value !== 'object' || value === null || Array.isArray(value)) { throw new TypeError(message); }
+   if (typeof value !== 'object' || value === null || Array.isArray(value)) { throw new TypeError(errorMsg); }
 }
 
 /**
