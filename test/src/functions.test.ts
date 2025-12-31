@@ -130,6 +130,21 @@ describe('ObjectUtil:', () =>
       expectTypeOf(val).toEqualTypeOf<NoOpObj>();
    });
 
+   it('assertRecord', () =>
+   {
+      assert.throws(() => ObjectUtil.assertRecord(false), 'Expected a record object.');
+      assert.throws(() => ObjectUtil.assertRecord(null), 'Expected a record object.');
+      assert.throws(() => ObjectUtil.assertRecord(void 0), 'Expected a record object.');
+      assert.throws(() => ObjectUtil.assertRecord([]), 'Expected a record object.');
+
+      assert.throws(() => ObjectUtil.assertRecord(void 0, 'Custom error message'), 'Custom error message');
+
+      // No-op visual type erasure check.
+      const val: NoOpObj = { a: 123 };
+      ObjectUtil.assertRecord(val);
+      expectTypeOf(val).toEqualTypeOf<NoOpObj & Record<string, unknown>>();
+   });
+
    it('deepFreeze w/ skipKeys:', () =>
    {
       const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
