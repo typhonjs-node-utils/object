@@ -733,13 +733,12 @@ export function objectSize(object: any): number
 }
 
 /**
- * Provides a way to safely access an objects data / entries given an accessor string which describes the
- * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
- * to walk.
+ * Provides a way to safely access an object's data / entries using either a dotted accessor string or an array of
+ * exact string or symbol property keys.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A string describing the entries to access with keys separated by `.`.
+ * @param accessor - A dotted string accessor or an array of exact string or symbol property keys.
  *
  * @param [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
  *
@@ -749,23 +748,30 @@ export function objectSize(object: any): number
  * @typeParam P - Accessor type.
  * @typeParam R - Return value / Inferred deep access type or any provided default value type.
  */
-export function safeAccess<T extends object, P extends string, R = DeepAccess<T, P>>(data: T, accessor: P,
- defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
+export function safeAccess<T extends object, const P extends SafeAccessor, R = DeepAccess<T, P>>(data: T,
+ accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
   DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
 {
    if (typeof data !== 'object' || data === null) { return defaultValue as any; }
-   if (typeof accessor !== 'string') { return defaultValue as any; }
+   if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return defaultValue as any; }
 
-   const keys: string[] = accessor.split('.');
+   const keys: readonly SafeAccessorKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+
+   if (keys.length === 0) { return defaultValue as any; }
+
    let result: any = data;
 
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < keys.length; cntr++)
    {
-      // If the next level of object access is undefined or null then return the default value.
-      if (result[keys[cntr]] === void 0 || result[keys[cntr]] === null) { return defaultValue as any; }
+      const key: SafeAccessorKey = keys[cntr];
 
-      result = result[keys[cntr]];
+      if (typeof key !== 'string' && typeof key !== 'symbol') { return defaultValue as any; }
+
+      // If the next level of object access is undefined or null then return the default value.
+      if (result[key] === void 0 || result[key] === null) { return defaultValue as any; }
+
+      result = result[key];
    }
 
    return result as any;
@@ -871,13 +877,17 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 }
 
 /**
- * Provides a way to safely set an objects data / entries given an accessor string which describes the
- * entries to walk. To access deeper entries into the object format the accessor string with `.` between entries
- * to walk.
+ * Provides a way to safely set an object's data / entries using either a dotted accessor string or an array of exact
+ * string or symbol property keys.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A string describing the entries to access.
+ * @param accessor - A dotted string accessor or an array of exact string or symbol property keys.
+ *
+ * The string keys `__proto__`, `prototype`, and `constructor` are rejected to prevent prototype-pollution access
+ * paths. ECMAScript well-known symbols, such as `Symbol.toStringTag`, `Symbol.iterator`, and `Symbol.toPrimitive`,
+ * are also rejected because they modify built-in language protocols and object behavior. User-created symbols and
+ * symbols from {@link Symbol.for} remain valid.
  *
  * @param value - A new value to set if an entry for accessor is found.
  *
@@ -891,11 +901,15 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
  *
  * @returns True if successful.
  */
-export function safeSet(data: object, accessor: string, value: any, { operation = 'set', createMissing = false }:
- { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
+export function safeSet(data: object, accessor: SafeAccessor, value: any,
+ { operation = 'set', createMissing = false }:
+  { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
-   if (typeof accessor !== 'string') { throw new TypeError(`safeSet error: 'accessor' is not a string.`); }
+   if (typeof accessor !== 'string' && !Array.isArray(accessor))
+   {
+      throw new TypeError(`safeSet error: 'accessor' is not a string or an array of strings or symbols.`);
+   }
    if (typeof operation !== 'string') { throw new TypeError(`safeSet error: 'options.operation' is not a string.`); }
    if (operation !== 'add' && operation !== 'div' && operation !== 'mult' && operation !== 'set' &&
     operation !== 'set-undefined' && operation !== 'sub')
@@ -907,27 +921,42 @@ export function safeSet(data: object, accessor: string, value: any, { operation 
       throw new TypeError(`safeSet error: 'options.createMissing' is not a boolean.`);
    }
 
-   const access: string[] = accessor.split('.');
+   const access: readonly SafeAccessorKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+
+   if (access.length === 0) { return false; }
 
    let result = false;
+   let target: any = data;
 
    // Verify first level missing property.
-   if (access.length === 1 && !createMissing && !(access[0] in data)) { return false; }
+   if (access.length === 1 && !createMissing && !(access[0] in target)) { return false; }
 
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < access.length; cntr++)
    {
-      // If data is an array perform validation that the accessor is a positive integer otherwise quit.
-      if (Array.isArray(data))
-      {
-         const number: number = (+access[cntr]);
+      const key: SafeAccessorKey = access[cntr];
 
-         if (!Number.isInteger(number) || number < 0) { return false; }
+      const keyType: string = typeof key;
+
+      if (keyType !== 'string' && keyType !== 'symbol')
+      {
+         throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a string or symbol.`);
       }
 
-      // Prevent prototype pollution
-      if (['__proto__', 'prototype', 'constructor'].indexOf(access[cntr]) !== -1) {
+      // Prevent prototype-pollution access paths.
+      if ((keyType === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor')) ||
+       (keyType === 'symbol' && wellKnownSymbols.has(key as symbol)))
+      {
          return false;
+      }
+
+      // If data is an array perform validation that string accessors are positive integers. Symbol accessors remain
+      // valid property keys for arrays.
+      if (Array.isArray(target) && typeof key === 'string')
+      {
+         const number: number = (+key);
+
+         if (!Number.isInteger(number) || number < 0) { return false; }
       }
 
       if (cntr === access.length - 1)
@@ -935,32 +964,32 @@ export function safeSet(data: object, accessor: string, value: any, { operation 
          switch (operation)
          {
             case 'add':
-               data[access[cntr]] += value;
+               target[key] += value;
                result = true;
                break;
 
             case 'div':
-               data[access[cntr]] /= value;
+               target[key] /= value;
                result = true;
                break;
 
             case 'mult':
-               data[access[cntr]] *= value;
+               target[key] *= value;
                result = true;
                break;
 
             case 'set':
-               data[access[cntr]] = value;
+               target[key] = value;
                result = true;
                break;
 
             case 'set-undefined':
-               if (data[access[cntr]] === void 0) { data[access[cntr]] = value; }
+               if (target[key] === void 0) { target[key] = value; }
                result = true;
                break;
 
             case 'sub':
-               data[access[cntr]] -= value;
+               target[key] -= value;
                result = true;
                break;
          }
@@ -968,30 +997,77 @@ export function safeSet(data: object, accessor: string, value: any, { operation 
       else
       {
          // If createMissing is true and the next level of object access is undefined then create a new object entry.
-         if (createMissing && data[access[cntr]] === void 0) { data[access[cntr]] = {}; }
+         if (createMissing && target[key] === void 0) { target[key] = {}; }
 
          // Abort if the next level is null or not an object and containing a value.
-         if (data[access[cntr]] === null || typeof data[access[cntr]] !== 'object') { return false; }
+         if (target[key] === null || typeof target[key] !== 'object') { return false; }
 
-         data = data[access[cntr]];
+         target = target[key];
       }
    }
 
    return result;
 }
 
-// Utility types -----------------------------------------------------------------------------------------------------
+// Utility data ------------------------------------------------------------------------------------------------------
 
 /**
- * Utility type for `safeAccess`. Infers compound accessor strings in object T.
+ * ECMAScript well-known symbols that activate or modify built-in language protocols.
  */
-type DeepAccess<T, P extends string> =
+const wellKnownSymbols: ReadonlySet<symbol> = new Set(Object.getOwnPropertyNames(Symbol)
+ .map((key: string): unknown => (Symbol as unknown as Record<string, unknown>)[key])
+  .filter((value: unknown): value is symbol => typeof value === 'symbol'));
+
+// External Types ----------------------------------------------------------------------------------------------------
+
+/**
+ * Accessor accepted by {@link safeAccess} and {@link safeSet}. String accessors use `.` delimiters while array
+ * accessors preserve each string or symbol as an exact property key.
+ */
+export type SafeAccessor = string | readonly SafeAccessorKey[];
+
+/**
+ * Valid property keys for array based safe accessors.
+ */
+export type SafeAccessorKey = string | symbol;
+
+// Internal Utility Types --------------------------------------------------------------------------------------------
+
+/**
+ * Utility type for `safeAccess`. Infers compound string accessors and readonly tuple accessors in object T.
+ */
+type DeepAccess<T, P extends SafeAccessor> =
+ P extends string
+  ? DeepAccessString<T, P>
+  : P extends readonly SafeAccessorKey[]
+   ? DeepAccessArray<T, P>
+   : undefined;
+
+/**
+ * Infers a dotted string accessor in object T.
+ */
+type DeepAccessString<T, P extends string> =
  P extends `${infer K}.${infer Rest}`
   ? K extends keyof T
-   ? DeepAccess<T[K], Rest>
+   ? DeepAccessString<T[K], Rest>
    : undefined
   : P extends keyof T
    ? T[P]
+   : undefined;
+
+/**
+ * Infers a readonly tuple accessor in object T. A non-tuple array returns `unknown` because its runtime path cannot be
+ * determined statically.
+ */
+type DeepAccessArray<T, P extends readonly SafeAccessorKey[]> =
+ number extends P['length']
+  ? unknown
+  : P extends readonly [infer K extends SafeAccessorKey, ...infer Rest extends readonly SafeAccessorKey[]]
+   ? K extends keyof T
+    ? Rest extends readonly []
+     ? T[K]
+     : DeepAccessArray<T[K], Rest>
+    : undefined
    : undefined;
 
 /**

@@ -54,7 +54,7 @@ const s_OBJECT_MIXED =
    }
 };
 
-const s_OBJECT_MIXED_ORIG = JSON.parse(JSON.stringify(s_OBJECT_MIXED));
+const s_OBJECT_MIXED_ORIG = ObjectUtil.klona(s_OBJECT_MIXED);
 
 // Last entry of array2 differs from s_OBJECT_MIXED
 const s_OBJECT_MIXED_ONE_MOD = { a: 1, b: 2, c: 3, array: ['a', 'b', 'c'], level1: { d: 4, e: 5, f: 6, array1: ['d', 'e', 'f'], level2: { g: 7, h: 8, i: 9, array2: ['g', 'h', 'z'] } } };
@@ -80,6 +80,17 @@ const s_OBJECT_NUM =
       }
    }
 };
+
+const s_SYMBOL_LEVEL1 = Symbol.for('level1');
+const s_SYMBOL_LEVEL2 = Symbol.for('level2');
+
+const s_OBJECT_SYM = {
+   [s_SYMBOL_LEVEL1]: {
+      [s_SYMBOL_LEVEL2]: true
+   }
+}
+
+const s_OBJECT_SYM_ORIG = ObjectUtil.klona(s_OBJECT_SYM);
 
 const s_VERIFY_DEPTH_TRAVERSE = `[1,2,3,"a","b","c",4,5,6,"d","e","f",7,8,9,"g","h","i"]`;
 
@@ -827,7 +838,7 @@ describe('ObjectUtil:', () =>
 
    describe('safeAccess:', () =>
    {
-      it('all mixed accessors', () =>
+      it('all mixed accessors (as accessor strings)', () =>
       {
          const output = [];
          const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
@@ -838,11 +849,31 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
       });
 
+      it('all mixed accessors (as accessor arrays)', () =>
+      {
+         const output = [];
+         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)].map((accessor) => accessor.split('.'));
+
+         for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
+
+         assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
+         assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
+      });
+
+      it('symbols', () =>
+      {
+         const result = ObjectUtil.safeAccess(s_OBJECT_SYM, [s_SYMBOL_LEVEL1, s_SYMBOL_LEVEL2]);
+         assert.isTrue(result);
+      });
+
       it('default value conditions', () =>
       {
          assert.equal(ObjectUtil.safeAccess(null, '', 'defaultValue'), 'defaultValue');
          assert.equal(ObjectUtil.safeAccess({}, null, 'defaultValue'), 'defaultValue');
          assert.equal(ObjectUtil.safeAccess({ a: null }, 'a', 'defaultValue'), 'defaultValue');
+         assert.equal(ObjectUtil.safeAccess({ a: null }, [], 'defaultValue'), 'defaultValue');
+         // @ts-expect-error
+         assert.equal(ObjectUtil.safeAccess({ a: null }, [false], 'defaultValue'), 'defaultValue');
       });
    });
 
@@ -893,11 +924,13 @@ describe('ObjectUtil:', () =>
    {
       const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)];
 
+      const accessorsAsArray = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)].map((accessor) => accessor.split('.'));
+
       let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);
 
       beforeEach(() => { objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM); });
 
-      it('add', () =>
+      it('add (accessor string)', () =>
       {
          for (const accessor of accessors)
          {
@@ -908,7 +941,18 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD));
       });
 
-      it('div', () =>
+      it('add (accessor array)', () =>
+      {
+         for (const accessor of accessorsAsArray)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'add' });
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD));
+      });
+
+      it('div (accessor string)', () =>
       {
          for (const accessor of accessors)
          {
@@ -919,7 +963,18 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV));
       });
 
-      it('mult', () =>
+      it('div (accessor array)', () =>
+      {
+         for (const accessor of accessorsAsArray)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'div' });
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV));
+      });
+
+      it('mult (accessor string)', () =>
       {
          for (const accessor of accessors)
          {
@@ -930,7 +985,18 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT));
       });
 
-      it('sub', () =>
+      it('mult (accessor array)', () =>
+      {
+         for (const accessor of accessorsAsArray)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'mult' });
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT));
+      });
+
+      it('sub (accessor string)', () =>
       {
          for (const accessor of accessors)
          {
@@ -941,9 +1007,31 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
       });
 
-      it('set', () =>
+      it('sub (accessor array)', () =>
+      {
+         for (const accessor of accessorsAsArray)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'sub' });
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
+      });
+
+      it('set (accessor string)', () =>
       {
          for (const accessor of accessors)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 'aa');
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
+      });
+
+      it('set (accessor array)', () =>
+      {
+         for (const accessor of accessorsAsArray)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 'aa');
             assert.isTrue(result);
@@ -974,6 +1062,14 @@ describe('ObjectUtil:', () =>
       it('no array accessor / negative number', () =>
       {
          const result = ObjectUtil.safeSet(objectNumCopy, 'level1.level2.array2.-1', 'bogus');
+
+         assert.isFalse(result);
+         assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
+      });
+
+      it('no accessor keys', () =>
+      {
+         const result = ObjectUtil.safeSet(objectNumCopy, [], 'bogus');
 
          assert.isFalse(result);
          assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
@@ -1018,6 +1114,30 @@ describe('ObjectUtil:', () =>
          assert.isTrue(result);
          assert.isObject((objectNumCopy as any)._new);
          assert.isTrue((objectNumCopy as any)._new._new);
+      });
+
+      it('rejects prototype-pollution / well known symbols', () =>
+      {
+         let result = ObjectUtil.safeSet(objectNumCopy, 'level1.__proto__', 'bogus');
+         assert.isFalse(result);
+
+         result = ObjectUtil.safeSet(objectNumCopy, 'level1.prototype', 'bogus');
+         assert.isFalse(result);
+
+         result = ObjectUtil.safeSet(objectNumCopy, 'level1.constructor', 'bogus');
+         assert.isFalse(result);
+
+         result = ObjectUtil.safeSet(objectNumCopy, ['level1', Symbol.toStringTag], 'bogus');
+         assert.isFalse(result);
+
+         assert.isTrue(Object.prototype.toString.call(objectNumCopy) === `[object Object]`);
+
+         result = ObjectUtil.safeSet(objectNumCopy, [Symbol.toStringTag], 'bogus');
+         assert.isFalse(result);
+
+         assert.isTrue(Object.prototype.toString.call(objectNumCopy) === `[object Object]`);
+
+         assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
       });
    });
 });

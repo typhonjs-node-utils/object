@@ -96,11 +96,18 @@ describe('API Errors:', () =>
           `safeSet error: 'data' is not an object.`);
       });
 
-      it('error - accessor is not a string', () =>
+      it('error - accessor is not a string or symbol', () =>
       {
          // @ts-expect-error
          expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
-          `safeSet error: 'accessor' is not a string.`);
+          `safeSet error: 'accessor' is not a string or an array of strings or symbols.`);
+      });
+
+      it('error - accessor is not a string or symbol', () =>
+      {
+         // @ts-expect-error
+         expect(() => ObjectUtil.safeSet({ a: { b: true } }, ['a', false], 'bar')).throws(TypeError,
+          `safeSet error: 'accessor' contains an entry that is not a string or symbol.`);
       });
 
       it('error - options.createMissing is not a boolean', () =>
