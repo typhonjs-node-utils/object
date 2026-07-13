@@ -925,6 +925,11 @@ export function safeSet(data: object, accessor: string, value: any, { operation 
          if (!Number.isInteger(number) || number < 0) { return false; }
       }
 
+      // Prevent prototype pollution
+      if (['__proto__', 'prototype', 'constructor'].indexOf(access[cntr]) !== -1) {
+         return false;
+      }
+
       if (cntr === access.length - 1)
       {
          switch (operation)
