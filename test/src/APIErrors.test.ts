@@ -46,6 +46,16 @@ describe('API Errors:', () =>
          assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
           `deepMerge error: 'sourceObj[0]' is not an object.`);
       });
+
+      it('error - throws for a circular source object', () =>
+      {
+         const source: Record<string, any> = { value: 42 };
+
+         source.self = source;
+
+         assert.throws(() => ObjectUtil.deepMerge({}, source), TypeError,
+          `deepMerge error: Circular source object detected.`);
+      });
    });
 
    describe('deepSeal:', () =>
@@ -62,6 +72,21 @@ describe('API Errors:', () =>
          // @ts-expect-error
          assert.throws(() => ObjectUtil.deepSeal({}, { skipKeys: 'bad' }), TypeError,
           `deepSeal error: 'options.skipKeys' is not a Set.`);
+      });
+   });
+
+   describe('safeEqual:', () =>
+   {
+      it('safeEqual throws when the source contains a circular path', () =>
+      {
+         const source: Record<string, any> = {
+            value: 42
+         };
+
+         source.self = source;
+
+         assert.throws(() => ObjectUtil.safeEqual(source, { value: 42 }), TypeError,
+          ``);
       });
    });
 
@@ -84,6 +109,16 @@ describe('API Errors:', () =>
       {
          expect(() => [...ObjectUtil.safeKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
           `safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
+      });
+
+      it('error - throws for a circular source object', () =>
+      {
+         const source: Record<string, any> = { value: 42 };
+
+         source.self = source;
+
+         assert.throws(() => [...ObjectUtil.safeKeyIterator(source)], TypeError,
+          `safeKeyIterator error: Circular object path detected.`);
       });
    });
 

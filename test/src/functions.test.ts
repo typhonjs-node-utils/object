@@ -160,103 +160,114 @@ describe('ObjectUtil:', () =>
       expectTypeOf(val).toEqualTypeOf<NoOpObj & Record<string, unknown>>();
    });
 
-   it('deepFreeze w/ skipKeys:', () =>
+   describe('deepFreeze:', () =>
    {
-      const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+      it('with skipKeys:', () =>
+      {
+         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
 
-      ObjectUtil.deepFreeze(testObj, { skipKeys: new Set(['skipKey']) });
+         ObjectUtil.deepFreeze(testObj, { skipKeys: new Set(['skipKey']) });
 
-      // Verify not frozen
-      assert.isFalse(Object.isFrozen(testObj.skipKey));
-      assert.isFalse(Object.isFrozen(testObj.skipKey.s1));
-      assert.isFalse(Object.isFrozen(testObj.level1.skipKey));
-      assert.isFalse(Object.isFrozen(testObj.level1.skipKey.s2));
-      assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey));
-      assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey.s3));
+         // Verify not frozen
+         assert.isFalse(Object.isFrozen(testObj.skipKey));
+         assert.isFalse(Object.isFrozen(testObj.skipKey.s1));
+         assert.isFalse(Object.isFrozen(testObj.level1.skipKey));
+         assert.isFalse(Object.isFrozen(testObj.level1.skipKey.s2));
+         assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey));
+         assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey.s3));
 
-      // Verify frozen
-      assert.isTrue(Object.isFrozen(testObj));
+         // Verify frozen
+         assert.isTrue(Object.isFrozen(testObj));
 
-      assert.isTrue(Object.isFrozen(testObj.a));
-      assert.isTrue(Object.isFrozen(testObj.a.a1));
-      assert.isTrue(Object.isFrozen(testObj.a.a1[0]));
-      assert.isTrue(Object.isFrozen(testObj.b));
-      assert.isTrue(Object.isFrozen(testObj.c));
-      assert.isTrue(Object.isFrozen(testObj.c[0]));
-      assert.isTrue(Object.isFrozen(testObj.array));
-      assert.isTrue(Object.isFrozen(testObj.array[0]));
-      assert.isTrue(Object.isFrozen(testObj.array[0][0]));
-      assert.isTrue(Object.isFrozen(testObj.array[1]));
-      assert.isTrue(Object.isFrozen(testObj.array[1][0]));
-      assert.isTrue(Object.isFrozen(testObj.array[2]));
-      assert.isTrue(Object.isFrozen(testObj.array[2][0]));
+         assert.isTrue(Object.isFrozen(testObj.a));
+         assert.isTrue(Object.isFrozen(testObj.a.a1));
+         assert.isTrue(Object.isFrozen(testObj.a.a1[0]));
+         assert.isTrue(Object.isFrozen(testObj.b));
+         assert.isTrue(Object.isFrozen(testObj.c));
+         assert.isTrue(Object.isFrozen(testObj.c[0]));
+         assert.isTrue(Object.isFrozen(testObj.array));
+         assert.isTrue(Object.isFrozen(testObj.array[0]));
+         assert.isTrue(Object.isFrozen(testObj.array[0][0]));
+         assert.isTrue(Object.isFrozen(testObj.array[1]));
+         assert.isTrue(Object.isFrozen(testObj.array[1][0]));
+         assert.isTrue(Object.isFrozen(testObj.array[2]));
+         assert.isTrue(Object.isFrozen(testObj.array[2][0]));
 
-      assert.isTrue(Object.isFrozen(testObj.level1));
-      assert.isTrue(Object.isFrozen(testObj.level1.d));
-      assert.isTrue(Object.isFrozen(testObj.level1.d.d1));
-      assert.isTrue(Object.isFrozen(testObj.level1.d.d1[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.e));
-      assert.isTrue(Object.isFrozen(testObj.level1.f));
-      assert.isTrue(Object.isFrozen(testObj.level1.f[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[0][0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[1]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[1][0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[2]));
-      assert.isTrue(Object.isFrozen(testObj.level1.array1[2][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1));
+         assert.isTrue(Object.isFrozen(testObj.level1.d));
+         assert.isTrue(Object.isFrozen(testObj.level1.d.d1));
+         assert.isTrue(Object.isFrozen(testObj.level1.d.d1[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.e));
+         assert.isTrue(Object.isFrozen(testObj.level1.f));
+         assert.isTrue(Object.isFrozen(testObj.level1.f[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[0][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[1]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[1][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[2]));
+         assert.isTrue(Object.isFrozen(testObj.level1.array1[2][0]));
 
-      assert.isTrue(Object.isFrozen(testObj.level1.level2));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.g));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.h));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.i));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.i[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0][0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1][0]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2]));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.g));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.h));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.i));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.i[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1][0]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2]));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2][0]));
 
-      // Make sure pushing to arrays fails.
-                                                                              // @ts-expect-error
-      assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
-      assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
-      assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
-      assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.array[2].push(1); });
-                                                                              // @ts-expect-error
-      assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
-      assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
+         // Make sure pushing to arrays fails.
+                                                                                 // @ts-expect-error
+         assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
+         assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
+         assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
+         assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.array[2].push(1); });
+                                                                                 // @ts-expect-error
+         assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
+         assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
 
-      assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
-   });
+         assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
+      });
 
-   it('deepFreeze without skipKeys:', () => {
-      const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+      it('without skipKeys:', () => {
+         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
 
-      ObjectUtil.deepFreeze(testObj);
+         ObjectUtil.deepFreeze(testObj);
 
-      // Verify frozen
-      assert.isTrue(Object.isFrozen(testObj.skipKey));
-      assert.isTrue(Object.isFrozen(testObj.skipKey.s1));
-      assert.isTrue(Object.isFrozen(testObj.level1.skipKey));
-      assert.isTrue(Object.isFrozen(testObj.level1.skipKey.s2));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey));
-      assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey.s3));
+         // Verify frozen
+         assert.isTrue(Object.isFrozen(testObj.skipKey));
+         assert.isTrue(Object.isFrozen(testObj.skipKey.s1));
+         assert.isTrue(Object.isFrozen(testObj.level1.skipKey));
+         assert.isTrue(Object.isFrozen(testObj.level1.skipKey.s2));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey));
+         assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey.s3));
+      });
+
+      it('skips already frozen keys:', () => {
+         const result = ObjectUtil.deepFreeze({ a: Object.freeze({ b: true }) });
+
+         // Verify frozen
+         assert.isTrue(Object.isFrozen(result));
+         assert.isTrue(Object.isFrozen(result.a));
+      });
    });
 
    describe('deepMerge', () =>
@@ -439,107 +450,291 @@ describe('ObjectUtil:', () =>
 
          assert.deepEqual(targetMod, result);
       });
+
+      it('skips an own enumerable __proto__ property', () =>
+      {
+         const source = JSON.parse('{"__proto__":{"polluted":true},"safe":1}');
+
+         const target: Record<string, any> = {};
+
+         const result = ObjectUtil.deepMerge(target, source);
+
+         assert.equal(result, target);
+         assert.deepEqual(target, { safe: 1 });
+         assert.equal(Object.getPrototypeOf(target), Object.prototype);
+         assert.equal(({} as any).polluted, undefined);
+      });
+
+      it('skips an own enumerable prototype property', () =>
+      {
+         const source = {
+            prototype: {
+               polluted: true
+            },
+            safe: 1
+         };
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(target, source);
+
+         assert.deepEqual(target, { safe: 1 });
+         assert.equal(Object.hasOwn(target, 'prototype'), false);
+      });
+
+      it('skips an own enumerable constructor property', () =>
+      {
+         const source = {
+            constructor: {
+               polluted: true
+            },
+            safe: 1
+         };
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(target, source);
+
+         assert.deepEqual(target, { safe: 1 });
+         assert.equal(Object.hasOwn(target, 'constructor'), false);
+      });
+
+      it('skips an own enumerable constructor property (nested)', () =>
+      {
+         const source = {
+            level1: {
+               constructor: {
+                  polluted: true
+               },
+               safe: 1
+            }
+         };
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(target, source);
+
+         assert.deepEqual(target, { level1: { safe: 1 } });
+         assert.equal(Object.hasOwn(target.level1, 'constructor'), false);
+      });
+
+      it('skips deeply nested blocked prototype keys', () =>
+      {
+         const source = {
+            level1: {
+               level2: {
+                  prototype: true,
+                  safe: 2
+               }
+            }
+         };
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(target, source);
+
+         assert.deepEqual(target, {
+            level1: {
+               level2: {
+                  safe: 2
+               }
+            }
+         });
+      });
+
+      it('skips an own enumerable constructor property in the multi-source branch', () =>
+      {
+         const target: Record<string, any> = {};
+
+         const source1 = {
+            level1: {
+               first: 1
+            }
+         };
+
+         const source2 = {
+            level1: {
+               constructor: {
+                  polluted: true
+               },
+               second: 2
+            }
+         };
+
+         const result = ObjectUtil.deepMerge(target, source1, source2);
+
+         assert.equal(result, target);
+
+         assert.deepEqual(target, {
+            level1: {
+               first: 1,
+               second: 2
+            }
+         });
+
+         assert.equal(Object.hasOwn(target.level1, 'constructor'), false);
+      });
+
+      it('preserves a null prototype for a missing nested plain object', () =>
+      {
+         const level1 = Object.create(null) as Record<string, any>;
+         level1.value = 1;
+
+         const source = {
+            level1
+         };
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(target, source);
+
+         assert.equal(Object.getPrototypeOf(target.level1), null);
+         assert.equal(target.level1.value, 1);
+      });
+
+      it('preserves a null prototype for a missing nested object in the multi-source branch', () =>
+      {
+         const level1 = Object.create(null) as Record<string, any>;
+         level1.value = 1;
+
+         const target: Record<string, any> = {};
+
+         ObjectUtil.deepMerge(
+          target,
+          { first: true },
+          { level1 }
+         );
+
+         assert.equal(Object.getPrototypeOf(target.level1), null);
+         assert.equal(target.level1.value, 1);
+      });
+
+      it('clones a null-prototype target value in the multi-source branch', () =>
+      {
+         const level1 = Object.create(null) as Record<string, any>;
+         level1.first = 1;
+
+         const target: Record<string, any> = { level1 };
+
+         ObjectUtil.deepMerge(target, { level1: { second: 2 } }, { level1: { third: 3 } });
+
+         assert.equal(Object.getPrototypeOf(target.level1), null);
+
+         assert.equal(target.level1.first, 1);
+         assert.equal(target.level1.second, 2);
+         assert.equal(target.level1.third, 3);
+      });
    });
 
-   it('deepSeal w/ skipKeys:', () =>
+   describe('deepSeal:', () =>
    {
-      const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+      it('with skipKeys:', () =>
+      {
+         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
 
-      ObjectUtil.deepSeal(testObj, { skipKeys: new Set(['skipKey']) });
+         ObjectUtil.deepSeal(testObj, { skipKeys: new Set(['skipKey']) });
 
-      // Verify not sealed
-      assert.isFalse(Object.isSealed(testObj.skipKey));
-      assert.isFalse(Object.isSealed(testObj.skipKey.s1));
-      assert.isFalse(Object.isSealed(testObj.level1.skipKey));
-      assert.isFalse(Object.isSealed(testObj.level1.skipKey.s2));
-      assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey));
-      assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey.s3));
+         // Verify not sealed
+         assert.isFalse(Object.isSealed(testObj.skipKey));
+         assert.isFalse(Object.isSealed(testObj.skipKey.s1));
+         assert.isFalse(Object.isSealed(testObj.level1.skipKey));
+         assert.isFalse(Object.isSealed(testObj.level1.skipKey.s2));
+         assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey));
+         assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey.s3));
 
-      // Verify sealed
-      assert.isTrue(Object.isSealed(testObj));
+         // Verify sealed
+         assert.isTrue(Object.isSealed(testObj));
 
-      assert.isTrue(Object.isSealed(testObj.a));
-      assert.isTrue(Object.isSealed(testObj.a.a1));
-      assert.isTrue(Object.isSealed(testObj.a.a1[0]));
-      assert.isTrue(Object.isSealed(testObj.b));
-      assert.isTrue(Object.isSealed(testObj.c));
-      assert.isTrue(Object.isSealed(testObj.c[0]));
-      assert.isTrue(Object.isSealed(testObj.array));
-      assert.isTrue(Object.isSealed(testObj.array[0]));
-      assert.isTrue(Object.isSealed(testObj.array[0][0]));
-      assert.isTrue(Object.isSealed(testObj.array[1]));
-      assert.isTrue(Object.isSealed(testObj.array[1][0]));
-      assert.isTrue(Object.isSealed(testObj.array[2]));
-      assert.isTrue(Object.isSealed(testObj.array[2][0]));
+         assert.isTrue(Object.isSealed(testObj.a));
+         assert.isTrue(Object.isSealed(testObj.a.a1));
+         assert.isTrue(Object.isSealed(testObj.a.a1[0]));
+         assert.isTrue(Object.isSealed(testObj.b));
+         assert.isTrue(Object.isSealed(testObj.c));
+         assert.isTrue(Object.isSealed(testObj.c[0]));
+         assert.isTrue(Object.isSealed(testObj.array));
+         assert.isTrue(Object.isSealed(testObj.array[0]));
+         assert.isTrue(Object.isSealed(testObj.array[0][0]));
+         assert.isTrue(Object.isSealed(testObj.array[1]));
+         assert.isTrue(Object.isSealed(testObj.array[1][0]));
+         assert.isTrue(Object.isSealed(testObj.array[2]));
+         assert.isTrue(Object.isSealed(testObj.array[2][0]));
 
-      assert.isTrue(Object.isSealed(testObj.level1));
-      assert.isTrue(Object.isSealed(testObj.level1.d));
-      assert.isTrue(Object.isSealed(testObj.level1.d.d1));
-      assert.isTrue(Object.isSealed(testObj.level1.d.d1[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.e));
-      assert.isTrue(Object.isSealed(testObj.level1.f));
-      assert.isTrue(Object.isSealed(testObj.level1.f[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[0][0]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[1]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[1][0]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[2]));
-      assert.isTrue(Object.isSealed(testObj.level1.array1[2][0]));
+         assert.isTrue(Object.isSealed(testObj.level1));
+         assert.isTrue(Object.isSealed(testObj.level1.d));
+         assert.isTrue(Object.isSealed(testObj.level1.d.d1));
+         assert.isTrue(Object.isSealed(testObj.level1.d.d1[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.e));
+         assert.isTrue(Object.isSealed(testObj.level1.f));
+         assert.isTrue(Object.isSealed(testObj.level1.f[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[0][0]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[1]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[1][0]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[2]));
+         assert.isTrue(Object.isSealed(testObj.level1.array1[2][0]));
 
-      assert.isTrue(Object.isSealed(testObj.level1.level2));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.g));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.h));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.i));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.i[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0][0]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1][0]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2]));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2][0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.g));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.h));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.i));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.i[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0][0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1][0]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2]));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2][0]));
 
-      // Make sure pushing to arrays fails.
-                                                                              // @ts-expect-error
-      assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
-      assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
-      assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
-      assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.array[2].push(1); });
-                                                                              // @ts-expect-error
-      assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
-      assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
-      assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
+         // Make sure pushing to arrays fails.
+                                                                                 // @ts-expect-error
+         assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
+         assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
+         assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
+         assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.array[2].push(1); });
+                                                                                 // @ts-expect-error
+         assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
+         assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
+         assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
 
-      assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
-      assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
+         assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
+         assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
+      });
+
+      it('without skipKeys:', () => {
+         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+
+         ObjectUtil.deepSeal(testObj);
+
+         // Verify frozen
+         assert.isTrue(Object.isSealed(testObj.skipKey));
+         assert.isTrue(Object.isSealed(testObj.skipKey.s1));
+         assert.isTrue(Object.isSealed(testObj.level1.skipKey));
+         assert.isTrue(Object.isSealed(testObj.level1.skipKey.s2));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey));
+         assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
+      });
+
+      it('skips already sealed keys:', () => {
+         const result = ObjectUtil.deepSeal({ a: Object.seal({ b: true }) });
+
+         // Verify frozen
+         assert.isTrue(Object.isSealed(result));
+         assert.isTrue(Object.isSealed(result.a));
+      });
    });
-
-   it('deepSeal without skipKeys:', () => {
-      const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
-
-      ObjectUtil.deepSeal(testObj);
-
-      // Verify frozen
-      assert.isTrue(Object.isSealed(testObj.skipKey));
-      assert.isTrue(Object.isSealed(testObj.skipKey.s1));
-      assert.isTrue(Object.isSealed(testObj.level1.skipKey));
-      assert.isTrue(Object.isSealed(testObj.level1.skipKey.s2));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey));
-      assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
-   });
-
 
    it('ensureNonEmptyAsyncIterable:', async () =>
    {
@@ -968,6 +1163,13 @@ describe('ObjectUtil:', () =>
          assert.isTrue(ObjectUtil.safeAccess(array, [0]));
          assert.isFalse(ObjectUtil.safeAccess(array, [1]));
          assert.isTrue(ObjectUtil.safeAccess(array, [2]));
+      });
+
+      it('returns the default for primitive intermediate values', () =>
+      {
+         assert.equal(ObjectUtil.safeAccess({ value: 42 }, 'value.test', null), null);
+         assert.equal(ObjectUtil.safeAccess({ value: true }, 'value.test', null), null);
+         assert.equal(ObjectUtil.safeAccess({ value: 'text' }, 'value.test', null), null);
       });
 
       it('default value conditions', () =>
@@ -1420,6 +1622,47 @@ describe('ObjectUtil:', () =>
          assert.isTrue(Object.prototype.toString.call(objectNumCopy) === `[object Object]`);
 
          assert.deepEqual(objectNumCopy, s_OBJECT_NUM);
+      });
+
+      it('returns false when an intermediate value is not traversable', () =>
+      {
+         const target = {
+            level1: 42
+         };
+
+         assert.equal(
+          ObjectUtil.safeSet(target, 'level1.value', 100),
+          false
+         );
+
+         assert.deepEqual(target, {
+            level1: 42
+         });
+      });
+
+      it('returns false for a primitive intermediate value with an array accessor', () =>
+      {
+         const target = {
+            level1: 42
+         };
+
+         assert.isFalse(ObjectUtil.safeSet(target, ['level1', 'value'], 100));
+      });
+   });
+
+   describe('Multiple functions:', () =>
+   {
+      it('allows shared references that do not form a circular path', () =>
+      {
+         const shared = { value: 42 };
+
+         const source = { first: shared, second: shared };
+
+         assert.doesNotThrow(() => [...ObjectUtil.safeKeyIterator(source)]);
+
+         assert.equal(ObjectUtil.safeEqual(source, { first: { value: 42 }, second: { value: 42 } }), true);
+
+         assert.deepEqual(ObjectUtil.deepMerge({}, source), { first: { value: 42 }, second: { value: 42 } });
       });
    });
 });
