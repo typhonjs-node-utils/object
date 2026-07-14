@@ -1,5 +1,19 @@
 /**
- * Provides common object manipulation utility functions and TypeScript type guards.
+ * Provides utilities for object validation, traversal, comparison, mutation, cloning, merging, freezing, sealing, and
+ * property-path access.
+ *
+ * The package includes:
+ * ```
+ * * Runtime assertions and TypeScript type guards for objects, records, plain objects, iterables, and accessors.
+ * * Safe property-path access and mutation using dotted strings or exact {@link PropertyKey} arrays.
+ * * Symbol-aware property traversal, existence checks, and shallow structural comparison.
+ * * Deep cloning via `klona`.
+ * * Deep merge, freeze, and seal operations for nested object graphs.
+ * * General object helpers for key enumeration, size inspection, prototype checks, and iterable validation.
+ * ```
+ *
+ * Property-path utilities support string, number, and symbol keys, enforce numeric array indexing, and guard mutation
+ * paths against prototype pollution and modification of ECMAScript well-known symbol protocols.
  *
  * @packageDocumentation
  */
