@@ -894,6 +894,47 @@ describe('ObjectUtil:', () =>
          assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, { a: 2 }));
          assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ONE_MOD));
       });
+
+      it('distinguishes missing, undefined, null, arrays, and symbols', () =>
+      {
+         const symbol = Symbol('value');
+
+         assert.equal(ObjectUtil.safeEqual({ value: undefined }, {}), false);
+         assert.equal(ObjectUtil.safeEqual({ value: undefined }, { value: undefined }), true);
+
+         assert.equal(ObjectUtil.safeEqual({ value: null }, {}), false);
+         assert.equal(ObjectUtil.safeEqual({ value: null }, { value: null }), true);
+
+         assert.equal(ObjectUtil.safeEqual({ values: [undefined] }, { values: new Array(1) }), false);
+         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: ['a'] }), true);
+         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: [] }), false);
+
+         assert.equal(ObjectUtil.safeEqual({ [symbol]: 42 }, { [symbol]: 42 }), true);
+         assert.equal(ObjectUtil.safeEqual({ [symbol]: 42 }, {}), false);
+      });
+
+      it('resolves inherited properties when enabled', () =>
+      {
+         const source = Object.create({ value: 42 });
+         const target = Object.create({ value: 42 });
+
+         assert.equal(ObjectUtil.safeEqual(source, target), true);
+         assert.equal(ObjectUtil.safeEqual(source, target, { hasOwnOnly: false }), true);
+
+         Object.setPrototypeOf(target, { value: 100 });
+
+         assert.equal(ObjectUtil.safeEqual(source, target, { hasOwnOnly: false }), false);
+      });
+
+      it('rejects invalid intermediate paths', () =>
+      {
+         const source = { nested: { value: 42 } };
+
+         assert.equal(ObjectUtil.safeEqual(source, { nested: null }), false);
+         assert.equal(ObjectUtil.safeEqual(source, { nested: undefined }), false);
+         assert.equal(ObjectUtil.safeEqual(source, { nested: 42 }), false);
+         assert.equal(ObjectUtil.safeEqual(source, { nested: {} }), false);
+      });
    });
 
    describe('safeKeyIterator:', () =>
