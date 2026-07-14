@@ -1,610 +1,12 @@
 /**
- * A focused collection of JavaScript and TypeScript utilities for validating, inspecting, traversing, comparing, and modifying objects.
+ * Provides JavaScript and TypeScript utilities for validating, inspecting, traversing, comparing, and modifying
+ * objects.
  *
- * The package combines conventional object helpers with strongly typed property-path operations. Property paths may be expressed as dotted strings for ordinary object properties or as exact `PropertyKey` arrays when symbols, numeric array indexes, or property names containing periods must be preserved.
+ * The package includes runtime assertions and type guards, strongly typed property-path access using dotted strings
+ * or exact {@link PropertyKey} arrays, hardened mutation and deep-merge operations, symbol-aware traversal, iterative
+ * freeze / seal helpers, prototype and descriptor inspection, and iterable utilities.
  *
- * The package also re-exports the cloning API from `klona/full`.
- *
- * ## Highlights
- *
- * - Runtime assertions and TypeScript type guards for objects, records, plain objects, and iterables.
- * - Typed property-path access with inferred return values.
- * - Exact string, number, and symbol path segments through `SafeAccessor`.
- * - Numeric-only array indexing with ECMAScript array-index validation.
- * - Symbol-aware property existence checks and traversal.
- * - Protected object mutation that blocks prototype-pollution paths and ECMAScript well-known symbols.
- * - Iterative deep freeze, seal, and merge operations.
- * - Source-driven shallow structural comparison across nested property paths.
- * - Utilities for getters, setters, prototypes, keys, sizes, and non-empty iterables.
- *
- * ## Importing
- *
- * When using the package directly, the utilities are available from:
- *
- * ```ts
- * import {
- *    hasProperty,
- *    isPlainObject,
- * } from '@typhonjs-utils/object';
- * ```
- *
- *
- * Within TRL, the utilities are available from:
- *
- * ```ts
- * import {
- *    hasProperty,
- *    isPlainObject,
- * } from '#runtime/util/object';
- * ```
- *
- * The package re-exports `klona/full`, so its cloning function is available from the same module:
- *
- * ```ts
- * import { klona } from '#runtime/util/object';
- * ```
- *
- * ## Property paths
- *
- * Several functions accept a `SafeAccessor`:
- *
- * ```ts
- * type SafeAccessor = string | readonly PropertyKey[];
- * ```
- *
- * ### Dotted string accessors
- *
- * Dotted strings are convenient for ordinary nested object properties:
- *
- * ```ts
- * const data = {
- *    user: {
- *       profile: {
- *          name: 'Ada'
- *       }
- *    }
- * };
- *
- * safeAccess(data, 'user.profile.name');
- * // 'Ada'
- * ```
- *
- * A dotted string is split at every period. It therefore cannot represent a literal property name containing `.` and cannot index arrays.
- *
- * ```ts
- * safeAccess({ 'user.name': 'Ada' }, 'user.name');
- * // Attempts to resolve data.user.name, not data['user.name'].
- *
- * safeAccess({ items: ['a'] }, 'items.0');
- * // Returns the default value because array indexes require numeric keys.
- * ```
- *
- * ### Exact property-key accessors
- *
- * Array accessors preserve every key exactly and support strings, numbers, and symbols:
- *
- * ```ts
- * const metadata = Symbol('metadata');
- *
- * const data = {
- *    'user.name': 'Ada',
- *    items: ['a', 'b'],
- *    [metadata]: {
- *       active: true
- *    }
- * };
- *
- * safeAccess(data, ['user.name']);
- * // 'Ada'
- *
- * safeAccess(data, ['items', 1]);
- * // 'b'
- *
- * safeAccess(data, [metadata, 'active']);
- * // true
- * ```
- *
- * Array indexes must be numbers in the range `0` through `0xFFFF_FFFE`. String indexes, negative numbers, fractional numbers, and values outside the ECMAScript array-index range are rejected.
- *
- * Inline accessor arrays retain tuple inference through a TypeScript `const` type parameter:
- *
- * ```ts
- * const result = safeAccess(data, ['items', 0]);
- * // Inferred from the exact path.
- * ```
- *
- * ## Property-path behavior
- *
- * A few distinctions are intentional:
- *
- * - `safeAccess` returns its default value when the resolved value is `undefined` or `null`.
- * - `hasProperty` checks whether the complete path exists, so present `undefined` and `null` values return `true`.
- * - Property lookup includes inherited properties.
- * - Functions may be traversed as intermediate values by the internal property resolver.
- * - Empty string and empty array accessors are considered invalid paths.
- *
- * ```ts
- * const data = {
- *    undefinedValue: undefined,
- *    nullValue: null
- * };
- *
- * safeAccess(data, 'undefinedValue', 'fallback');
- * // 'fallback'
- *
- * hasProperty(data, 'undefinedValue');
- * // true
- *
- * hasProperty(data, 'nullValue');
- * // true
- *
- * hasProperty(data, 'missing');
- * // false
- * ```
- *
- * ## API overview
- *
- * ### Assertions
- *
- * | Function | Description |
- * | --- | --- |
- * | `assertObject` | Asserts that a value is a non-null, non-array object while preserving its existing static type. |
- * | `assertPlainObject` | Asserts that a value has either `Object.prototype` or `null` as its prototype while preserving its existing static type. |
- * | `assertRecord` | Asserts that a value is a non-null, non-array object and narrows it to a string-keyed record without discarding its known shape. |
- *
- * ### Type guards
- *
- * | Function | Description |
- * | --- | --- |
- * | `isObject` | Returns whether a value is a non-null, non-array object, preserving a known object type when possible. |
- * | `isPlainObject` | Returns whether a value is a plain object created with `Object.prototype` or a `null` prototype. |
- * | `isRecord` | Returns whether a value is a non-null, non-array object and narrows it to `Record<string, unknown>`. |
- * | `isIterable` | Returns whether a non-null object provides `Symbol.iterator`; primitive strings are intentionally excluded. |
- * | `isAsyncIterable` | Returns whether a non-null object provides `Symbol.asyncIterator`. |
- *
- * ### Property descriptors and prototypes
- *
- * | Function | Description |
- * | --- | --- |
- * | `hasAccessor` | Checks the object and its prototype chain for a property descriptor containing both a getter and setter. |
- * | `hasGetter` | Checks the object and its prototype chain for a getter descriptor. |
- * | `hasSetter` | Checks the object and its prototype chain for a setter descriptor. |
- * | `hasPrototype` | Determines whether a constructor is, or inherits from, another constructor. |
- * | `hasProperty` | Returns whether a complete `SafeAccessor` path exists, aborting as soon as resolution fails. |
- *
- * ### Property-path utilities
- *
- * | Function | Description |
- * | --- | --- |
- * | `safeAccess` | Resolves a dotted string or exact property-key path and returns a typed value or supplied default. |
- * | `safeSet` | Sets or updates a value at a property path with optional missing-object creation and mutation hardening. |
- * | `safeKeyIterator` | Iteratively yields enumerable leaf paths as readonly `PropertyKey` arrays. |
- * | `safeEqual` | Verifies that every traversed leaf in a source object resolves to the same value in a target object. |
- *
- * ### Object graph utilities
- *
- * | Function | Description |
- * | --- | --- |
- * | `deepMerge` | Recursively merges one or more plain source objects into a plain target object in place. |
- * | `deepFreeze` | Iteratively freezes an object graph, including values stored in arrays. |
- * | `deepSeal` | Iteratively seals an object graph, including values stored in arrays. |
- * | `klona` | Deep-clones values through the API re-exported from `klona/full`. |
- *
- * ### Iterable utilities
- *
- * | Function | Description |
- * | --- | --- |
- * | `ensureNonEmptyIterable` | Returns `undefined` for a missing, invalid, or empty iterable; otherwise returns an iterable containing the peeked first value and remaining values. |
- * | `ensureNonEmptyAsyncIterable` | Performs the equivalent operation for async iterables and may lift a synchronous iterable into an async iterable. |
- *
- * ### General helpers
- *
- * | Function | Description |
- * | --- | --- |
- * | `objectKeys` | Returns typed enumerable own string keys for an object, or an empty array for an invalid runtime input. |
- * | `objectSize` | Returns the size of maps, sets, boxed strings, arrays, and enumerable string-keyed objects according to their supported representation. |
- *
- * ## Safe access
- *
- * `safeAccess` provides compile-time inference for known string paths and readonly tuple paths:
- *
- * ```ts
- * const state = {
- *    settings: {
- *       enabled: true
- *    },
- *    entries: [
- *       { id: 1 },
- *       { id: 2 }
- *    ]
- * };
- *
- * const enabled = safeAccess(state, 'settings.enabled');
- * // boolean
- *
- * const id = safeAccess(state, ['entries', 1, 'id']);
- * // number
- *
- * const missing = safeAccess(state, 'settings.label', 'Unnamed');
- * // string
- * ```
- *
- * The supplied default is returned when:
- *
- * - `data` is not a valid object.
- * - The accessor is invalid or empty.
- * - An intermediate property is missing.
- * - An intermediate value cannot be traversed.
- * - An array segment is not a valid numeric array index.
- * - The final value is `undefined` or `null`.
- *
- * Use `hasProperty` when the distinction between a missing property and a present `undefined` or `null` property matters.
- *
- * ## Property existence
- *
- * `hasProperty` resolves a path with early termination:
- *
- * ```ts
- * const data = {
- *    user: {
- *       name: undefined
- *    },
- *    entries: ['first']
- * };
- *
- * hasProperty(data, 'user.name');
- * // true
- *
- * hasProperty(data, 'user.email');
- * // false
- *
- * hasProperty(data, ['entries', 0]);
- * // true
- *
- * hasProperty(data, ['entries', '0']);
- * // false
- * ```
- *
- * Inherited properties are considered available because path resolution uses JavaScript property lookup semantics.
- *
- * ## Safe mutation
- *
- * `safeSet` supports direct assignment and basic arithmetic operations:
- *
- * ```ts
- * const data = {
- *    count: 2,
- *    settings: {
- *       enabled: false
- *    }
- * };
- *
- * safeSet(data, 'settings.enabled', true);
- * safeSet(data, 'count', 3, { operation: 'add' });
- *
- * data.count;
- * // 5
- * ```
- *
- * ### Operations
- *
- * | Operation | Effect |
- * | --- | --- |
- * | `set` | Assigns the supplied value. |
- * | `set-undefined` | Assigns only when the current value is `undefined`. |
- * | `add` | Applies `+=`. |
- * | `sub` | Applies `-=`. |
- * | `mult` | Applies `*=`. |
- * | `div` | Applies `/=`. |
- *
- * The default operation is `set`.
- *
- * ### Creating missing objects
- *
- * By default, every intermediate path segment must already resolve to an object:
- *
- * ```ts
- * const data = {};
- *
- * safeSet(data, 'settings.enabled', true);
- * // false
- * ```
- *
- * Set `createMissing` to create missing intermediate object entries:
- *
- * ```ts
- * safeSet(data, 'settings.enabled', true, {
- *    createMissing: true
- * });
- * // true
- * ```
- *
- * Missing entries are created as ordinary objects. The function does not infer that a missing segment should be an array.
- *
- * ### Mutation safety
- *
- * `safeSet` rejects the following string path segments:
- *
- * - `__proto__`
- * - `prototype`
- * - `constructor`
- *
- * It also rejects ECMAScript well-known symbols, including protocol hooks such as:
- *
- * - `Symbol.iterator`
- * - `Symbol.toPrimitive`
- * - `Symbol.toStringTag`
- *
- * This prevents prototype-pollution paths and modification of built-in language protocols through the generic mutation API. User-created symbols and symbols produced by `Symbol.for` remain valid.
- *
- * Validation occurs during traversal. When `createMissing` is enabled, earlier missing segments may already have been created before a later blocked or invalid segment causes the operation to return `false`.
- *
- * ## Property-path iteration
- *
- * `safeKeyIterator` performs an iterative depth-first traversal and yields readonly arrays suitable for `safeAccess`, `hasProperty`, and `safeSet`:
- *
- * ```ts
- * const marker = Symbol('marker');
- *
- * const data = {
- *    user: {
- *       name: 'Ada'
- *    },
- *    entries: ['a', 'b'],
- *    [marker]: true
- * };
- *
- * [...safeKeyIterator(data)];
- * // Example:
- * // [
- * //    [marker],
- * //    ['entries', 0],
- * //    ['entries', 1],
- * //    ['user', 'name']
- * // ]
- * ```
- *
- * The exact order follows the iterator's depth-first traversal rules. Array indexes are emitted immediately when an array property is encountered, preserving the established array ordering.
- *
- * Behavioral details:
- *
- * - Enumerable own string and symbol properties are included by default.
- * - Set `hasOwnOnly: false` to include enumerable inherited properties.
- * - Set `arrayIndex: false` to omit numeric array indexes.
- * - Enumerable symbol properties attached to arrays remain included when `arrayIndex` is false.
- * - Functions are excluded as leaf values.
- * - Objects are traversed recursively.
- * - Array elements are yielded as indexed leaf paths rather than recursively traversed.
- * - `Map` and `Set` entries are not traversed.
- * - Literal string keys containing periods remain unambiguous because paths are arrays.
- *
- * ## Source-driven equality
- *
- * `safeEqual` is a source-driven structural comparison rather than a symmetric general-purpose deep-equality function:
- *
- * ```ts
- * safeEqual(
- *    { settings: { enabled: true } },
- *    { settings: { enabled: true }, extra: 42 }
- * );
- * // true
- * ```
- *
- * Every leaf path produced from `source` must exist in `target` and resolve to the same value. Extra target properties are ignored.
- *
- * Values are compared with strict equality:
- *
- * - Primitive leaves compare by value and type.
- * - Object and function leaves compare by reference.
- * - `NaN` does not equal `NaN`.
- * - `0` and `-0` compare as equal.
- * - Present `undefined` and `null` properties remain distinct from missing properties.
- *
- * Arrays are compared by their numeric element paths. Object values stored in arrays are therefore compared by reference rather than recursively by their internal properties.
- *
- * ```ts
- * const shared = { id: 1 };
- *
- * safeEqual({ entries: [shared] }, { entries: [shared] });
- * // true
- *
- * safeEqual({ entries: [{ id: 1 }] }, { entries: [{ id: 1 }] });
- * // false
- * ```
- *
- * Options:
- *
- * ```ts
- * safeEqual(source, target, {
- *    arrayIndex: false,
- *    hasOwnOnly: false
- * });
- * ```
- *
- * - `arrayIndex: false` ignores numeric array elements.
- * - `hasOwnOnly: false` includes enumerable inherited properties.
- *
- * ## Deep merge
- *
- * `deepMerge` mutates and returns the target:
- *
- * ```ts
- * const target = {
- *    settings: {
- *       enabled: false,
- *       mode: 'basic'
- *    }
- * };
- *
- * deepMerge(target, {
- *    settings: {
- *       enabled: true
- *    }
- * });
- *
- * // {
- * //    settings: {
- * //       enabled: true,
- * //       mode: 'basic'
- * //    }
- * // }
- * ```
- *
- * Only plain object inputs are accepted. Nested values are recursively merged when both the source and target values are object literals. Other values, including arrays, replace the target value.
- *
- * Later source objects take precedence over earlier sources:
- *
- * ```ts
- * deepMerge({}, defaults, userOptions, runtimeOverrides);
- * ```
- *
- * ## Deep freeze and seal
- *
- * `deepFreeze` and `deepSeal` use iterative traversal, avoiding recursive call-stack growth for deeply nested object graphs.
- *
- * ```ts
- * const frozen = deepFreeze({
- *    settings: {
- *       enabled: true
- *    }
- * });
- *
- * Object.isFrozen(frozen);
- * Object.isFrozen(frozen.settings);
- * // true
- * ```
- *
- * Both functions accept an optional `skipKeys` set:
- *
- * ```ts
- * deepFreeze(data, {
- *    skipKeys: new Set(['cache'])
- * });
- * ```
- *
- * `skipKeys` applies to traversed object string keys. The containing object is still frozen or sealed; the referenced child is simply omitted from further traversal through that key.
- *
- * ## Non-empty iterables
- *
- * `ensureNonEmptyIterable` safely peeks at an iterable:
- *
- * ```ts
- * const values = ensureNonEmptyIterable([1, 2, 3]);
- *
- * if (values)
- * {
- *    for (const value of values)
- *    {
- *       // 1, 2, 3
- *    }
- * }
- * ```
- *
- * It returns `undefined` when the input is missing, non-iterable, or empty. For one-shot iterators, the returned iterable preserves the already-consumed first item before continuing with the original iterator.
- *
- * `ensureNonEmptyAsyncIterable` provides the same behavior for async iteration:
- *
- * ```ts
- * const values = await ensureNonEmptyAsyncIterable(source);
- *
- * if (values)
- * {
- *    for await (const value of values)
- *    {
- *       // ...
- *    }
- * }
- * ```
- *
- * Synchronous iterables may also be lifted into an async iterable.
- *
- * ## Object checks
- *
- * The object predicates intentionally provide different narrowing behavior:
- *
- * ```ts
- * interface Options
- * {
- *    enabled?: boolean;
- * }
- *
- * declare const input: Options | undefined;
- *
- * if (input && isObject(input))
- * {
- *    input.enabled;
- *    // Existing Options shape is retained.
- * }
- * ```
- *
- * Use:
- *
- * - `isObject` when a known object type should be preserved.
- * - `isRecord` when generic string-keyed access is required.
- * - `isPlainObject` when class instances, arrays, and custom prototypes must be excluded.
- * - The corresponding assertion functions when invalid input should throw instead of returning `false`.
- *
- * ## Getter, setter, and prototype checks
- *
- * Descriptor utilities inspect both the instance and its prototype chain:
- *
- * ```ts
- * class Example
- * {
- *    #value = 0;
- *
- *    get value(): number
- *    {
- *       return this.#value;
- *    }
- *
- *    set value(value: number)
- *    {
- *       this.#value = value;
- *    }
- * }
- *
- * const example = new Example();
- *
- * hasAccessor(example, 'value');
- * // true
- *
- * hasGetter(example, 'value');
- * // true
- *
- * hasSetter(example, 'value');
- * // true
- * ```
- *
- * `hasPrototype` operates on constructors:
- *
- * ```ts
- * class Base {}
- * class Derived extends Base {}
- *
- * hasPrototype(Derived, Base);
- * // true
- * ```
- *
- * ## TypeScript notes
- *
- * - Exact tuple accessors provide the strongest `safeAccess` inference.
- * - Runtime-sized `PropertyKey[]` accessors resolve to `unknown` at the type level because their path cannot be determined statically.
- * - Dotted string inference is supported for object properties but intentionally rejects traversal into arrays.
- *
- * ## Scope and limitations
- *
- * These utilities focus on ordinary JavaScript objects and arrays:
- *
- * - `Map` and `Set` entries are not traversed by `safeKeyIterator` or compared by `safeEqual`.
- * - Property access may invoke getters and proxy traps.
- * - `safeEqual` is asymmetric and source-driven.
- * - Array element objects are compared by reference.
- * - `safeSet` creates missing intermediate segments as objects, not arrays.
- * - Dotted string paths cannot represent literal periods, symbols, or array indexes.
- * - The package does not attempt to serialize symbols into string paths.
- *
- * Use exact property-key arrays whenever correctness across the complete JavaScript property-key space is required.
+ * The cloning API from `klona/full` is re-exported.
  *
  * @packageDocumentation
  */
@@ -673,10 +75,7 @@ export function assertObject<T>(value: T, errorMsg: string = 'Expected an object
 export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a plain object.'):
  asserts value is T & object
 {
-   if (Object.prototype.toString.call(value) !== '[object Object]') { throw new TypeError(errorMsg); }
-
-   const prototype: any = Object.getPrototypeOf(value);
-   if (prototype !== null && prototype !== Object.prototype) { throw new TypeError(errorMsg); }
+   if (!isPlainObjectValue(value)) { throw new TypeError(errorMsg); }
 }
 
 /**
@@ -737,34 +136,28 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
       throw new TypeError(`deepFreeze error: 'options.skipKeys' is not a Set.`);
    }
 
-   const stack: any[] = [data];
+   const stack: object[] = [data];
 
    while (stack.length > 0)
    {
-      const obj: any = stack.pop();
+      const obj: any = stack.pop()!;
 
       if (typeof obj !== 'object' || obj === null || Object.isFrozen(obj)) { continue; }
 
-      // Collect nested properties before freezing.
-      const children: any[] = [];
+      const children: unknown[] = [];
 
-      if (Array.isArray(obj))
+      for (const key of getEnumerablePropertyKeys(obj, true))
       {
-         for (let cntr: number = 0; cntr < obj.length; cntr++) { children.push(obj[cntr]); }
-      }
-      else
-      {
-         for (const key in obj)
-         {
-            if (Object.hasOwn(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
-         }
+         if (typeof key === 'string' && skipKeys?.has(key)) { continue; }
+         children.push(obj[key]);
       }
 
-      // Freeze after collecting children to avoid modifying a frozen object.
       Object.freeze(obj);
 
-      // Push collected children onto the stack for further processing.
-      stack.push(...children);
+      for (const child of children)
+      {
+         if (typeof child === 'object' && child !== null) { stack.push(child); }
+      }
    }
 
    return data;
@@ -789,11 +182,11 @@ export function deepMerge<T extends object, U extends object, V extends object>(
  sourceObj2: V): DeepMerge<T, [U, V]>;
 
 export function deepMerge<T extends object, U extends object[]>(target: T, ...sourceObj: U):
- DeepMerge<T, U>
+ DeepMerge<T, U>;
 
 export function deepMerge(target: object, ...sourceObj: object[]): object
 {
-   if (Object.prototype.toString.call(target) !== '[object Object]')
+   if (!isMergeObjectValue(target))
    {
       throw new TypeError(`deepMerge error: 'target' is not an object.`);
    }
@@ -805,72 +198,74 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
    for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
    {
-      if (Object.prototype.toString.call(sourceObj[cntr]) !== '[object Object]')
+      if (!isMergeObjectValue(sourceObj[cntr]))
       {
          throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an object.`);
       }
+
+      assertNoCircularPlainObject(sourceObj[cntr]);
    }
 
-   // When merging a single source object there is an implementation that is twice as fast as multiple source objects.
    if (sourceObj.length === 1)
    {
-      const stack: { target: any, source: any }[] = [];
-
-      for (const obj of sourceObj) { stack.push({ target, source: obj }); }
+      const stack: { target: any; source: any }[] = [{ target, source: sourceObj[0] }];
 
       while (stack.length > 0)
       {
-         const { target, source } = stack.pop()!; // LIFO but maintains correct merge order.
+         const entry = stack.pop()!;
 
-         for (const prop in source)
+         for (const key of getEnumerablePropertyKeys(entry.source, true))
          {
-            if (Object.hasOwn(source, prop))
-            {
-               const sourceValue: any = source[prop];
-               const targetValue: any = target[prop];
+            if (isBlockedPrototypeKey(key)) { continue; }
 
-               // If both values are plain objects, enqueue for further merging.
-               if (Object.hasOwn(target, prop) && targetValue?.constructor === Object &&
-                sourceValue?.constructor === Object)
-               {
-                  stack.push({ target: targetValue, source: sourceValue });
-               }
-               else
-               {
-                  target[prop] = sourceValue;
-               }
+            const sourceValue: any = entry.source[key];
+            const targetValue: any = entry.target[key];
+
+            if (isPlainObjectValue(sourceValue))
+            {
+               const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
+                targetValue : Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
+
+               entry.target[key] = mergedTarget;
+               stack.push({ target: mergedTarget, source: sourceValue });
+            }
+            else
+            {
+               entry.target[key] = sourceValue;
             }
          }
       }
    }
-   else // Stack implementation for multiple source objects.
+   else
    {
-      const stack: { target: any, sources: any[] }[] = [{ target, sources: sourceObj }];
-
-      while (stack.length > 0)
+      // Complete each source before processing the next so queued nested work cannot target a replaced object.
+      for (const source of sourceObj)
       {
-         const { target, sources } = stack.pop()!;
+         const stack: { target: any; source: any }[] = [{ target, source }];
 
-         for (const source of sources)
+         while (stack.length > 0)
          {
-            for (const prop in source)
-            {
-               if (Object.hasOwn(source, prop))
-               {
-                  const sourceValue: any = source[prop];
-                  const targetValue: any = target[prop];
+            const entry = stack.pop()!;
 
-                  // If both values are plain objects, push for further merging with a new object.
-                  if (Object.hasOwn(target, prop) && targetValue?.constructor === Object &&
-                   sourceValue?.constructor === Object)
-                  {
-                     target[prop] = Object.assign({}, targetValue); // Copy existing target data.
-                     stack.push({ target: target[prop], sources: [sourceValue] });
-                  }
-                  else
-                  {
-                     target[prop] = sourceValue;
-                  }
+            for (const key of getEnumerablePropertyKeys(entry.source, true))
+            {
+               if (isBlockedPrototypeKey(key)) { continue; }
+
+               const sourceValue: any = entry.source[key];
+               const targetValue: any = entry.target[key];
+
+               if (isPlainObjectValue(sourceValue))
+               {
+                  const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
+                   clonePlainEnumerable(targetValue) :
+                    Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
+
+                  entry.target[key] = mergedTarget;
+                  stack.push({ target: mergedTarget, source: sourceValue });
+               }
+               else
+               {
+                  entry.target[key] = sourceValue;
                }
             }
          }
@@ -905,34 +300,28 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
       throw new TypeError(`deepSeal error: 'options.skipKeys' is not a Set.`);
    }
 
-   const stack: any[] = [data];
+   const stack: object[] = [data];
 
    while (stack.length > 0)
    {
-      const obj: any = stack.pop();
+      const obj: any = stack.pop()!;
 
       if (typeof obj !== 'object' || obj === null || Object.isSealed(obj)) { continue; }
 
-      // Collect nested properties before freezing.
-      const children: any[] = [];
+      const children: unknown[] = [];
 
-      if (Array.isArray(obj))
+      for (const key of getEnumerablePropertyKeys(obj, true))
       {
-         for (let cntr: number = 0; cntr < obj.length; cntr++) { children.push(obj[cntr]); }
-      }
-      else
-      {
-         for (const key in obj)
-         {
-            if (Object.hasOwn(obj, key) && !skipKeys?.has?.(key)) { children.push(obj[key]); }
-         }
+         if (typeof key === 'string' && skipKeys?.has(key)) { continue; }
+         children.push(obj[key]);
       }
 
-      // Freeze after collecting children to avoid modifying a frozen object.
       Object.seal(obj);
 
-      // Push collected children onto the stack for further processing.
-      stack.push(...children);
+      for (const child of children)
+      {
+         if (typeof child === 'object' && child !== null) { stack.push(child); }
+      }
    }
 
    return data;
@@ -956,39 +345,45 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 export async function ensureNonEmptyAsyncIterable<T>(value: AsyncIterable<T> | Iterable<T> | null | undefined):
  Promise<AsyncIterable<T> | undefined>
 {
-   // First detect async-iterable-like values.
-   const asyncIteratorFn = value?.[Symbol.asyncIterator];
-   const syncIteratorFn  = value?.[Symbol.iterator];
+   const candidate = value as {
+      [Symbol.asyncIterator]?: () => AsyncIterator<T>;
+      [Symbol.iterator]?: () => Iterator<T>;
+   } | null | undefined;
 
-   if (asyncIteratorFn)
+   const asyncIteratorFn = candidate?.[Symbol.asyncIterator];
+   const syncIteratorFn = candidate?.[Symbol.iterator];
+
+   if (typeof asyncIteratorFn === 'function')
    {
-      const iter = asyncIteratorFn.call(value);
-      const first = await iter.next();
+      const iter: AsyncIterator<T> = asyncIteratorFn.call(value);
+      const first: IteratorResult<T> = await iter.next();
 
       if (first.done) { return void 0; }
 
       return (async function* (): AsyncGenerator<T, void, unknown>
       {
-         // Yield peeked first value.
          yield first.value;
-
-         // Manually consume the underlying async iterator.
-         for (let r = await iter.next(); !r.done; r = await iter.next()) { yield r.value; }
+         for (let result: IteratorResult<T> = await iter.next(); !result.done; result = await iter.next())
+         {
+            yield result.value;
+         }
       })();
    }
-   else if (syncIteratorFn)
+
+   if (typeof syncIteratorFn === 'function')
    {
-      // Allow synchronous iterables to be lifted into async context.
-      const iter = syncIteratorFn.call(value);
-      const first = iter.next();
+      const iter: Iterator<T> = syncIteratorFn.call(value);
+      const first: IteratorResult<T> = iter.next();
 
       if (first.done) { return void 0; }
 
       return (async function* (): AsyncGenerator<T, void, unknown>
       {
          yield first.value;
-
-         for (let r = iter.next(); !r.done; r = iter.next()) { yield r.value; }
+         for (let result: IteratorResult<T> = iter.next(); !result.done; result = iter.next())
+         {
+            yield result.value;
+         }
       })();
    }
 
@@ -1064,13 +459,13 @@ export function hasAccessor<T extends object, K extends keyof T>(object: T, acce
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.get !== void 0 && iDescriptor.set !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
    for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.get !== void 0 && descriptor.set !== void 0) { return true; }
    }
 
@@ -1094,13 +489,13 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.get !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
    for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.get !== void 0) { return true; }
    }
 
@@ -1126,9 +521,13 @@ export function hasProperty(data: object, accessor: SafeAccessor): boolean
    if (typeof data !== 'object' || data === null) { return false; }
    if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return false; }
 
-   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+   if ((typeof accessor === 'string' && accessor.length === 0) ||
+    (Array.isArray(accessor) && accessor.length === 0))
+   {
+      return false;
+   }
 
-   if (keys.length === 0) { return false; }
+   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
 
    return resolvePropertyPath(data, keys) !== unresolvedProperty;
 }
@@ -1177,13 +576,13 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
    // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(object, accessor);
+   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
    if (iDescriptor !== void 0 && iDescriptor.set !== void 0) { return true; }
 
    // Walk parent prototype chain. Check for descriptor at each prototype level.
    for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
    {
-      const descriptor: PropertyDescriptor = Object.getOwnPropertyDescriptor(o, accessor);
+      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
       if (descriptor !== void 0 && descriptor.set !== void 0) { return true; }
    }
 
@@ -1296,10 +695,7 @@ export function isPlainObject<T extends object>(value: T): value is T;
 export function isPlainObject(value: unknown): value is Record<string, unknown>;
 export function isPlainObject(value: unknown): value is Record<string, unknown>
 {
-   if (Object.prototype.toString.call(value) !== '[object Object]') { return false; }
-
-   const prototype: any = Object.getPrototypeOf(value);
-   return prototype === null || prototype === Object.prototype;
+   return isPlainObjectValue(value);
 }
 
 /**
@@ -1387,31 +783,34 @@ export function safeAccess<T extends object, const P extends SafeAccessor, R = D
 {
    if (typeof data !== 'object' || data === null) { return defaultValue as any; }
    if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return defaultValue as any; }
+   if ((typeof accessor === 'string' && accessor.length === 0) ||
+    (Array.isArray(accessor) && accessor.length === 0))
+   {
+      return defaultValue as any;
+   }
 
    const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
-
-   if (keys.length === 0) { return defaultValue as any; }
-
    let result: any = data;
 
-   // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < keys.length; cntr++)
    {
+      if (!isTraversableValue(result)) { return defaultValue as any; }
+
       const key: PropertyKey = keys[cntr];
       const keyType: string = typeof key;
 
       if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return defaultValue as any; }
 
-      // Array indexes must use a valid numeric array index in an array accessor. Symbol properties remain valid.
       if (Array.isArray(result) && keyType !== 'symbol' && !isArrayIndex(key))
       {
          return defaultValue as any;
       }
 
-      // If the next level of object access is undefined or null then return the default value.
-      if (result[key] === void 0 || result[key] === null) { return defaultValue as any; }
+      // Cache each read so getters and proxy traps are invoked only once per path segment.
+      const next: any = (result as any)[key];
+      if (next === void 0 || next === null) { return defaultValue as any; }
 
-      result = result[key];
+      result = next;
    }
 
    return result as any;
@@ -1488,15 +887,16 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
       throw new TypeError(`safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   const stack: { obj: object; path: readonly PropertyKey[] }[] = [{ obj: data, path: [] }];
+   const rootAncestors: ReadonlySet<object> = new Set([data]);
+   const stack: PropertyTraversalEntry[] = [{ obj: data, path: [], ancestors: rootAncestors }];
 
    while (stack.length > 0)
    {
-      const { obj, path } = stack.pop()!;
+      const { obj, path, ancestors } = stack.pop()!;
 
       if (Array.isArray(obj))
       {
-         yield* iterateArrayAccessors(obj, path, arrayIndex, hasOwnOnly, stack);
+         yield* iterateArrayAccessors(obj, path, arrayIndex, hasOwnOnly, stack, ancestors);
          continue;
       }
 
@@ -1505,14 +905,14 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
          const fullPath: readonly PropertyKey[] = path.concat(key);
          const value: any = (obj as any)[key];
 
-         // Preserve the previous ordering by yielding array indexes immediately when the array property is encountered.
          if (Array.isArray(value))
          {
-            yield* iterateArrayAccessors(value, fullPath, arrayIndex, hasOwnOnly, stack);
+            yield* iterateArrayAccessors(value, fullPath, arrayIndex, hasOwnOnly, stack,
+             extendPropertyAncestors(ancestors, value));
          }
          else if (typeof value === 'object' && value !== null)
          {
-            stack.push({ obj: value, path: fullPath });
+            stack.push({ obj: value, path: fullPath, ancestors: extendPropertyAncestors(ancestors, value) });
          }
          else if (typeof value !== 'function')
          {
@@ -1567,14 +967,15 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
       throw new TypeError(`safeSet error: 'options.createMissing' is not a boolean.`);
    }
 
+   if ((typeof accessor === 'string' && accessor.length === 0) || (Array.isArray(accessor) && accessor.length === 0))
+   {
+      return false;
+   }
+
    const access: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
-
-   if (access.length === 0) { return false; }
-
    let result = false;
    let target: any = data;
 
-   // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < access.length; cntr++)
    {
       const key: PropertyKey = access[cntr];
@@ -1585,66 +986,43 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
          throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a property key.`);
       }
 
-      // Prevent prototype-pollution access paths and modification of built-in language protocols.
-      if ((keyType === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor')) ||
+      if ((keyType === 'string' && isBlockedPrototypeKey(key)) ||
        (keyType === 'symbol' && wellKnownSymbols.has(key as symbol)))
       {
          return false;
       }
 
-      // Array indexes must use a valid numeric array index in an array accessor. Symbol properties remain valid.
-      if (Array.isArray(target) && keyType !== 'symbol' && !isArrayIndex(key))
-      {
-         return false;
-      }
+      if (Array.isArray(target) && keyType !== 'symbol' && !isArrayIndex(key)) { return false; }
 
-      // Verify first level missing property.
-      if (cntr === 0 && access.length === 1 && !createMissing && !(key in target)) { return false; }
+      if (cntr === 0 && access.length === 1 && !createMissing && !(key in (target as any))) { return false; }
 
       if (cntr === access.length - 1)
       {
          switch (operation)
          {
-            case 'add':
-               target[key] += value;
-               result = true;
-               break;
-
-            case 'div':
-               target[key] /= value;
-               result = true;
-               break;
-
-            case 'mult':
-               target[key] *= value;
-               result = true;
-               break;
-
-            case 'set':
-               target[key] = value;
-               result = true;
-               break;
-
+            case 'add': (target as any)[key] += value; result = true; break;
+            case 'div': (target as any)[key] /= value; result = true; break;
+            case 'mult': (target as any)[key] *= value; result = true; break;
+            case 'set': (target as any)[key] = value; result = true; break;
             case 'set-undefined':
-               if (target[key] === void 0) { target[key] = value; }
+               if ((target as any)[key] === void 0) { (target as any)[key] = value; }
                result = true;
                break;
-
-            case 'sub':
-               target[key] -= value;
-               result = true;
-               break;
+            case 'sub': (target as any)[key] -= value; result = true; break;
          }
       }
       else
       {
-         // If createMissing is true and the next level of object access is undefined then create a new object entry.
-         if (createMissing && target[key] === void 0) { target[key] = {}; }
+         let next: any = (target as any)[key];
 
-         // Abort if the next level is null or not an object and containing a value.
-         if (target[key] === null || typeof target[key] !== 'object') { return false; }
+         if (createMissing && next === void 0)
+         {
+            next = {};
+            (target as any)[key] = next;
+         }
 
-         target = target[key];
+         if (!isTraversableValue(next)) { return false; }
+         target = next;
       }
    }
 
@@ -1667,114 +1045,59 @@ const unresolvedProperty: unique symbol = Symbol();
 
 // Utility Function --------------------------------------------------------------------------------------------------
 
-/**
- * Returns whether a value is a valid ECMAScript array index.
- */
-function isArrayIndex(value: unknown): value is number
+function assertNoCircularPlainObject(source: object): void
 {
-   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
-}
-
-/**
- * Resolves an exact property-key accessor while preserving the distinction between a missing property and a property
- * whose value is `undefined` or `null`.
- */
-function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): unknown
-{
-   let result: any = data;
-
-   for (let cntr: number = 0; cntr < accessor.length; cntr++)
-   {
-      if ((typeof result !== 'object' && typeof result !== 'function') || result === null)
-      {
-         return unresolvedProperty;
-      }
-
-      const key: PropertyKey = accessor[cntr];
-      const keyType: string = typeof key;
-
-      /* v8 ignore start */ // The following is sanity checks that should not normally be reached.
-      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol')
-      {
-         return unresolvedProperty;
-      }
-
-      if (Array.isArray(result) && keyType !== 'symbol' && !isArrayIndex(key))
-      {
-         return unresolvedProperty;
-      }
-      /* v8 ignore stop */
-
-      if (!(key in result)) { return unresolvedProperty; }
-
-      result = result[key];
-   }
-
-   return result;
-}
-
-/**
- * Yields numeric indexes and enumerable symbol-property accessors for an array. Nested arrays reached through symbol
- * properties are processed immediately while object values are added to the primary depth-first traversal stack.
- */
-function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
- hasOwnOnly: boolean, objectStack: { obj: object; path: readonly PropertyKey[] }[]):
-  IterableIterator<readonly PropertyKey[]>
-{
-   const stack: {
-      array: any[];
-      path: readonly PropertyKey[];
-      symbols?: symbol[];
-      symbolIndex: number;
-      indexesYielded: boolean;
-   }[] = [{ array, path, symbolIndex: 0, indexesYielded: false }];
+   const stack: { value: object; ancestors: ReadonlySet<object> }[] = [{
+      value: source,
+      ancestors: new Set([source])
+   }];
 
    while (stack.length > 0)
    {
-      const frame = stack[stack.length - 1];
+      const { value, ancestors } = stack.pop()!;
 
-      if (!frame.indexesYielded)
+      for (const key of getEnumerablePropertyKeys(value, true))
       {
-         frame.indexesYielded = true;
+         if (isBlockedPrototypeKey(key)) { continue; }
 
-         if (arrayIndex)
+         const child: unknown = (value as any)[key];
+         if (!isPlainObjectValue(child)) { continue; }
+
+         if (ancestors.has(child))
          {
-            for (let cntr: number = 0; cntr < frame.array.length; cntr++)
-            {
-               yield frame.path.concat(cntr);
-            }
+            throw new TypeError(`deepMerge error: Circular source object detected.`);
          }
-      }
 
-      if (frame.symbols === void 0)
-      {
-         frame.symbols = getEnumerablePropertyKeys(frame.array, hasOwnOnly)
-          .filter((key: PropertyKey): key is symbol => typeof key === 'symbol');
-      }
-
-      if (frame.symbolIndex >= frame.symbols.length)
-      {
-         stack.pop();
-         continue;
-      }
-
-      const key: symbol = frame.symbols[frame.symbolIndex++];
-      const fullPath: readonly PropertyKey[] = frame.path.concat(key);
-      const value: any = (frame.array as any)[key];
-
-      if (Array.isArray(value))
-      {
-         stack.push({ array: value, path: fullPath, symbolIndex: 0, indexesYielded: false });
-      }
-      else if (typeof value === 'object' && value !== null)
-      {
-         objectStack.push({ obj: value, path: fullPath });
-      }
-      else if (typeof value !== 'function')
-      {
-         yield fullPath;
+         const childAncestors: Set<object> = new Set(ancestors);
+         childAncestors.add(child);
+         stack.push({ value: child, ancestors: childAncestors });
       }
    }
+}
+
+function clonePlainEnumerable(source: Record<PropertyKey, unknown>): Record<PropertyKey, unknown>
+{
+   const clone: Record<PropertyKey, unknown> = Object.create(Object.getPrototypeOf(source) === null ? null :
+    Object.prototype);
+
+   for (const key of getEnumerablePropertyKeys(source, true))
+   {
+      if (!isBlockedPrototypeKey(key)) { clone[key] = source[key]; }
+   }
+
+   return clone;
+}
+
+function extendPropertyAncestors(ancestors: ReadonlySet<object>, child: object): ReadonlySet<object>
+{
+   if (ancestors.has(child))
+   {
+      throw new TypeError(`safeKeyIterator error: Circular object path detected.`);
+   }
+
+   const result: Set<object> = new Set(ancestors);
+   result.add(child);
+   return result;
 }
 
 /**
@@ -1813,6 +1136,143 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
    return keys;
 }
 
+/**
+ * Returns whether a value is a valid ECMAScript array index.
+ */
+function isArrayIndex(value: unknown): value is number
+{
+   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
+}
+
+function isBlockedPrototypeKey(key: PropertyKey): boolean
+{
+   return typeof key === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor');
+}
+
+function isTraversableValue(value: unknown): value is object | ((...args: any[]) => any)
+{
+   return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+
+function isMergeObjectValue(value: unknown): value is Record<PropertyKey, unknown>
+{
+   return value !== null && typeof value === 'object' && !Array.isArray(value) &&
+    Object.prototype.toString.call(value) === '[object Object]';
+}
+
+function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknown>
+{
+   if (value === null || typeof value !== 'object') { return false; }
+   const prototype: object | null = Object.getPrototypeOf(value);
+   return prototype === null || prototype === Object.prototype;
+}
+
+function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
+ hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>):
+  IterableIterator<readonly PropertyKey[]>
+{
+   const stack: ArrayTraversalEntry[] = [{ array, path, ancestors, symbolIndex: 0, indexesYielded: false }];
+
+   while (stack.length > 0)
+   {
+      const frame: ArrayTraversalEntry = stack[stack.length - 1];
+
+      if (!frame.indexesYielded)
+      {
+         frame.indexesYielded = true;
+
+         if (arrayIndex)
+         {
+            for (let cntr: number = 0; cntr < frame.array.length; cntr++)
+            {
+               yield frame.path.concat(cntr);
+            }
+         }
+      }
+
+      if (frame.symbols === void 0)
+      {
+         frame.symbols = getEnumerablePropertyKeys(frame.array, hasOwnOnly)
+         .filter((key: PropertyKey): key is symbol => typeof key === 'symbol');
+      }
+
+      if (frame.symbolIndex >= frame.symbols.length)
+      {
+         stack.pop();
+         continue;
+      }
+
+      const key: symbol = frame.symbols[frame.symbolIndex++];
+      const fullPath: readonly PropertyKey[] = frame.path.concat(key);
+      const value: any = (frame.array as any)[key];
+
+      if (Array.isArray(value))
+      {
+         stack.push({
+            array: value,
+            path: fullPath,
+            ancestors: extendPropertyAncestors(frame.ancestors, value),
+            symbolIndex: 0,
+            indexesYielded: false
+         });
+      }
+      else if (typeof value === 'object' && value !== null)
+      {
+         objectStack.push({
+            obj: value,
+            path: fullPath,
+            ancestors: extendPropertyAncestors(frame.ancestors, value)
+         });
+      }
+      else if (typeof value !== 'function')
+      {
+         yield fullPath;
+      }
+   }
+}
+
+function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): unknown
+{
+   let result: any = data;
+
+   for (let cntr: number = 0; cntr < accessor.length; cntr++)
+   {
+      if (!isTraversableValue(result)) { return unresolvedProperty; }
+
+      const key: PropertyKey = accessor[cntr];
+      const keyType: string = typeof key;
+
+      /* v8 ignore start */
+      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return unresolvedProperty; }
+      if (Array.isArray(result) && keyType !== 'symbol' && !isArrayIndex(key)) { return unresolvedProperty; }
+      /* v8 ignore stop */
+
+      if (!(key in (result as any))) { return unresolvedProperty; }
+      result = (result as any)[key];
+   }
+
+   return result;
+}
+
+// Internal Types ----------------------------------------------------------------------------------------------------
+
+interface PropertyTraversalEntry
+{
+   obj: object;
+   path: readonly PropertyKey[];
+   ancestors: ReadonlySet<object>;
+}
+
+interface ArrayTraversalEntry
+{
+   array: any[];
+   path: readonly PropertyKey[];
+   ancestors: ReadonlySet<object>;
+   symbols?: symbol[];
+   symbolIndex: number;
+   indexesYielded: boolean;
+}
+
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
@@ -1829,46 +1289,52 @@ export type SafeAccessor = string | readonly PropertyKey[];
  */
 type DeepAccess<T, P extends SafeAccessor> =
  P extends string
-  ? DeepAccessString<T, P>
+  ? P extends ''
+   ? undefined
+   : DeepAccessString<T, P>
   : P extends readonly PropertyKey[]
    ? DeepAccessArray<T, P>
    : undefined;
 
 /**
- * Infers a dotted string accessor in object T.
+ * Infers a dotted string accessor in object T. Primitive and array traversal is rejected, matching runtime behavior.
  */
 type DeepAccessString<T, P extends string> =
- T extends readonly unknown[]
-  ? undefined
-  : P extends `${infer K}.${infer Rest}`
-   ? K extends keyof T
-    ? DeepAccessString<T[K], Rest>
-    : undefined
-   : P extends keyof T
-    ? T[P]
-    : undefined;
+ T extends object
+  ? T extends readonly unknown[]
+   ? undefined
+   : P extends `${infer K}.${infer Rest}`
+    ? K extends keyof T
+     ? DeepAccessString<T[K], Rest>
+     : undefined
+    : P extends keyof T
+     ? T[P]
+     : undefined
+  : undefined;
 
 /**
  * Infers a readonly tuple accessor in object T. Array traversal accepts only numeric or symbol keys, matching runtime
- * behavior. A non-tuple accessor array returns `unknown` because its runtime path cannot be determined statically.
+ * behavior. Primitive traversal is rejected. A non-tuple accessor array returns `unknown`.
  */
 type DeepAccessArray<T, P extends readonly PropertyKey[]> =
  number extends P['length']
   ? unknown
   : P extends readonly [infer K extends PropertyKey, ...infer Rest extends readonly PropertyKey[]]
-   ? T extends readonly unknown[]
-    ? K extends number | symbol
-     ? K extends keyof T
+   ? T extends object
+    ? T extends readonly unknown[]
+     ? K extends number | symbol
+      ? K extends keyof T
+       ? Rest extends readonly []
+        ? T[K]
+        : DeepAccessArray<T[K], Rest>
+       : undefined
+      : undefined
+     : K extends keyof T
       ? Rest extends readonly []
        ? T[K]
        : DeepAccessArray<T[K], Rest>
       : undefined
-     : undefined
-    : K extends keyof T
-     ? Rest extends readonly []
-      ? T[K]
-      : DeepAccessArray<T[K], Rest>
-     : undefined
+    : undefined
    : undefined;
 
 /**
