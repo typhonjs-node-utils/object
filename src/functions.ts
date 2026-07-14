@@ -734,11 +734,13 @@ export function objectSize(object: any): number
 
 /**
  * Provides a way to safely access an object's data / entries using either a dotted accessor string or an array of
- * exact string or symbol property keys.
+ * exact property keys.
+ *
+ * Array indexes may only be accessed by number through the array accessor form.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A dotted string accessor or an array of exact string or symbol property keys.
+ * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
  *
  * @param [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
  *
@@ -755,7 +757,7 @@ export function safeAccess<T extends object, const P extends SafeAccessor, R = D
    if (typeof data !== 'object' || data === null) { return defaultValue as any; }
    if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return defaultValue as any; }
 
-   const keys: readonly SafeAccessorKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
 
    if (keys.length === 0) { return defaultValue as any; }
 
@@ -764,9 +766,17 @@ export function safeAccess<T extends object, const P extends SafeAccessor, R = D
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < keys.length; cntr++)
    {
-      const key: SafeAccessorKey = keys[cntr];
+      const key: PropertyKey = keys[cntr];
+      const keyType: string = typeof key;
 
-      if (typeof key !== 'string' && typeof key !== 'symbol') { return defaultValue as any; }
+      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return defaultValue as any; }
+
+      // Array indexes must use a non-negative integer in an array accessor. Symbol properties remain valid.
+      if (Array.isArray(result) && keyType !== 'symbol' &&
+       (keyType !== 'number' || !Number.isInteger(key) || (key as number) < 0))
+      {
+         return defaultValue as any;
+      }
 
       // If the next level of object access is undefined or null then return the default value.
       if (result[key] === void 0 || result[key] === null) { return defaultValue as any; }
@@ -813,9 +823,10 @@ export function safeEqual<T extends object>(source: T, target: object,
 }
 
 /**
- * Returns an iterator of safe keys useful with {@link safeAccess} and {@link safeSet} by traversing the given object.
+ * Returns an iterator of property-key accessor arrays useful with {@link safeAccess} and {@link safeSet} by traversing
+ * the given object. Enumerable string and symbol keys are included, and array indexes are emitted as numbers.
  *
- * Note: Keys are only generated for JSON objects; {@link Map} and {@link Set} are not indexed.
+ * Note: Keys are only generated for JSON-like objects; {@link Map} and {@link Set} are not indexed.
  *
  * @param data - An object to traverse for accessor keys.
  *
@@ -828,7 +839,7 @@ export function safeEqual<T extends object>(source: T, target: object,
  * @returns Safe key iterator.
  */
 export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly = true }:
- { arrayIndex?: boolean, hasOwnOnly?: boolean } = {}): IterableIterator<string>
+ { arrayIndex?: boolean, hasOwnOnly?: boolean } = {}): IterableIterator<readonly PropertyKey[]>
 {
    if (typeof data !== 'object' || data === null)
    {
@@ -845,32 +856,75 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
       throw new TypeError(`safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   const stack: { obj: object; prefix: string }[] = [{ obj: data, prefix: '' }];
+   const stack: { obj: object; path: readonly PropertyKey[] }[] = [{ obj: data, path: [] }];
 
    while (stack.length > 0)
    {
-      const { obj, prefix } = stack.pop()!;
+      const { obj, path } = stack.pop()!;
 
-      for (const key in obj)
+      // Handle a root array or an array reached through an enumerable symbol property.
+      if (Array.isArray(obj))
       {
-         if (hasOwnOnly && !Object.hasOwn(obj, key)) { continue; }
+         if (arrayIndex)
+         {
+            for (let cntr: number = 0; cntr < obj.length; cntr++)
+            {
+               yield path.concat(cntr);
+            }
+         }
 
-         const fullKey: string = prefix ? `${prefix}.${key}` : key;
-         const value: any = obj[key];
+         // String properties on arrays are not supported by safe accessors. Enumerable symbol properties remain valid.
+         for (const key of getEnumerablePropertyKeys(obj, hasOwnOnly))
+         {
+            if (typeof key !== 'symbol') { continue; }
 
+            const fullPath: readonly PropertyKey[] = path.concat(key);
+            const value: any = obj[key];
+
+            if (Array.isArray(value))
+            {
+               if (!arrayIndex) { continue; }
+
+               for (let cntr: number = 0; cntr < value.length; cntr++)
+               {
+                  yield fullPath.concat(cntr);
+               }
+            }
+            else if (typeof value === 'object' && value !== null)
+            {
+               stack.push({ obj: value, path: fullPath });
+            }
+            else if (typeof value !== 'function')
+            {
+               yield fullPath;
+            }
+         }
+
+         continue;
+      }
+
+      for (const key of getEnumerablePropertyKeys(obj, hasOwnOnly))
+      {
+         const fullPath: readonly PropertyKey[] = path.concat(key);
+         const value: any = (obj as any)[key];
+
+         // Preserve the previous ordering by yielding array indexes immediately when the array property is encountered.
          if (Array.isArray(value))
          {
             if (!arrayIndex) { continue; }
 
-            for (let cntr: number = 0; cntr < value.length; cntr++) { yield `${fullKey}.${cntr}`; }
+            for (let cntr: number = 0; cntr < value.length; cntr++)
+            {
+               yield fullPath.concat(cntr);
+            }
          }
          else if (typeof value === 'object' && value !== null)
          {
-            stack.push({ obj: value, prefix: fullKey }); // Push to stack for DFS traversal.
+            stack.push({ obj: value, path: fullPath });
          }
          else if (typeof value !== 'function')
          {
-            yield fullKey;
+            yield fullPath;
          }
       }
    }
@@ -878,11 +932,11 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 
 /**
  * Provides a way to safely set an object's data / entries using either a dotted accessor string or an array of exact
- * string or symbol property keys.
+ * property keys. Array indexes may only be accessed by number through the array accessor form.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A dotted string accessor or an array of exact string or symbol property keys.
+ * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
  *
  * The string keys `__proto__`, `prototype`, and `constructor` are rejected to prevent prototype-pollution access
  * paths. ECMAScript well-known symbols, such as `Symbol.toStringTag`, `Symbol.iterator`, and `Symbol.toPrimitive`,
@@ -908,7 +962,7 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
    if (typeof accessor !== 'string' && !Array.isArray(accessor))
    {
-      throw new TypeError(`safeSet error: 'accessor' is not a string or an array of strings or symbols.`);
+      throw new TypeError(`safeSet error: 'accessor' is not a string or an array of property keys.`);
    }
    if (typeof operation !== 'string') { throw new TypeError(`safeSet error: 'options.operation' is not a string.`); }
    if (operation !== 'add' && operation !== 'div' && operation !== 'mult' && operation !== 'set' &&
@@ -921,43 +975,40 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
       throw new TypeError(`safeSet error: 'options.createMissing' is not a boolean.`);
    }
 
-   const access: readonly SafeAccessorKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+   const access: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
 
    if (access.length === 0) { return false; }
 
    let result = false;
    let target: any = data;
 
-   // Verify first level missing property.
-   if (access.length === 1 && !createMissing && !(access[0] in target)) { return false; }
-
    // Walk through the given object by the accessor indexes.
    for (let cntr: number = 0; cntr < access.length; cntr++)
    {
-      const key: SafeAccessorKey = access[cntr];
-
+      const key: PropertyKey = access[cntr];
       const keyType: string = typeof key;
 
-      if (keyType !== 'string' && keyType !== 'symbol')
+      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol')
       {
-         throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a string or symbol.`);
+         throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a property key.`);
       }
 
-      // Prevent prototype-pollution access paths.
+      // Prevent prototype-pollution access paths and modification of built-in language protocols.
       if ((keyType === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor')) ||
        (keyType === 'symbol' && wellKnownSymbols.has(key as symbol)))
       {
          return false;
       }
 
-      // If data is an array perform validation that string accessors are positive integers. Symbol accessors remain
-      // valid property keys for arrays.
-      if (Array.isArray(target) && typeof key === 'string')
+      // Array indexes must use a non-negative integer in an array accessor. Symbol properties remain valid.
+      if (Array.isArray(target) && keyType !== 'symbol' &&
+       (keyType !== 'number' || !Number.isInteger(key) || (key as number) < 0))
       {
-         const number: number = (+key);
-
-         if (!Number.isInteger(number) || number < 0) { return false; }
+         return false;
       }
+
+      // Verify first level missing property.
+      if (cntr === 0 && access.length === 1 && !createMissing && !(key in target)) { return false; }
 
       if (cntr === access.length - 1)
       {
@@ -1009,7 +1060,7 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
    return result;
 }
 
-// Utility data ------------------------------------------------------------------------------------------------------
+// Utility Data ------------------------------------------------------------------------------------------------------
 
 /**
  * ECMAScript well-known symbols that activate or modify built-in language protocols.
@@ -1018,18 +1069,51 @@ const wellKnownSymbols: ReadonlySet<symbol> = new Set(Object.getOwnPropertyNames
  .map((key: string): unknown => (Symbol as unknown as Record<string, unknown>)[key])
   .filter((value: unknown): value is symbol => typeof value === 'symbol'));
 
+// Utility Function --------------------------------------------------------------------------------------------------
+
+/**
+ * Returns enumerable string and symbol property keys. When inherited keys are included, nearest properties shadow
+ * matching keys further up the prototype chain, including when the nearest property is non-enumerable.
+ */
+function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): PropertyKey[]
+{
+   if (hasOwnOnly)
+   {
+      const keys: PropertyKey[] = Object.keys(object);
+
+      for (const symbol of Object.getOwnPropertySymbols(object))
+      {
+         if (Object.prototype.propertyIsEnumerable.call(object, symbol)) { keys.push(symbol); }
+      }
+
+      return keys;
+   }
+
+   const keys: PropertyKey[] = [];
+   const seen: Set<PropertyKey> = new Set();
+
+   for (let current: object | null = object; current !== null; current = Object.getPrototypeOf(current))
+   {
+      for (const key of Reflect.ownKeys(current))
+      {
+         if (seen.has(key)) { continue; }
+
+         seen.add(key);
+
+         if (Object.prototype.propertyIsEnumerable.call(current, key)) { keys.push(key); }
+      }
+   }
+
+   return keys;
+}
+
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
  * Accessor accepted by {@link safeAccess} and {@link safeSet}. String accessors use `.` delimiters while array
- * accessors preserve each string or symbol as an exact property key.
+ * accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require numeric keys.
  */
-export type SafeAccessor = string | readonly SafeAccessorKey[];
-
-/**
- * Valid property keys for array based safe accessors.
- */
-export type SafeAccessorKey = string | symbol;
+export type SafeAccessor = string | readonly PropertyKey[];
 
 // Internal Utility Types --------------------------------------------------------------------------------------------
 
@@ -1039,7 +1123,7 @@ export type SafeAccessorKey = string | symbol;
 type DeepAccess<T, P extends SafeAccessor> =
  P extends string
   ? DeepAccessString<T, P>
-  : P extends readonly SafeAccessorKey[]
+  : P extends readonly PropertyKey[]
    ? DeepAccessArray<T, P>
    : undefined;
 
@@ -1059,10 +1143,10 @@ type DeepAccessString<T, P extends string> =
  * Infers a readonly tuple accessor in object T. A non-tuple array returns `unknown` because its runtime path cannot be
  * determined statically.
  */
-type DeepAccessArray<T, P extends readonly SafeAccessorKey[]> =
+type DeepAccessArray<T, P extends readonly PropertyKey[]> =
  number extends P['length']
   ? unknown
-  : P extends readonly [infer K extends SafeAccessorKey, ...infer Rest extends readonly SafeAccessorKey[]]
+  : P extends readonly [infer K extends PropertyKey, ...infer Rest extends readonly PropertyKey[]]
    ? K extends keyof T
     ? Rest extends readonly []
      ? T[K]

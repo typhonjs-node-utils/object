@@ -90,18 +90,22 @@ const s_OBJECT_SYM = {
    }
 }
 
-const s_OBJECT_SYM_ORIG = ObjectUtil.klona(s_OBJECT_SYM);
-
 const s_VERIFY_DEPTH_TRAVERSE = `[1,2,3,"a","b","c",4,5,6,"d","e","f",7,8,9,"g","h","i"]`;
 
-const s_VERIFY_ACCESSOR_LIST = `["a","b","c","array.0","array.1","array.2","level1.d","level1.e","level1.f","level1.array1.0","level1.array1.1","level1.array1.2","level1.level2.g","level1.level2.h","level1.level2.i","level1.level2.array2.0","level1.level2.array2.1","level1.level2.array2.2"]`;
-const s_VERIFY_ACCESSOR_LIST_NO_ARRAY = `["a","b","c","level1.d","level1.e","level1.f","level1.level2.g","level1.level2.h","level1.level2.i"]`;
+const s_VERIFY_ACCESSOR_LIST = `[["a"],["b"],["c"],["array",0],["array",1],["array",2],["level1","d"],["level1","e"],["level1","f"],["level1","array1",0],["level1","array1",1],["level1","array1",2],["level1","level2","g"],["level1","level2","h"],["level1","level2","i"],["level1","level2","array2",0],["level1","level2","array2",1],["level1","level2","array2",2]]`;
+const s_VERIFY_ACCESSOR_LIST_NO_ARRAY = `[["a"],["b"],["c"],["level1","d"],["level1","e"],["level1","f"],["level1","level2","g"],["level1","level2","h"],["level1","level2","i"]]`;
 
 const s_VERIFY_SAFESET_SET = `{"a":"aa","b":"aa","c":"aa","array":["aa","aa","aa"],"level1":{"d":"aa","e":"aa","f":"aa","array1":["aa","aa","aa"],"level2":{"g":"aa","h":"aa","i":"aa","array2":["aa","aa","aa"]}}}`;
 const s_VERIFY_SAFESET_ADD = `{"a":20,"b":20,"c":20,"array":[20,20,20],"level1":{"d":20,"e":20,"f":20,"array1":[20,20,20],"level2":{"g":20,"h":20,"i":20,"array2":[20,20,20]}}}`;
 const s_VERIFY_SAFESET_DIV = `{"a":1,"b":1,"c":1,"array":[1,1,1],"level1":{"d":1,"e":1,"f":1,"array1":[1,1,1],"level2":{"g":1,"h":1,"i":1,"array2":[1,1,1]}}}`;
 const s_VERIFY_SAFESET_MULT = `{"a":100,"b":100,"c":100,"array":[100,100,100],"level1":{"d":100,"e":100,"f":100,"array1":[100,100,100],"level2":{"g":100,"h":100,"i":100,"array2":[100,100,100]}}}`;
 const s_VERIFY_SAFESET_SUB = `{"a":0,"b":0,"c":0,"array":[0,0,0],"level1":{"d":0,"e":0,"f":0,"array1":[0,0,0],"level2":{"g":0,"h":0,"i":0,"array2":[0,0,0]}}}`;
+
+const s_VERIFY_SAFESET_SET_NO_ARRAY = `{"a":"aa","b":"aa","c":"aa","array":[10,10,10],"level1":{"d":"aa","e":"aa","f":"aa","array1":[10,10,10],"level2":{"g":"aa","h":"aa","i":"aa","array2":[10,10,10]}}}`;
+const s_VERIFY_SAFESET_ADD_NO_ARRAY = `{"a":20,"b":20,"c":20,"array":[10,10,10],"level1":{"d":20,"e":20,"f":20,"array1":[10,10,10],"level2":{"g":20,"h":20,"i":20,"array2":[10,10,10]}}}`;
+const s_VERIFY_SAFESET_DIV_NO_ARRAY = `{"a":1,"b":1,"c":1,"array":[10,10,10],"level1":{"d":1,"e":1,"f":1,"array1":[10,10,10],"level2":{"g":1,"h":1,"i":1,"array2":[10,10,10]}}}`;
+const s_VERIFY_SAFESET_MULT_NO_ARRAY = `{"a":100,"b":100,"c":100,"array":[10,10,10],"level1":{"d":100,"e":100,"f":100,"array1":[10,10,10],"level2":{"g":100,"h":100,"i":100,"array2":[10,10,10]}}}`;
+const s_VERIFY_SAFESET_SUB_NO_ARRAY = `{"a":0,"b":0,"c":0,"array":[10,10,10],"level1":{"d":0,"e":0,"f":0,"array1":[10,10,10],"level2":{"g":0,"h":0,"i":0,"array2":[10,10,10]}}}`;
 
 describe('ObjectUtil:', () =>
 {
@@ -838,21 +842,10 @@ describe('ObjectUtil:', () =>
 
    describe('safeAccess:', () =>
    {
-      it('all mixed accessors (as accessor strings)', () =>
-      {
-         const output = [];
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
-
-         for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
-
-         assert.deepEqual(output, JSON.parse(s_VERIFY_DEPTH_TRAVERSE));
-         assert.deepEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG);
-      });
-
       it('all mixed accessors (as accessor arrays)', () =>
       {
          const output = [];
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)].map((accessor) => accessor.split('.'));
+         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
 
          for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
 
@@ -866,12 +859,22 @@ describe('ObjectUtil:', () =>
          assert.isTrue(result);
       });
 
+      it('base array', () =>
+      {
+         const array = [true, false, true];
+
+         assert.isTrue(ObjectUtil.safeAccess(array, [0]));
+         assert.isFalse(ObjectUtil.safeAccess(array, [1]));
+         assert.isTrue(ObjectUtil.safeAccess(array, [2]));
+      });
+
       it('default value conditions', () =>
       {
          assert.equal(ObjectUtil.safeAccess(null, '', 'defaultValue'), 'defaultValue');
          assert.equal(ObjectUtil.safeAccess({}, null, 'defaultValue'), 'defaultValue');
          assert.equal(ObjectUtil.safeAccess({ a: null }, 'a', 'defaultValue'), 'defaultValue');
          assert.equal(ObjectUtil.safeAccess({ a: null }, [], 'defaultValue'), 'defaultValue');
+         assert.equal(ObjectUtil.safeAccess({ a: [true] }, 'a.1', 'defaultValue'), 'defaultValue');
          // @ts-expect-error
          assert.equal(ObjectUtil.safeAccess({ a: null }, [false], 'defaultValue'), 'defaultValue');
       });
@@ -916,7 +919,142 @@ describe('ObjectUtil:', () =>
          });
 
          assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: true })], []);
-         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: false })], ['a']);
+         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: false })], [['a']]);
+      });
+
+      it('yields numeric indexes for a root array', () =>
+      {
+         const data = ['a', 'b', 'c'];
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[0], [1], [2]]);
+      });
+
+      it('does not yield root array indexes when arrayIndex is false', () =>
+      {
+         const data = ['a', 'b', 'c'];
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { arrayIndex: false })], []);
+      });
+
+      it('yields an enumerable symbol property containing a primitive', () =>
+      {
+         const key = Symbol('value');
+         const data: any[] = [];
+
+         data[key] = 42;
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key]]);
+      });
+
+      it('yields numeric indexes for an enumerable symbol property containing an array', () =>
+      {
+         const key = Symbol('items');
+         const data: any[] = [];
+
+         data[key] = ['a', 'b'];
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key, 0], [key, 1]]);
+      });
+
+      it('does not yield a symbol array property when arrayIndex is false', () =>
+      {
+         const key = Symbol('items');
+         const data: any[] = [];
+
+         data[key] = ['a', 'b'];
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { arrayIndex: false })], []);
+      });
+
+      it('traverses an object stored under an enumerable symbol property', () =>
+      {
+         const key = Symbol('object');
+         const data: any[] = [];
+
+         data[key] = { first: 1, second: 2 };
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key, 'first'], [key, 'second']]);
+      });
+
+      it('does not yield a function stored under an enumerable symbol property', () =>
+      {
+         const key = Symbol('callback');
+         const data: any[] = [];
+
+         data[key] = (): void => {};
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], []);
+      });
+
+      it('ignores enumerable string properties attached to arrays', () =>
+      {
+         const data: any[] = ['a'];
+
+         // @ts-expect-error
+         data.extra = 42;
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[0]]);
+      });
+
+      it('ignores non-enumerable symbol properties', () =>
+      {
+         const key = Symbol('hidden');
+         const data: any[] = [];
+
+         Object.defineProperty(data, key, { enumerable: false, value: 42 });
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], []);
+      });
+
+      it('includes inherited enumerable symbol properties when hasOwnOnly is false', () =>
+      {
+         const key = Symbol('inherited');
+
+         const prototype: any[] = [];
+         prototype[key] = 42;
+
+         const data: any[] = [];
+         Object.setPrototypeOf(data, prototype);
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { hasOwnOnly: false })], [[key]]);
+      });
+
+      it('excludes inherited enumerable symbol properties when hasOwnOnly is true', () =>
+      {
+         const key = Symbol('inherited');
+
+         const prototype: any[] = [];
+         prototype[key] = 42;
+
+         const data: any[] = [];
+         Object.setPrototypeOf(data, prototype);
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { hasOwnOnly: true })], []);
+      });
+
+      it('handles all supported root-array entries in order', () =>
+      {
+         const primitiveKey = Symbol('primitive');
+         const arrayKey = Symbol('array');
+         const objectKey = Symbol('object');
+         const functionKey = Symbol('function');
+
+         const data: any[] = ['root-0', 'root-1'];
+
+         // @ts-expect-error
+         data.extra = 'ignored';
+         data[primitiveKey] = 42;
+         data[arrayKey] = ['nested-0', 'nested-1'];
+         data[objectKey] = { value: true };
+         data[functionKey] = (): void => {};
+
+         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [
+            [0],
+            [1],
+            [primitiveKey],
+            [arrayKey, 0],
+            [arrayKey, 1],
+            [objectKey, 'value']
+         ]);
       });
    });
 
@@ -924,26 +1062,16 @@ describe('ObjectUtil:', () =>
    {
       const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)];
 
-      const accessorsAsArray = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)].map((accessor) => accessor.split('.'));
+      const accessorsAsStrings = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM, { arrayIndex: false })].map(
+       (accessor) => accessor.join('.'));
 
       let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);
 
       beforeEach(() => { objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM); });
 
-      it('add (accessor string)', () =>
-      {
-         for (const accessor of accessors)
-         {
-            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'add' });
-            assert.isTrue(result);
-         }
-
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD));
-      });
-
       it('add (accessor array)', () =>
       {
-         for (const accessor of accessorsAsArray)
+         for (const accessor of accessors)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'add' });
             assert.isTrue(result);
@@ -952,20 +1080,20 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD));
       });
 
-      it('div (accessor string)', () =>
+      it('add (accessor string)', () =>
       {
-         for (const accessor of accessors)
+         for (const accessor of accessorsAsStrings)
          {
-            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'div' });
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'add' });
             assert.isTrue(result);
          }
 
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV));
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_ADD_NO_ARRAY));
       });
 
       it('div (accessor array)', () =>
       {
-         for (const accessor of accessorsAsArray)
+         for (const accessor of accessors)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'div' });
             assert.isTrue(result);
@@ -974,20 +1102,20 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV));
       });
 
-      it('mult (accessor string)', () =>
+      it('div (accessor string)', () =>
       {
-         for (const accessor of accessors)
+         for (const accessor of accessorsAsStrings)
          {
-            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'mult' });
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'div' });
             assert.isTrue(result);
          }
 
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT));
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_DIV_NO_ARRAY));
       });
 
       it('mult (accessor array)', () =>
       {
-         for (const accessor of accessorsAsArray)
+         for (const accessor of accessors)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'mult' });
             assert.isTrue(result);
@@ -996,20 +1124,20 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT));
       });
 
-      it('sub (accessor string)', () =>
+      it('mult (accessor string)', () =>
       {
-         for (const accessor of accessors)
+         for (const accessor of accessorsAsStrings)
          {
-            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'sub' });
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'mult' });
             assert.isTrue(result);
          }
 
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_MULT_NO_ARRAY));
       });
 
       it('sub (accessor array)', () =>
       {
-         for (const accessor of accessorsAsArray)
+         for (const accessor of accessors)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'sub' });
             assert.isTrue(result);
@@ -1018,7 +1146,18 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB));
       });
 
-      it('set (accessor string)', () =>
+      it('sub (accessor string)', () =>
+      {
+         for (const accessor of accessorsAsStrings)
+         {
+            const result = ObjectUtil.safeSet(objectNumCopy, accessor, 10, { operation: 'sub' });
+            assert.isTrue(result);
+         }
+
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SUB_NO_ARRAY));
+      });
+
+      it('set (accessor array)', () =>
       {
          for (const accessor of accessors)
          {
@@ -1029,15 +1168,15 @@ describe('ObjectUtil:', () =>
          assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
       });
 
-      it('set (accessor array)', () =>
+      it('set (accessor string)', () =>
       {
-         for (const accessor of accessorsAsArray)
+         for (const accessor of accessorsAsStrings)
          {
             const result = ObjectUtil.safeSet(objectNumCopy, accessor, 'aa');
             assert.isTrue(result);
          }
 
-         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET));
+         assert.deepEqual(objectNumCopy, JSON.parse(s_VERIFY_SAFESET_SET_NO_ARRAY));
       });
 
       it('set-undefined', () =>
