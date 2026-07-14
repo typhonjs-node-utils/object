@@ -672,6 +672,108 @@ describe('ObjectUtil:', () =>
       });
    });
 
+   describe('hasProperty:', () =>
+   {
+      it('invalid data neither object or null', () =>
+      {
+         // @ts-expect-error
+         assert.equal(ObjectUtil.hasProperty('bogus', 'bogus'), false);
+
+         assert.equal(ObjectUtil.hasProperty(void 0, 'bogus'), false);
+         assert.equal(ObjectUtil.hasProperty(null, 'bogus'), false);
+      });
+
+      it('returns true for an existing dotted property path', () =>
+      {
+         assert.equal(ObjectUtil.hasProperty({ nested: { value: 42 } }, 'nested.value'), true);
+      });
+
+      it('returns false for a missing dotted property path', () =>
+      {
+         assert.equal(ObjectUtil.hasProperty({ nested: {} }, 'nested.value'), false);
+      });
+
+      it('considers properties with undefined or null values present', () =>
+      {
+         assert.equal(ObjectUtil.hasProperty({ value: undefined }, 'value'), true);
+         assert.equal(ObjectUtil.hasProperty({ value: null }, 'value'), true);
+      });
+
+      it('returns false when an intermediate value cannot be traversed', () =>
+      {
+         assert.equal(ObjectUtil.hasProperty({ nested: null }, 'nested.value'), false);
+         assert.equal(ObjectUtil.hasProperty({ nested: 42 }, 'nested.value'), false);
+      });
+
+      it('supports symbol property keys', () =>
+      {
+         const key = Symbol('value');
+         const data = { [key]: 42 };
+
+         assert.equal(ObjectUtil.hasProperty(data, [key]), true);
+         assert.equal(ObjectUtil.hasProperty({}, [key]), false);
+      });
+
+      it('supports numeric array indexes through array accessors', () =>
+      {
+         const data = { values: ['a', 'b'] };
+
+         assert.equal(ObjectUtil.hasProperty(data, ['values', 0]), true);
+         assert.equal(ObjectUtil.hasProperty(data, ['values', 1]), true);
+         assert.equal(ObjectUtil.hasProperty(data, ['values', 2]), false);
+      });
+
+      it('rejects string array indexes', () =>
+      {
+         const data = { values: ['a'] };
+
+         assert.equal(ObjectUtil.hasProperty(data, ['values', '0']), false);
+         assert.equal(ObjectUtil.hasProperty(data, 'values.0'), false);
+      });
+
+      it('distinguishes sparse array holes from explicit undefined entries', () =>
+      {
+         const sparse = new Array(1);
+         const explicit = [undefined];
+
+         assert.equal(ObjectUtil.hasProperty(sparse, [0]), false);
+         assert.equal(ObjectUtil.hasProperty(explicit, [0]), true);
+      });
+
+      it('supports symbol properties attached to arrays', () =>
+      {
+         const key = Symbol('metadata');
+         const data: any[] = ['a'];
+
+         data[key] = 42;
+
+         assert.equal(ObjectUtil.hasProperty(data, [key]), true);
+      });
+
+      it('includes inherited properties', () =>
+      {
+         const data = Object.create({ inherited: 42 });
+
+         assert.equal(ObjectUtil.hasProperty(data, 'inherited'), true);
+      });
+
+      it('returns false for invalid or empty accessors', () =>
+      {
+         assert.equal(ObjectUtil.hasProperty({}, ''), false);
+         assert.equal(ObjectUtil.hasProperty({}, []), false);
+         assert.equal(ObjectUtil.hasProperty({}, null as unknown as any), false);
+      });
+
+      it('rejects invalid array indexes', () =>
+      {
+         const data = ['a'];
+
+         assert.equal(ObjectUtil.hasProperty(data, [-1]), false);
+         assert.equal(ObjectUtil.hasProperty(data, [1.5]), false);
+         assert.equal(ObjectUtil.hasProperty(data, [0xFFFF_FFFF]), false);
+      });
+   });
+
    it('hasPrototype:', () =>
    {
       class Base { static test: string = 'test'; }

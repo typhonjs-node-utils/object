@@ -503,6 +503,32 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
 }
 
 /**
+ * Determines whether an accessor path exists on an object.
+ *
+ * Traversal aborts immediately when a property is missing, an intermediate value cannot be traversed, or an invalid
+ * array index is encountered. Properties whose values are `undefined` or `null` are considered present.
+ *
+ * Array indexes may only be accessed by number through the array accessor form.
+ *
+ * @param data - An object to inspect.
+ *
+ * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
+ *
+ * @returns Whether the complete accessor path exists.
+ */
+export function hasProperty(data: object, accessor: SafeAccessor): boolean
+{
+   if (typeof data !== 'object' || data === null) { return false; }
+   if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return false; }
+
+   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
+
+   if (keys.length === 0) { return false; }
+
+   return resolvePropertyPath(data, keys) !== unresolvedProperty;
+}
+
+/**
  * Returns whether the target is or has the given prototype walking up the prototype chain.
  *
  * @param target - Any target class / constructor function to test.

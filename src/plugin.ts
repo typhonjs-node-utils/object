@@ -21,6 +21,7 @@ import * as OU from './functions.js';
  * - `typhonjs:utils:object:ensure:non:empty:iterable`: Invokes `ensureNonEmptyIterable`.
  * - `typhonjs:utils:object:has:accessor`: Invokes `hasAccessor`.
  * - `typhonjs:utils:object:has:getter`: Invokes `hasGetter`.
+ * - `typhonjs:utils:object:has:property`: Invokes `hasProperty`.
  * - `typhonjs:utils:object:has:prototype`: Invokes `hasPrototype`.
  * - `typhonjs:utils:object:has:setter`: Invokes `hasSetter`.
  * - `typhonjs:utils:object:is:iterable:async`: Invokes `isAsyncIterable`.
@@ -65,6 +66,7 @@ export function onPluginLoad(ev)
    eventbus.on('typhonjs:utils:object:deep:seal', OU.deepSeal, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:accessor', OU.hasAccessor, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:getter', OU.hasGetter, void 0, { guard });
+   eventbus.on('typhonjs:utils:object:has:property', OU.hasProperty, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:prototype', OU.hasPrototype, void 0, { guard });
    eventbus.on('typhonjs:utils:object:has:setter', OU.hasSetter, void 0, { guard });
    eventbus.on('typhonjs:utils:object:is:iterable:async', OU.isAsyncIterable, void 0, { guard });
