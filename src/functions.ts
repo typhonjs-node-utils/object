@@ -144,6 +144,8 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
 
       if (typeof obj !== 'object' || obj === null || Object.isFrozen(obj)) { continue; }
 
+      // Collect own enumerable string and symbol children before freezing; reading after Object.freeze would still
+      // be legal, but batching first keeps graph discovery separate from mutation and handles self references safely.
       const children: unknown[] = [];
 
       for (const key of getEnumerablePropertyKeys(obj, true))
@@ -203,11 +205,13 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
          throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an object.`);
       }
 
+      // Preflight every source before mutating the target so a circular source cannot leave a partial merge behind.
       assertNoCircularPlainObject(sourceObj[cntr]);
    }
 
    if (sourceObj.length === 1)
    {
+      // Fast path: an existing plain target branch can be reused directly because no later source can replace it.
       const stack: { target: any; source: any }[] = [{ target, source: sourceObj[0] }];
 
       while (stack.length > 0)
@@ -216,6 +220,8 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
          for (const key of getEnumerablePropertyKeys(entry.source, true))
          {
+            // Filtering occurs at every depth. Plain source objects must therefore be traversed rather than assigned
+            // wholesale, otherwise a blocked nested key could bypass this guard.
             if (isBlockedPrototypeKey(key)) { continue; }
 
             const sourceValue: any = entry.source[key];
@@ -223,6 +229,8 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
             if (isPlainObjectValue(sourceValue))
             {
+               // Preserve an existing plain branch; otherwise create only the two supported plain-object prototype
+               // categories. Custom source prototypes are never propagated into recursively merged branches.
                const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
                 targetValue : Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
 
@@ -238,7 +246,8 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
    }
    else
    {
-      // Complete each source before processing the next so queued nested work cannot target a replaced object.
+      // Complete each source before processing the next so queued nested work cannot target a branch replaced by a
+      // later source. This preserves source precedence without recursive calls.
       for (const source of sourceObj)
       {
          const stack: { target: any; source: any }[] = [{ target, source }];
@@ -249,6 +258,7 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
             for (const key of getEnumerablePropertyKeys(entry.source, true))
             {
+               // Apply the same security filter at every nested level in the multi-source path.
                if (isBlockedPrototypeKey(key)) { continue; }
 
                const sourceValue: any = entry.source[key];
@@ -256,6 +266,8 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 
                if (isPlainObjectValue(sourceValue))
                {
+                  // Copy an existing plain target branch before merging so multi-source operation does not mutate
+                  // that preexisting nested object by reference. Missing / non-plain branches are recreated safely.
                   const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
                    clonePlainEnumerable(targetValue) :
                     Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
@@ -308,6 +320,8 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 
       if (typeof obj !== 'object' || obj === null || Object.isSealed(obj)) { continue; }
 
+      // Discover own enumerable string and symbol children before sealing. Already sealed objects serve as the
+      // visited boundary, so cycles terminate without a separate allocation-heavy visited set.
       const children: unknown[] = [];
 
       for (const key of getEnumerablePropertyKeys(obj, true))
@@ -887,6 +901,8 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
       throw new TypeError(`safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
+   // Ancestors are tracked per active path, not globally. Shared objects may therefore appear at multiple valid
+   // accessors while a true reference back to an ancestor still throws.
    const rootAncestors: ReadonlySet<object> = new Set([data]);
    const stack: PropertyTraversalEntry[] = [{ obj: data, path: [], ancestors: rootAncestors }];
 
@@ -907,6 +923,8 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 
          if (Array.isArray(value))
          {
+            // Array index paths are emitted inline to preserve established ordering instead of deferring the array to
+            // the primary LIFO object stack.
             yield* iterateArrayAccessors(value, fullPath, arrayIndex, hasOwnOnly, stack,
              extendPropertyAncestors(ancestors, value));
          }
@@ -986,6 +1004,7 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
          throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a property key.`);
       }
 
+      // Block prototype-pollution strings and built-in protocol symbols before reading or creating any path segment.
       if ((keyType === 'string' && isBlockedPrototypeKey(key)) ||
        (keyType === 'symbol' && wellKnownSymbols.has(key as symbol)))
       {
@@ -1017,6 +1036,8 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
 
          if (createMissing && next === void 0)
          {
+            // Missing segments are intentionally created as ordinary objects; array intent cannot be inferred safely
+            // from an arbitrary following property key.
             next = {};
             (target as any)[key] = next;
          }
@@ -1033,6 +1054,11 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
 
 /**
  * ECMAScript well-known symbols that activate or modify built-in language protocols.
+ *
+ * Discovered once at module initialization so {@link safeSet} membership checks remain constant-time.
+ *
+ * Used by:
+ * - {@link safeSet}.
  */
 const wellKnownSymbols: ReadonlySet<symbol> = new Set(Object.getOwnPropertyNames(Symbol)
  .map((key: string): unknown => (Symbol as unknown as Record<string, unknown>)[key])
@@ -1040,11 +1066,28 @@ const wellKnownSymbols: ReadonlySet<symbol> = new Set(Object.getOwnPropertyNames
 
 /**
  * Sentinel returned when an accessor path cannot be resolved.
+ *
+ * Used by:
+ * - {@link resolvePropertyPath}, {@link hasProperty}, and {@link safeEqual}.
  */
 const unresolvedProperty: unique symbol = Symbol();
 
 // Utility Function --------------------------------------------------------------------------------------------------
 
+/**
+ * Verifies that all recursively mergeable plain-object paths in a source object are acyclic.
+ *
+ * A path-local ancestor set is used instead of a global visited set. This permits the same object to be referenced
+ * from multiple independent branches while still rejecting a reference back to an ancestor on the active path.
+ * Blocked prototype keys are skipped because {@link deepMerge} will not traverse or assign them.
+ *
+ * Called by:
+ * - {@link deepMerge} before any source mutation begins.
+ *
+ * @param source - A validated top-level merge source.
+ *
+ * @throws {TypeError} When a circular plain-object path is detected.
+ */
 function assertNoCircularPlainObject(source: object): void
 {
    const stack: { value: object; ancestors: ReadonlySet<object> }[] = [{
@@ -1075,6 +1118,19 @@ function assertNoCircularPlainObject(source: object): void
    }
 }
 
+/**
+ * Creates a shallow copy of a plain object using only safe enumerable own string and symbol properties.
+ *
+ * The source prototype category is retained (`null` or `Object.prototype`), but custom prototypes are never copied.
+ * Blocked prototype keys are filtered during copying so an existing target branch cannot reintroduce unsafe keys.
+ *
+ * Called by:
+ * - {@link deepMerge} in the multi-source branch before applying a later source to an existing plain-object branch.
+ *
+ * @param source - A validated plain object to copy.
+ *
+ * @returns A safe shallow copy preserving the source plain-object prototype category.
+ */
 function clonePlainEnumerable(source: Record<PropertyKey, unknown>): Record<PropertyKey, unknown>
 {
    const clone: Record<PropertyKey, unknown> = Object.create(Object.getPrototypeOf(source) === null ? null :
@@ -1088,6 +1144,23 @@ function clonePlainEnumerable(source: Record<PropertyKey, unknown>): Record<Prop
    return clone;
 }
 
+/**
+ * Extends the active traversal ancestry for one child object and rejects a cycle back to an existing ancestor.
+ *
+ * A new set is allocated for each descending object path. This is intentionally more expensive than a global
+ * `WeakSet`, but it correctly permits shared references that occur on separate non-circular paths.
+ *
+ * Called by:
+ * - {@link safeKeyIterator} when descending through ordinary object and array properties.
+ * - {@link iterateArrayAccessors} when descending through symbol properties attached to arrays.
+ *
+ * @param ancestors - Objects already present on the active traversal path.
+ * @param child - The object about to be traversed.
+ *
+ * @returns A new ancestor set containing `child`.
+ *
+ * @throws {TypeError} When `child` already occurs on the active path.
+ */
 function extendPropertyAncestors(ancestors: ReadonlySet<object>, child: object): ReadonlySet<object>
 {
    if (ancestors.has(child))
@@ -1101,13 +1174,29 @@ function extendPropertyAncestors(ancestors: ReadonlySet<object>, child: object):
 }
 
 /**
- * Returns enumerable string and symbol property keys. When inherited keys are included, nearest properties shadow
- * matching keys further up the prototype chain, including when the nearest property is non-enumerable.
+ * Returns enumerable string and symbol property keys with JavaScript-compatible prototype shadowing.
+ *
+ * When inherited keys are requested, the nearest occurrence of each key wins even when that nearest property is
+ * non-enumerable. Recording a key before testing enumerability prevents an enumerable ancestor property from leaking
+ * through a non-enumerable shadowing property.
+ *
+ * Called by:
+ * - {@link deepFreeze} and {@link deepSeal} for symbol-aware object-graph traversal.
+ * - {@link deepMerge} for safe own-property merging.
+ * - {@link safeKeyIterator} and {@link iterateArrayAccessors} for path enumeration.
+ * - {@link assertNoCircularPlainObject} for merge-cycle validation.
+ * - {@link clonePlainEnumerable} for safe target-branch copying.
+ *
+ * @param object - Object whose enumerable property keys are requested.
+ * @param hasOwnOnly - Whether to exclude properties inherited through the prototype chain.
+ *
+ * @returns Enumerable string and symbol keys in traversal order.
  */
 function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): PropertyKey[]
 {
    if (hasOwnOnly)
    {
+      // Hot path: avoid a prototype walk and Reflect.ownKeys when callers only need own enumerable properties.
       const keys: PropertyKey[] = Object.keys(object);
 
       for (const symbol of Object.getOwnPropertySymbols(object))
@@ -1118,6 +1207,8 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
       return keys;
    }
 
+   // The inherited path is intentionally more expensive to reproduce JavaScript shadowing across string and symbol
+   // keys, including non-enumerable properties that suppress an enumerable ancestor property.
    const keys: PropertyKey[] = [];
    const seen: Set<PropertyKey> = new Set();
 
@@ -1138,28 +1229,97 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
 
 /**
  * Returns whether a value is a valid ECMAScript array index.
+ *
+ * The maximum array index is `2^32 - 2`; `2^32 - 1` is reserved and does not update an array's `length`.
+ *
+ * Called by:
+ * - {@link safeAccess} and {@link safeSet} for runtime array-path validation.
+ * - {@link resolvePropertyPath}, and therefore {@link hasProperty} / {@link safeEqual}.
+ *
+ * @param value - Candidate numeric property key.
+ *
+ * @returns Whether `value` is an integer in the ECMAScript array-index range.
  */
 function isArrayIndex(value: unknown): value is number
 {
    return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
 }
 
+/**
+ * Returns whether a property key is blocked from generic merge or mutation operations.
+ *
+ * Only string keys are blocked. Symbols are handled separately by {@link safeSet}, which rejects ECMAScript
+ * well-known symbols but permits user-created symbols.
+ *
+ * Called by:
+ * - {@link deepMerge} while enumerating every merge level.
+ * - {@link safeSet} while validating mutation paths.
+ * - {@link assertNoCircularPlainObject} while validating merge sources.
+ * - {@link clonePlainEnumerable} while copying existing target branches.
+ *
+ * @param key - Property key to inspect.
+ *
+ * @returns Whether the key is `__proto__`, `prototype`, or `constructor`.
+ */
 function isBlockedPrototypeKey(key: PropertyKey): boolean
 {
    return typeof key === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor');
 }
 
+/**
+ * Returns whether a value can participate as an intermediate JavaScript property-path target.
+ *
+ * Functions are included because they are objects for property-access purposes even though `typeof` reports
+ * `"function"`. Primitive boxing is intentionally not performed, keeping all path utilities consistent.
+ *
+ * Called by:
+ * - {@link safeAccess} and {@link safeSet} during path traversal.
+ * - {@link resolvePropertyPath}, and therefore {@link hasProperty} / {@link safeEqual}.
+ *
+ * @param value - Candidate intermediate path value.
+ *
+ * @returns Whether properties may be traversed directly on `value`.
+ */
 function isTraversableValue(value: unknown): value is object | ((...args: any[]) => any)
 {
    return value !== null && (typeof value === 'object' || typeof value === 'function');
 }
 
+/**
+ * Returns whether a value is accepted as a top-level {@link deepMerge} target or source.
+ *
+ * This deliberately accepts class instances whose intrinsic tag is `[object Object]`, preserving legacy behavior for
+ * top-level inputs. Recursive merging remains restricted by {@link isPlainObjectValue}; nested class instances are
+ * assigned as values rather than traversed.
+ *
+ * Called by:
+ * - {@link deepMerge} for top-level target and source validation.
+ *
+ * @param value - Candidate merge input.
+ *
+ * @returns Whether the value is an accepted non-array object record.
+ */
 function isMergeObjectValue(value: unknown): value is Record<PropertyKey, unknown>
 {
    return value !== null && typeof value === 'object' && !Array.isArray(value) &&
     Object.prototype.toString.call(value) === '[object Object]';
 }
 
+/**
+ * Returns whether a value is a plain object with either `Object.prototype` or `null` as its prototype.
+ *
+ * Direct prototype inspection avoids `Symbol.toStringTag` spoofing and excludes arrays, functions, and class
+ * instances from recursive plain-object operations.
+ *
+ * Called by:
+ * - {@link assertPlainObject} and {@link isPlainObject}.
+ * - {@link deepMerge} to decide which nested values are recursively merged.
+ * - {@link assertNoCircularPlainObject} to limit cycle detection to recursively mergeable values.
+ *
+ * @param value - Candidate plain object.
+ *
+ * @returns Whether `value` is a plain object.
+ */
 function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknown>
 {
    if (value === null || typeof value !== 'object') { return false; }
@@ -1167,10 +1327,30 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
    return prototype === null || prototype === Object.prototype;
 }
 
+/**
+ * Yields accessor paths for array indexes and enumerable symbol properties attached to arrays.
+ *
+ * Numeric indexes are yielded immediately to preserve the established iterator ordering and are intentionally treated
+ * as leaves, even when an indexed value is an object. Symbol properties receive normal recursive traversal. A private
+ * array stack avoids recursive generator calls for nested arrays reached through symbols.
+ *
+ * Called by:
+ * - {@link safeKeyIterator} for root arrays and arrays encountered as object-property values.
+ *
+ * @param array - Array to enumerate.
+ * @param path - Accessor path leading to `array`.
+ * @param arrayIndex - Whether numeric array indexes should be yielded.
+ * @param hasOwnOnly - Whether inherited enumerable symbol properties should be excluded.
+ * @param objectStack - Primary object traversal stack owned by {@link safeKeyIterator}.
+ * @param ancestors - Active path ancestors used for circular-reference detection.
+ *
+ * @returns An iterator of readonly property-key accessor paths.
+ */
 function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
  hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>):
   IterableIterator<readonly PropertyKey[]>
 {
+   // A dedicated iterative stack avoids recursive generator delegation for symbol-linked nested arrays.
    const stack: ArrayTraversalEntry[] = [{ array, path, ancestors, symbolIndex: 0, indexesYielded: false }];
 
    while (stack.length > 0)
@@ -1183,6 +1363,7 @@ function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arra
 
          if (arrayIndex)
          {
+            // Array elements are leaf comparisons by design; object-valued entries are not recursively expanded.
             for (let cntr: number = 0; cntr < frame.array.length; cntr++)
             {
                yield frame.path.concat(cntr);
@@ -1231,6 +1412,21 @@ function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arra
    }
 }
 
+/**
+ * Resolves an exact property-key path while preserving missing-property information.
+ *
+ * Unlike {@link safeAccess}, this helper returns present `undefined` and `null` values unchanged. The private
+ * {@link unresolvedProperty} sentinel is returned only when the path itself cannot be resolved.
+ *
+ * Called by:
+ * - {@link hasProperty} to distinguish missing paths from present nullish values.
+ * - {@link safeEqual} to compare source and target paths without collapsing missing and nullish values.
+ *
+ * @param data - Root object to traverse.
+ * @param accessor - Exact property-key path.
+ *
+ * @returns The resolved value or {@link unresolvedProperty}.
+ */
 function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): unknown
 {
    let result: any = data;
@@ -1256,6 +1452,9 @@ function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): un
 
 // Internal Types ----------------------------------------------------------------------------------------------------
 
+/**
+ * Stack frame for ordinary-object traversal in {@link safeKeyIterator}.
+ */
 interface PropertyTraversalEntry
 {
    obj: object;
@@ -1263,6 +1462,9 @@ interface PropertyTraversalEntry
    ancestors: ReadonlySet<object>;
 }
 
+/**
+ * Stack frame for array traversal in {@link iterateArrayAccessors}.
+ */
 interface ArrayTraversalEntry
 {
    array: any[];
