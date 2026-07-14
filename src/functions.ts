@@ -1211,8 +1211,9 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
- * Accessor accepted by {@link safeAccess} and {@link safeSet}. String accessors use `.` delimiters while array
- * accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require numeric keys.
+ * Accessor accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String accessors use `.`
+ * delimiters while array accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require
+ * numeric keys.
  */
 export type SafeAccessor = string | readonly PropertyKey[];
 
