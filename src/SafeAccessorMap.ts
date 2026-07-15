@@ -107,7 +107,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * Removes every stored entry and releases the complete trie.
     *
     * This operation is `O(1)` with respect to explicit traversal; the prior structure becomes available for garbage
-    * collection once no active iterator or external value references remain.
+    * collection once no active iterator or external references remain.
     */
    clear(): void
    {
@@ -555,7 +555,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * The equality check implements SameValueZero so numeric `NaN` segments compare as equal while `0` and `-0`
     * naturally compare as equal through strict equality. Symbol segments continue to compare by identity.
     *
-    * Called by {@link SafeAccessorMap#resolveTraversalScope} when both `pathPrefix` and `stopAt` are supplied.
+    * Called by {@link #resolveTraversalScope} when both `pathPrefix` and `stopAt` are supplied.
     *
     * @param prefix - Candidate prefix path.
     *
