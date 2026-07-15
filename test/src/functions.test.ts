@@ -268,6 +268,23 @@ describe('ObjectUtil:', () =>
          assert.isTrue(Object.isFrozen(result));
          assert.isTrue(Object.isFrozen(result.a));
       });
+
+      describe('Errors', () =>
+      {
+         it('throws - data not object', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepFreeze('bad'), TypeError,
+             `deepFreeze error: 'data' is not an object or array.`);
+         });
+
+         it('throws - options.skipKeys is not a Set', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepFreeze({}, { skipKeys: 'bad' }), TypeError,
+             `deepFreeze error: 'options.skipKeys' is not a Set.`);
+         });
+      });
    });
 
    describe('deepMerge', () =>
@@ -624,6 +641,53 @@ describe('ObjectUtil:', () =>
          assert.equal(target.level1.second, 2);
          assert.equal(target.level1.third, 3);
       });
+
+      it('allows shared references that do not form a circular path', () =>
+      {
+         const shared = { value: 42 };
+         const source = { first: shared, second: shared };
+
+         assert.deepEqual(ObjectUtil.deepMerge({}, source), { first: { value: 42 }, second: { value: 42 } });
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - target not object', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepMerge('bad', {}), TypeError,
+             `deepMerge error: 'target' is not an object.`);
+         });
+
+         it('throws - no source object', () =>
+         {
+            assert.throws(() => ObjectUtil.deepMerge({}), TypeError,
+             `deepMerge error: 'sourceObj' is not an object.`);
+         });
+
+         it('throws - source not object (string)', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepMerge({}, 'bad'), TypeError,
+             `deepMerge error: 'sourceObj[0]' is not an object.`);
+         });
+
+         it('throws - source not object (array)', () =>
+         {
+            assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
+             `deepMerge error: 'sourceObj[0]' is not an object.`);
+         });
+
+         it('throws - for a circular source object', () =>
+         {
+            const source: Record<string, any> = { value: 42 };
+
+            source.self = source;
+
+            assert.throws(() => ObjectUtil.deepMerge({}, source), TypeError,
+             `deepMerge error: Circular source object detected.`);
+         });
+      });
    });
 
    describe('deepSeal:', () =>
@@ -733,6 +797,23 @@ describe('ObjectUtil:', () =>
          // Verify frozen
          assert.isTrue(Object.isSealed(result));
          assert.isTrue(Object.isSealed(result.a));
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - data not object', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepSeal('bad'), TypeError,
+             `deepSeal error: 'data' is not an object or array.`);
+         });
+
+         it('throws - options.skipKeys is not a Set', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.deepSeal({}, { skipKeys: 'bad' }), TypeError,
+             `deepSeal error: 'options.skipKeys' is not a Set.`);
+         });
       });
    });
 
@@ -1188,6 +1269,28 @@ describe('ObjectUtil:', () =>
          assert.equal(result, accessor);
          assert.deepEqual(result, ['']);
       });
+
+      describe('Errors', () =>
+      {
+         it('throws - for an empty string accessor', () =>
+         {
+            assert.throws(() => ObjectUtil.normalizeSafeAccessor(''), TypeError,
+             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+         });
+
+         it('throws - for an empty accessor array', () =>
+         {
+            assert.throws(() => ObjectUtil.normalizeSafeAccessor([]), TypeError,
+             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+         });
+
+         it('throws - when an accessor array contains an invalid key', () =>
+         {
+            // @ts-expect-error
+            assert.throws(() => ObjectUtil.normalizeSafeAccessor(['level1', true]), TypeError,
+             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+         });
+      });
    });
 
    it('objectKeys', () =>
@@ -1318,6 +1421,26 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeEqual(source, { nested: undefined }), false);
          assert.equal(ObjectUtil.safeEqual(source, { nested: 42 }), false);
          assert.equal(ObjectUtil.safeEqual(source, { nested: {} }), false);
+      });
+
+      it('allows shared references that do not form a circular path', () =>
+      {
+         const shared = { value: 42 };
+         const source = { first: shared, second: shared };
+
+         assert.equal(ObjectUtil.safeEqual(source, { first: { value: 42 }, second: { value: 42 } }), true);
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - when the source contains a circular path', () =>
+         {
+            const source: Record<string, any> = { value: 42 };
+
+            source.self = source;
+
+            assert.throws(() => ObjectUtil.safeEqual(source, { value: 42 }), TypeError, ``);
+         });
       });
    });
 
@@ -1480,6 +1603,46 @@ describe('ObjectUtil:', () =>
             [arrayKey, 1],
             [objectKey, 'value']
          ]);
+      });
+
+      it('allows shared references that do not form a circular path', () =>
+      {
+         const shared = { value: 42 };
+         const source = { first: shared, second: shared };
+
+         assert.doesNotThrow(() => [...ObjectUtil.safeKeyIterator(source)]);
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - data not object', () =>
+         {
+            // @ts-expect-error
+            expect(() => [...ObjectUtil.safeKeyIterator(false)]).throws(TypeError,
+             `safeKeyIterator error: 'data' is not an object.`);
+         });
+
+         it('throws - options.arrayIndex is not a boolean', () =>
+         {
+            expect(() => [...ObjectUtil.safeKeyIterator({}, { arrayIndex: null })]).throws(TypeError,
+             `safeKeyIterator error: 'options.arrayIndex' is not a boolean.`);
+         });
+
+         it('throws - options.hasOwnOnly is not a boolean', () =>
+         {
+            expect(() => [...ObjectUtil.safeKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
+             `safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
+         });
+
+         it('throws - circular source object', () =>
+         {
+            const source: Record<string, any> = { value: 42 };
+
+            source.self = source;
+
+            assert.throws(() => [...ObjectUtil.safeKeyIterator(source)], TypeError,
+             `safeKeyIterator error: Circular object path detected.`);
+         });
       });
    });
 
@@ -1728,21 +1891,50 @@ describe('ObjectUtil:', () =>
 
          assert.isFalse(ObjectUtil.safeSet(target, ['level1', 'value'], 100));
       });
-   });
 
-   describe('Multiple functions:', () =>
-   {
-      it('allows shared references that do not form a circular path', () =>
+      describe('Errors', () =>
       {
-         const shared = { value: 42 };
+         it('throws - data not object', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet(false, 'foo', 'bar')).throws(TypeError,
+             `safeSet error: 'data' is not an object.`);
+         });
 
-         const source = { first: shared, second: shared };
+         it('throws - accessor is not a string or symbol', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet({}, false, 'bar')).throws(TypeError,
+             `safeSet error: 'accessor' is not a string or an array of property keys.`);
+         });
 
-         assert.doesNotThrow(() => [...ObjectUtil.safeKeyIterator(source)]);
+         it('throws - accessor is not a string or symbol', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet({ a: { b: true } }, ['a', false], 'bar')).throws(TypeError,
+             `safeSet error: 'accessor' contains an entry that is not a property key.`);
+         });
 
-         assert.equal(ObjectUtil.safeEqual(source, { first: { value: 42 }, second: { value: 42 } }), true);
+         it('throws - options.createMissing is not a boolean', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { createMissing: 'bad' })).throws(TypeError,
+             `safeSet error: 'options.createMissing' is not a boolean.`);
+         });
 
-         assert.deepEqual(ObjectUtil.deepMerge({}, source), { first: { value: 42 }, second: { value: 42 } });
+         it('throws - options.operation is not a string', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { operation: false })).throws(TypeError,
+             `safeSet error: 'options.operation' is not a string.`);
+         });
+
+         it('throws - Unknown options.operation', () =>
+         {
+            // @ts-expect-error
+            expect(() => ObjectUtil.safeSet({}, 'foo', 'bar', { operation: 'bad' })).throws(Error,
+             `safeSet error: Unknown 'options.operation'.`);
+         });
       });
    });
 });
