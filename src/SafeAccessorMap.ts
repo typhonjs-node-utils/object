@@ -1,5 +1,6 @@
 import {
    isArrayIndex,
+   isSafeAccessorPrefix,
    normalizeSafeAccessor }    from './functions';
 
 import type { SafeAccessor }  from './functions';
@@ -550,40 +551,6 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 
    /**
-    * Returns whether one normalized path is an exact prefix of another using native `Map` key semantics.
-    *
-    * The equality check implements SameValueZero so numeric `NaN` segments compare as equal while `0` and `-0`
-    * naturally compare as equal through strict equality. Symbol segments continue to compare by identity.
-    *
-    * Called by {@link #resolveTraversalScope} when both `pathPrefix` and `stopAt` are supplied.
-    *
-    * @param prefix - Candidate prefix path.
-    *
-    * @param path - Complete path that must equal or descend from `prefix`.
-    *
-    * @returns Whether `prefix` is an exact structural prefix of `path`.
-    */
-   static #isSafeAccessorMapPathPrefix(prefix: readonly PropertyKey[], path: readonly PropertyKey[]): boolean
-   {
-      if (prefix.length > path.length) { return false; }
-
-      for (let index: number = 0; index < prefix.length; index++)
-      {
-         const prefixKey: PropertyKey = prefix[index];
-         const pathKey: PropertyKey = path[index];
-
-         // SameValueZero differs from strict equality only for NaN; PropertyKey excludes all other numeric edge cases.
-         if (prefixKey !== pathKey && !(typeof prefixKey === 'number' && typeof pathKey === 'number' &&
-          Number.isNaN(prefixKey) && Number.isNaN(pathKey)))
-         {
-            return false;
-         }
-      }
-
-      return true;
-   }
-
-   /**
     * Returns whether a candidate value can provide another property-path segment.
     *
     * Called by matching traversal for the root candidate and for each value reached below a stored trie prefix.
@@ -768,8 +735,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
       const stopPath: readonly PropertyKey[] | undefined = stopAt === void 0 ?
        void 0 : normalizeSafeAccessor(stopAt);
 
-      if (prefixPath !== void 0 && stopPath !== void 0 &&
-       !SafeAccessorMap.#isSafeAccessorMapPathPrefix(prefixPath, stopPath))
+      if (prefixPath !== void 0 && stopPath !== void 0 && !isSafeAccessorPrefix(prefixPath, stopPath))
       {
          throw new RangeError(`SafeAccessorMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
       }

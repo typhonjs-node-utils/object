@@ -112,6 +112,95 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
 }
 
 /**
+ * Concatenates one or more safe accessors into a newly allocated exact property-key path.
+ *
+ * Every accessor is normalized before concatenation. Dotted strings therefore contribute one segment per delimiter,
+ * while array accessors preserve numbers, symbols, empty-string keys, and literal periods exactly. The returned array
+ * is independent of every input array and may be retained or modified by the caller without affecting those inputs.
+ *
+ * @example
+ * ```ts
+ * concatSafeAccessor('actor.system', ['attributes', 'hp'], 'value');
+ * // ['actor', 'system', 'attributes', 'hp', 'value']
+ * ```
+ *
+ * @param accessor - First accessor to concatenate.
+ *
+ * @param accessors - Additional accessors appended in order.
+ *
+ * @returns A newly allocated exact property-key accessor.
+ *
+ * @throws {TypeError} If any argument is not a valid {@link SafeAccessor} or no accessor is supplied at runtime.
+ */
+export function concatSafeAccessor(accessor: SafeAccessor, ...accessors: SafeAccessor[]): readonly PropertyKey[]
+{
+   if (arguments.length === 0)
+   {
+      throw new TypeError(`concatSafeAccessor error: At least one safe accessor is required.`);
+   }
+
+   const result: PropertyKey[] = Array.from(normalizeSafeAccessor(accessor));
+
+   for (const entry of accessors) { result.push(...normalizeSafeAccessor(entry)); }
+
+   return result;
+}
+
+/**
+ * Deletes the property resolved by a safe accessor.
+ *
+ * By default, every path segment must be an own property. Set `hasOwnOnly` to `false` to permit inherited traversal;
+ * when the final property is inherited, the property is deleted from the prototype object that owns it. This explicit
+ * opt-in prevents accidental prototype mutation during ordinary use.
+ *
+ * Prototype-pollution keys (`__proto__`, `prototype`, and `constructor`) and ECMAScript well-known symbols are rejected
+ * at every path segment, matching the mutation hardening applied by {@link safeSet}. Non-configurable properties are
+ * not deleted.
+ *
+ * @param data - Object containing the property path.
+ *
+ * @param accessor - Dotted or exact property-key accessor.
+ *
+ * @param options - Deletion options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `true`.
+ *
+ * @returns Whether an existing configurable property was deleted.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+ */
+export function deleteProperty(data: object, accessor: SafeAccessor,
+ { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}): boolean
+{
+   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
+
+   if (typeof hasOwnOnly !== 'boolean')
+   {
+      throw new TypeError(`deleteProperty error: 'options.hasOwnOnly' is not a boolean.`);
+   }
+
+   const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+
+   for (const key of path)
+   {
+      if ((typeof key === 'string' && isBlockedPrototypeKey(key)) ||
+       (typeof key === 'symbol' && wellKnownSymbols.has(key)))
+      {
+         return false;
+      }
+   }
+
+   const resolution: PropertyPathResolution | undefined = resolvePropertyPath(data, path, {
+      hasOwnOnly,
+      readValue: false
+   });
+
+   if (resolution === void 0 || resolution.descriptor.configurable === false) { return false; }
+
+   return Reflect.deleteProperty(resolution.owner, resolution.key);
+}
+
+/**
  * Freezes all entries traversed that are objects including entries in arrays.
  *
  * @param data - An object or array.
@@ -456,6 +545,106 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
 }
 
 /**
+ * Returns the value resolved by a safe accessor while preserving present `undefined` and `null` values.
+ *
+ * Unlike {@link safeAccess}, this function returns a present nullish property unchanged. A missing or invalid path
+ * returns `undefined`; use {@link hasProperty} when that result must be distinguished from a present `undefined`
+ * property. Array indexes require numeric keys through an exact array accessor.
+ *
+ * @param data - Object to inspect.
+ *
+ * @param accessor - Dotted or exact property-key accessor.
+ *
+ * @param options - Property lookup options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `false`.
+ *
+ * @returns The resolved property value, or `undefined` when the path cannot be resolved.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+ *
+ * @typeParam T - Root object type.
+ * @typeParam P - Accessor type.
+ */
+export function getProperty<T extends object, const P extends SafeAccessor>(data: T, accessor: P,
+ { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): DeepAccess<T, P> | undefined
+{
+   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+
+   if (typeof hasOwnOnly !== 'boolean')
+   {
+      throw new TypeError(`getProperty error: 'options.hasOwnOnly' is not a boolean.`);
+   }
+
+   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly })?.value as
+    DeepAccess<T, P> | undefined;
+}
+
+/**
+ * Returns the own property descriptor that defines the final segment of a safe accessor.
+ *
+ * Intermediate values are read as necessary to continue traversal, but the final property value is not read. Getter
+ * accessors at the terminal segment are therefore not invoked. When inherited lookup is enabled, the descriptor is
+ * returned from the prototype object that owns the final property.
+ *
+ * @param data - Object to inspect.
+ *
+ * @param accessor - Dotted or exact property-key accessor.
+ *
+ * @param options - Property lookup options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `false`.
+ *
+ * @returns The terminal property descriptor, or `undefined` when the path cannot be resolved.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+ */
+export function getPropertyDescriptor(data: object, accessor: SafeAccessor,
+ { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): PropertyDescriptor | undefined
+{
+   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+
+   if (typeof hasOwnOnly !== 'boolean')
+   {
+      throw new TypeError(`getPropertyDescriptor error: 'options.hasOwnOnly' is not a boolean.`);
+   }
+
+   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false })?.descriptor;
+}
+
+/**
+ * Returns the object that owns the final property resolved by a safe accessor.
+ *
+ * The owner may be the object reached directly by the parent path or one of its prototypes. Intermediate values are
+ * read to continue traversal, but the final property value is not read. Set `hasOwnOnly` to `true` to require every
+ * segment, including the terminal property, to be owned directly by the value reached at that depth.
+ *
+ * @param data - Object to inspect.
+ *
+ * @param accessor - Dotted or exact property-key accessor.
+ *
+ * @param options - Property lookup options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `false`.
+ *
+ * @returns The terminal property owner, or `undefined` when the path cannot be resolved.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+ */
+export function getPropertyOwner(data: object, accessor: SafeAccessor,
+ { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): object | undefined
+{
+   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+
+   if (typeof hasOwnOnly !== 'boolean')
+   {
+      throw new TypeError(`getPropertyOwner error: 'options.hasOwnOnly' is not a boolean.`);
+   }
+
+   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false })?.owner;
+}
+
+/**
  * Determine if the given object has a getter & setter accessor.
  *
  * @param object - An object.
@@ -472,18 +661,8 @@ export function hasAccessor<T extends object, K extends keyof T>(object: T, acce
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
-   // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
-   if (iDescriptor !== void 0 && iDescriptor.get !== void 0 && iDescriptor.set !== void 0) { return true; }
-
-   // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
-   {
-      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
-      if (descriptor !== void 0 && descriptor.get !== void 0 && descriptor.set !== void 0) { return true; }
-   }
-
-   return false;
+   const descriptor: PropertyDescriptor | undefined = getPropertyDescriptor(object, [accessor as PropertyKey]);
+   return descriptor?.get !== void 0 && descriptor.set !== void 0;
 }
 
 /**
@@ -502,25 +681,15 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
-   // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
-   if (iDescriptor !== void 0 && iDescriptor.get !== void 0) { return true; }
-
-   // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
-   {
-      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
-      if (descriptor !== void 0 && descriptor.get !== void 0) { return true; }
-   }
-
-   return false;
+   return getPropertyDescriptor(object, [accessor as PropertyKey])?.get !== void 0;
 }
 
 /**
  * Determines whether an accessor path exists on an object.
  *
  * Traversal aborts immediately when a property is missing, an intermediate value cannot be traversed, or an invalid
- * array index is encountered. Properties whose values are `undefined` or `null` are considered present.
+ * array index is encountered. Properties whose values are `undefined` or `null` are considered present. The terminal
+ * property value is not read, so a getter at the final segment is not invoked merely to test existence.
  *
  * Array indexes may only be accessed by number through the array accessor form.
  *
@@ -528,22 +697,25 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
  *
  * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
  *
+ * @param options - Property lookup options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `false`.
+ *
  * @returns Whether the complete accessor path exists.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
-export function hasProperty(data: object, accessor: SafeAccessor): boolean
+export function hasProperty(data: object, accessor: SafeAccessor,
+ { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): boolean
 {
-   if (typeof data !== 'object' || data === null) { return false; }
-   if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return false; }
+   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
 
-   if ((typeof accessor === 'string' && accessor.length === 0) ||
-    (Array.isArray(accessor) && accessor.length === 0))
+   if (typeof hasOwnOnly !== 'boolean')
    {
-      return false;
+      throw new TypeError(`hasProperty error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
-
-   return resolvePropertyPath(data, keys) !== unresolvedProperty;
+   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false }) !== void 0;
 }
 
 /**
@@ -589,18 +761,7 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
 {
    if (typeof object !== 'object' || object === null || object === void 0) { return false; }
 
-   // Check for instance accessor.
-   const iDescriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(object, accessor);
-   if (iDescriptor !== void 0 && iDescriptor.set !== void 0) { return true; }
-
-   // Walk parent prototype chain. Check for descriptor at each prototype level.
-   for (let o: any = Object.getPrototypeOf(object); o; o = Object.getPrototypeOf(o))
-   {
-      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(o, accessor);
-      if (descriptor !== void 0 && descriptor.set !== void 0) { return true; }
-   }
-
-   return false;
+   return getPropertyDescriptor(object, [accessor as PropertyKey])?.set !== void 0;
 }
 
 /**
@@ -727,6 +888,22 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
 }
 
 /**
+ * Determines whether a value is a JavaScript property key.
+ *
+ * Property keys are strings, numbers, or symbols. Numbers are accepted because exact accessor arrays preserve numeric
+ * array indexes and ordinary JavaScript property access coerces numeric object keys as usual.
+ *
+ * @param value - Candidate property key.
+ *
+ * @returns Whether `value` is a string, number, or symbol.
+ */
+export function isPropertyKey(value: unknown): value is PropertyKey
+{
+   const valueType: string = typeof value;
+   return valueType === 'string' || valueType === 'number' || valueType === 'symbol';
+}
+
+/**
  * Checks whether a value is a generic key / value object / `Record<string, unknown>`.
  *
  * A record in this context means:
@@ -778,12 +955,85 @@ export function isSafeAccessor(value: unknown): value is SafeAccessor
 
    for (let i: number = 0, l: number = value.length; i < l; i++)
    {
-      const keyType: string = typeof value[i];
-
-      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return false; }
+      if (!isPropertyKey(value[i])) { return false; }
    }
 
    return true;
+}
+
+/**
+ * Determines whether one safe accessor is an exact structural prefix of another.
+ *
+ * Both accessors are compared after normalization. Segment comparison follows native `Map` / SameValueZero
+ * semantics: strings compare by value, symbols by identity, `0` equals `-0`, and numeric `NaN` segments compare as
+ * equal. Numeric and string segments remain distinct.
+ *
+ * Invalid accessor values return `false` rather than throwing, matching predicate conventions.
+ *
+ * @param prefix - Candidate prefix accessor.
+ *
+ * @param accessor - Complete accessor that must equal or descend from `prefix`.
+ *
+ * @returns Whether `prefix` is an exact structural prefix of `accessor`.
+ */
+export function isSafeAccessorPrefix(prefix: SafeAccessor, accessor: SafeAccessor): boolean
+{
+   if (!isSafeAccessor(prefix) || !isSafeAccessor(accessor)) { return false; }
+
+   const prefixPath: readonly PropertyKey[] = normalizeSafeAccessor(prefix);
+   const accessorPath: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+
+   if (prefixPath.length > accessorPath.length) { return false; }
+
+   for (let index: number = 0; index < prefixPath.length; index++)
+   {
+      const prefixKey: PropertyKey = prefixPath[index];
+      const accessorKey: PropertyKey = accessorPath[index];
+
+      if (prefixKey !== accessorKey && !(typeof prefixKey === 'number' && typeof accessorKey === 'number' &&
+       Number.isNaN(prefixKey) && Number.isNaN(accessorKey)))
+      {
+         return false;
+      }
+   }
+
+   return true;
+}
+
+/**
+ * Converts a safe accessor to an equivalent dotted string accessor when that conversion is lossless.
+ *
+ * Exact accessor arrays containing numbers, symbols, or string segments with literal periods cannot be represented by
+ * dotted-string syntax without changing their property-path semantics and are rejected. Empty segments are retained,
+ * so `['level1', '', 'value']` becomes `'level1..value'`. The exact single empty-string key `['']` is rejected because
+ * an empty dotted string is not a valid {@link SafeAccessor}.
+ *
+ * @param accessor - Accessor to convert.
+ *
+ * @returns An equivalent dotted string accessor.
+ *
+ * @throws {TypeError} If `accessor` is invalid or cannot be represented losslessly as a dotted string accessor.
+ */
+export function joinSafeAccessor(accessor: SafeAccessor): string
+{
+   const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+
+   for (const key of path)
+   {
+      if (typeof key !== 'string' || key.includes('.'))
+      {
+         throw new TypeError(`joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
+      }
+   }
+
+   const result: string = path.join('.');
+
+   if (result.length === 0)
+   {
+      throw new TypeError(`joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
+   }
+
+   return result;
 }
 
 /**
@@ -862,39 +1112,10 @@ export function safeAccess<T extends object, const P extends SafeAccessor, R = D
  accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
   DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
 {
-   if (typeof data !== 'object' || data === null) { return defaultValue as any; }
-   if (typeof accessor !== 'string' && !Array.isArray(accessor)) { return defaultValue as any; }
-   if ((typeof accessor === 'string' && accessor.length === 0) ||
-    (Array.isArray(accessor) && accessor.length === 0))
-   {
-      return defaultValue as any;
-   }
+   const result: unknown = getProperty(data, accessor);
 
-   const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
-   let result: any = data;
-
-   for (let i: number = 0; i < keys.length; i++)
-   {
-      if (!isTraversableValue(result)) { return defaultValue as any; }
-
-      const key: PropertyKey = keys[i];
-      const keyType: string = typeof key;
-
-      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return defaultValue as any; }
-
-      if (Array.isArray(result) && keyType !== 'symbol' && !isArrayIndex(key))
-      {
-         return defaultValue as any;
-      }
-
-      // Cache each read so getters and proxy traps are invoked only once per path segment.
-      const next: any = (result as any)[key];
-      if (next === void 0 || next === null) { return defaultValue as any; }
-
-      result = next;
-   }
-
-   return result as any;
+   // Preserve legacy safeAccess behavior: present nullish values collapse to the supplied default.
+   return result === void 0 || result === null ? defaultValue as any : result as any;
 }
 
 /**
@@ -924,10 +1145,14 @@ export function safeEqual<T extends object>(source: T, target: object,
 
    for (const accessor of safeKeyIterator(source, options))
    {
-      const sourceObjectValue: unknown = resolvePropertyPath(source, accessor);
-      const targetObjectValue: unknown = resolvePropertyPath(target, accessor);
+      const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, accessor);
+      const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, accessor);
 
-      if (sourceObjectValue !== targetObjectValue) { return false; }
+      if (sourceResolution === void 0 || targetResolution === void 0 ||
+       sourceResolution.value !== targetResolution.value)
+      {
+         return false;
+      }
    }
 
    return true;
@@ -1066,7 +1291,7 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
       const key: PropertyKey = access[i];
       const keyType: string = typeof key;
 
-      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol')
+      if (!isPropertyKey(key))
       {
          throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a property key.`);
       }
@@ -1130,14 +1355,6 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
 const wellKnownSymbols: ReadonlySet<symbol> = new Set(Object.getOwnPropertyNames(Symbol)
  .map((key: string): unknown => (Symbol as unknown as Record<string, unknown>)[key])
   .filter((value: unknown): value is symbol => typeof value === 'symbol'));
-
-/**
- * Sentinel returned when an accessor path cannot be resolved.
- *
- * Used by:
- * - {@link resolvePropertyPath}, {@link hasProperty}, and {@link safeEqual}.
- */
-const unresolvedProperty: unique symbol = Symbol();
 
 // Utility Function --------------------------------------------------------------------------------------------------
 
@@ -1238,6 +1455,31 @@ function extendPropertyAncestors(ancestors: ReadonlySet<object>, child: object):
    const result: Set<object> = new Set(ancestors);
    result.add(child);
    return result;
+}
+
+/**
+ * Locates the nearest own property descriptor and its owner in a prototype chain.
+ *
+ * Called by {@link resolvePropertyPath} when inherited-property lookup is enabled. Returning both values from one
+ * prototype walk avoids a second descriptor lookup and keeps proxy descriptor traps to one call per inspected owner.
+ *
+ * @param value - Candidate object or function.
+ * @param key - Property key to locate.
+ *
+ * @returns The nearest property descriptor / owner pair, or `undefined` when the property does not exist.
+ */
+function findPropertyDescriptorOwner(value: PropertyPathTraversableValue, key: PropertyKey):
+ PropertyDescriptorOwner | undefined
+{
+   for (let current: PropertyPathTraversableValue | null = value; current !== null;
+    current = Object.getPrototypeOf(current) as PropertyPathTraversableValue | null)
+   {
+      const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(current, key);
+
+      if (descriptor !== void 0) { return { descriptor, owner: current }; }
+   }
+
+   return void 0;
 }
 
 /**
@@ -1462,54 +1704,89 @@ function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arra
 }
 
 /**
- * Resolves an exact property-key path while preserving missing-property information.
+ * Resolves an exact property-key path and returns terminal ownership metadata.
  *
- * Unlike {@link safeAccess}, this helper returns present `undefined` and `null` values unchanged. The private
- * {@link unresolvedProperty} sentinel is returned only when the path itself cannot be resolved.
- *
- * Called by:
- * - {@link hasProperty} to distinguish missing paths from present nullish values.
- * - {@link safeEqual} to compare source and target paths without collapsing missing and nullish values.
+ * The resolver centralizes array-index rules, own-only behavior, inherited property ownership, descriptor lookup, and
+ * single-read traversal for all accessor-based property utilities. Intermediate properties are read exactly once.
+ * The terminal property is read only when `readValue` is enabled, allowing existence, descriptor, owner, and deletion
+ * operations to avoid invoking a final getter.
  *
  * @param data - Root object to traverse.
- * @param accessor - Exact property-key path.
+ * @param accessor - Valid normalized property-key path.
+ * @param options - Resolution options.
+ * @param options.hasOwnOnly - Whether each segment must be an own property.
+ * @param options.readValue - Whether to read and return the terminal property value.
  *
- * @returns The resolved value or {@link unresolvedProperty}.
+ * @returns Complete terminal resolution metadata, or `undefined` when the path cannot be resolved.
  */
-function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): unknown
+function resolvePropertyPath(data: object, accessor: readonly PropertyKey[],
+ { hasOwnOnly = false, readValue = true }: { hasOwnOnly?: boolean, readValue?: boolean } = {}):
+  PropertyPathResolution | undefined
 {
-   let result: any = data;
+   let candidate: PropertyPathTraversableValue = data;
 
-   for (let i: number = 0; i < accessor.length; i++)
+   for (let index: number = 0; index < accessor.length; index++)
    {
-      if (!isTraversableValue(result)) { return unresolvedProperty; }
+      const key: PropertyKey = accessor[index];
 
-      const key: PropertyKey = accessor[i];
-      const keyType: string = typeof key;
-
-      /* v8 ignore start */
-      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return unresolvedProperty; }
-      if (Array.isArray(result) && keyType !== 'symbol' && !isArrayIndex(key)) { return unresolvedProperty; }
+      /* v8 ignore start -- callers normalize / validate SafeAccessor before resolution. */
+      if (!isPropertyKey(key)) { return void 0; }
       /* v8 ignore stop */
 
-      if (!(key in (result as any))) { return unresolvedProperty; }
-      result = (result as any)[key];
+      if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndex(key)) { return void 0; }
+
+      let descriptorOwner: PropertyDescriptorOwner | undefined;
+
+      if (hasOwnOnly)
+      {
+         const descriptor: PropertyDescriptor | undefined = Object.getOwnPropertyDescriptor(candidate, key);
+
+         if (descriptor !== void 0) { descriptorOwner = { descriptor, owner: candidate }; }
+      }
+      else
+      {
+         descriptorOwner = findPropertyDescriptorOwner(candidate, key);
+      }
+
+      if (descriptorOwner === void 0) { return void 0; }
+
+      const { descriptor, owner } = descriptorOwner;
+      const isFinal: boolean = index === accessor.length - 1;
+
+      if (isFinal)
+      {
+         return {
+            descriptor,
+            key,
+            owner,
+            value: readValue ? (candidate as Record<PropertyKey, unknown>)[key] : void 0
+         };
+      }
+
+      const next: unknown = (candidate as Record<PropertyKey, unknown>)[key];
+
+      if (!isTraversableValue(next)) { return void 0; }
+
+      candidate = next;
+
+      /* v8 ignore start - SafeAccessor paths are always non-empty */
    }
 
-   return result;
+   return void 0;
 }
+/* v8 ignore stop */
 
-// Internal Types ----------------------------------------------------------------------------------------------------
+// External Types ----------------------------------------------------------------------------------------------------
 
 /**
- * Stack frame for ordinary-object traversal in {@link safeKeyIterator}.
+ * Accessor accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String accessors use `.`
+ * delimiters while array accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require
+ * numeric keys.
  */
-interface PropertyTraversalEntry
-{
-   obj: object;
-   path: readonly PropertyKey[];
-   ancestors: ReadonlySet<object>;
-}
+export type SafeAccessor = string | readonly PropertyKey[];
+
+
+// Internal Types ----------------------------------------------------------------------------------------------------
 
 /**
  * Stack frame for array traversal in {@link iterateArrayAccessors}.
@@ -1524,14 +1801,47 @@ interface ArrayTraversalEntry
    indexesYielded: boolean;
 }
 
-// External Types ----------------------------------------------------------------------------------------------------
+/**
+ * Own property descriptor paired with the object or function that defines it.
+ */
+interface PropertyDescriptorOwner
+{
+   descriptor: PropertyDescriptor;
+   owner: PropertyPathTraversableValue;
+}
 
 /**
- * Accessor accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String accessors use `.`
- * delimiters while array accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require
- * numeric keys.
+ * Complete terminal metadata returned by {@link resolvePropertyPath}.
  */
-export type SafeAccessor = string | readonly PropertyKey[];
+interface PropertyPathResolution
+{
+   /** Own descriptor defining the terminal property. */
+   descriptor: PropertyDescriptor;
+
+   /** Final accessor key. */
+   key: PropertyKey;
+
+   /** Object or function that owns the terminal property. */
+   owner: PropertyPathTraversableValue;
+
+   /** Terminal property value when requested; otherwise `undefined`. */
+   value: unknown;
+}
+
+/**
+ * Object or function that can provide a direct JavaScript property-path segment.
+ */
+type PropertyPathTraversableValue = object | ((...args: any[]) => any);
+
+/**
+ * Stack frame for ordinary-object traversal in {@link safeKeyIterator}.
+ */
+interface PropertyTraversalEntry
+{
+   obj: object;
+   path: readonly PropertyKey[];
+   ancestors: ReadonlySet<object>;
+}
 
 // Internal Utility Types --------------------------------------------------------------------------------------------
 

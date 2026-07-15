@@ -160,6 +160,111 @@ describe('ObjectUtil:', () =>
       expectTypeOf(val).toEqualTypeOf<NoOpObj & Record<string, unknown>>();
    });
 
+
+   describe('concatSafeAccessor:', () =>
+   {
+      it('concatenates dotted and exact accessors into a new property-key array', () =>
+      {
+         const symbol = Symbol('value');
+         const exact: PropertyKey[] = ['attributes', 0, symbol];
+         const result = ObjectUtil.concatSafeAccessor('actor.system', exact, ['value']);
+
+         assert.deepEqual(result, ['actor', 'system', 'attributes', 0, symbol, 'value']);
+         assert.notEqual(result, exact);
+
+         (result as PropertyKey[])[0] = 'changed';
+         assert.deepEqual(exact, ['attributes', 0, symbol]);
+      });
+
+      it('returns a copy for one exact accessor', () =>
+      {
+         const accessor = ['actor', 'name'] as const;
+         const result = ObjectUtil.concatSafeAccessor(accessor);
+
+         assert.deepEqual(result, accessor);
+         assert.notEqual(result, accessor);
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - when no accessor is supplied', () =>
+         {
+            assert.throws(() => (ObjectUtil.concatSafeAccessor as (...accessors: any[]) => readonly PropertyKey[])(),
+             TypeError, `concatSafeAccessor error: At least one safe accessor is required.`);
+         });
+
+         it('throws - when any accessor is invalid', () =>
+         {
+            assert.throws(() => ObjectUtil.concatSafeAccessor('actor', []), TypeError,
+             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+         });
+      });
+   });
+
+   describe('deleteProperty:', () =>
+   {
+      it('deletes own nested and symbol properties', () =>
+      {
+         const symbol = Symbol('value');
+         const data = { nested: { value: 42, [symbol]: true } };
+
+         assert.isTrue(ObjectUtil.deleteProperty(data, 'nested.value'));
+         assert.isFalse(ObjectUtil.hasProperty(data, 'nested.value'));
+
+         assert.isTrue(ObjectUtil.deleteProperty(data, ['nested', symbol]));
+         assert.isFalse(ObjectUtil.hasProperty(data, ['nested', symbol]));
+      });
+
+      it('requires own properties by default and can explicitly delete an inherited owner property', () =>
+      {
+         const prototype = { inherited: 42 };
+         const data = Object.create(prototype);
+
+         assert.isFalse(ObjectUtil.deleteProperty(data, 'inherited'));
+         assert.equal(prototype.inherited, 42);
+
+         assert.isTrue(ObjectUtil.deleteProperty(data, 'inherited', { hasOwnOnly: false }));
+         assert.equal(Object.hasOwn(prototype, 'inherited'), false);
+      });
+
+      it('returns false for missing, invalid, non-configurable, and invalid-array paths', () =>
+      {
+         const data: Record<string, any> = { values: ['a'] };
+         Object.defineProperty(data, 'fixed', { configurable: false, value: 1 });
+
+         assert.isFalse(ObjectUtil.deleteProperty(data, 'missing'));
+         assert.isFalse(ObjectUtil.deleteProperty(data, ''));
+         assert.isFalse(ObjectUtil.deleteProperty(null, 'value'));
+         assert.isFalse(ObjectUtil.deleteProperty(data, ['values', '0']));
+         assert.isFalse(ObjectUtil.deleteProperty(data, 'fixed'));
+         assert.equal(data.fixed, 1);
+      });
+
+      it('rejects prototype-pollution keys and well-known symbols', () =>
+      {
+         const data: Record<PropertyKey, unknown> = {
+            safe: {
+               constructor: 1
+            },
+            [Symbol.toStringTag]: 'Custom'
+         };
+
+         assert.isFalse(ObjectUtil.deleteProperty(data, ['safe', 'constructor']));
+         assert.isFalse(ObjectUtil.deleteProperty(data, [Symbol.toStringTag]));
+
+         // @ts-expect-error
+         assert.equal((data.safe as Record<string, unknown>).constructor, 1);
+         assert.equal(data[Symbol.toStringTag], 'Custom');
+      });
+
+      it('validates options.hasOwnOnly', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.deleteProperty({}, 'value', { hasOwnOnly: 'yes' }), TypeError,
+          `deleteProperty error: 'options.hasOwnOnly' is not a boolean.`);
+      });
+   });
+
    describe('deepFreeze:', () =>
    {
       it('with skipKeys:', () =>
@@ -479,7 +584,7 @@ describe('ObjectUtil:', () =>
          assert.equal(result, target);
          assert.deepEqual(target, { safe: 1 });
          assert.equal(Object.getPrototypeOf(target), Object.prototype);
-         assert.equal(({} as any).polluted, undefined);
+         assert.equal(({} as any).polluted, void 0);
       });
 
       it('skips an own enumerable prototype property', () =>
@@ -648,6 +753,23 @@ describe('ObjectUtil:', () =>
          const source = { first: shared, second: shared };
 
          assert.deepEqual(ObjectUtil.deepMerge({}, source), { first: { value: 42 }, second: { value: 42 } });
+      });
+
+      it('filters blocked keys while cloning an existing target branch in the multi-source path', () =>
+      {
+         const level1 = JSON.parse('{"constructor":{"polluted":true},"safe":1}');
+         const target: Record<string, any> = { level1 };
+
+         ObjectUtil.deepMerge(target, { level1: { next: 2 } }, { marker: true });
+
+         assert.deepEqual(target, {
+            level1: {
+               safe: 1,
+               next: 2
+            },
+            marker: true
+         });
+         assert.equal(Object.hasOwn(target.level1, 'constructor'), false);
       });
 
       describe('Errors', () =>
@@ -865,6 +987,155 @@ describe('ObjectUtil:', () =>
       assert.deepEqual([...ObjectUtil.ensureNonEmptyIterable([1, 2])], [1, 2]);
    });
 
+   describe('getProperty:', () =>
+   {
+      it('resolves dotted, numeric, and symbol accessors while preserving nullish values', () =>
+      {
+         const symbol = Symbol('value');
+         const data = {
+            nested: { value: 42, undefinedValue: void 0, nullValue: null },
+            values: ['a'],
+            [symbol]: true
+         };
+
+         assert.equal(ObjectUtil.getProperty(data, 'nested.value'), 42);
+         assert.isUndefined(ObjectUtil.getProperty(data, 'nested.undefinedValue'));
+         assert.isNull(ObjectUtil.getProperty(data, 'nested.nullValue'));
+         assert.equal(ObjectUtil.getProperty(data, ['values', 0]), 'a');
+         assert.isTrue(ObjectUtil.getProperty(data, [symbol]));
+      });
+
+      it('includes inherited properties by default and can require own properties', () =>
+      {
+         const prototype = { inherited: { value: 42 } };
+         const data = Object.create(prototype);
+
+         assert.equal(ObjectUtil.getProperty(data, 'inherited.value'), 42);
+         assert.isUndefined(ObjectUtil.getProperty(data, 'inherited.value', { hasOwnOnly: true }));
+      });
+
+      it('returns undefined for invalid, missing, non-traversable, and invalid-array paths', () =>
+      {
+         assert.isUndefined(ObjectUtil.getProperty(null, 'value'));
+         assert.isUndefined(ObjectUtil.getProperty({}, ''));
+         assert.isUndefined(ObjectUtil.getProperty({}, 'missing'));
+         assert.isUndefined(ObjectUtil.getProperty({ nested: null }, 'nested.value'));
+         assert.isUndefined(ObjectUtil.getProperty({ values: ['a'] }, ['values', '0']));
+      });
+
+      it('reads each traversed getter once', () =>
+      {
+         let prefixReads = 0;
+         let valueReads = 0;
+         const nested = Object.defineProperty({}, 'value', {
+            get()
+            {
+               valueReads++;
+               return 42;
+            }
+         });
+         const data = Object.defineProperty({}, 'nested', {
+            get()
+            {
+               prefixReads++;
+               return nested;
+            }
+         });
+
+         assert.equal(ObjectUtil.getProperty(data, 'nested.value'), 42);
+         assert.equal(prefixReads, 1);
+         assert.equal(valueReads, 1);
+      });
+
+      it('validates options.hasOwnOnly', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.getProperty({}, 'value', { hasOwnOnly: 'yes' }), TypeError,
+          `getProperty error: 'options.hasOwnOnly' is not a boolean.`);
+      });
+   });
+
+   describe('getPropertyDescriptor:', () =>
+   {
+      it('returns own and inherited terminal descriptors without invoking a terminal getter', () =>
+      {
+         let reads = 0;
+         const prototype = Object.defineProperty({}, 'inherited', {
+            configurable: true,
+            enumerable: true,
+            get()
+            {
+               reads++;
+               return 42;
+            }
+         });
+         const data = Object.create(prototype);
+         Object.defineProperty(data, 'own', { configurable: true, enumerable: false, value: 1 });
+
+         const ownDescriptor = ObjectUtil.getPropertyDescriptor(data, 'own');
+         const inheritedDescriptor = ObjectUtil.getPropertyDescriptor(data, 'inherited');
+
+         assert.equal(ownDescriptor?.value, 1);
+         assert.equal(ownDescriptor?.enumerable, false);
+         assert.isFunction(inheritedDescriptor?.get);
+         assert.equal(reads, 0);
+         assert.isUndefined(ObjectUtil.getPropertyDescriptor(data, 'inherited', { hasOwnOnly: true }));
+      });
+
+      it('resolves nested and symbol descriptors and rejects invalid paths', () =>
+      {
+         const symbol = Symbol('value');
+         const nested = { [symbol]: 42 };
+         const data = { nested, values: ['a'] };
+
+         assert.equal(ObjectUtil.getPropertyDescriptor(data, ['nested', symbol])?.value, 42);
+         assert.equal(ObjectUtil.getPropertyDescriptor(data, ['values', 0])?.value, 'a');
+         assert.isUndefined(ObjectUtil.getPropertyDescriptor(data, ['values', '0']));
+         assert.isUndefined(ObjectUtil.getPropertyDescriptor({ nested: 1 }, 'nested.value'));
+         assert.isUndefined(ObjectUtil.getPropertyDescriptor({}, ''));
+         assert.isUndefined(ObjectUtil.getPropertyDescriptor(null, 'value'));
+      });
+
+      it('validates options.hasOwnOnly', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.getPropertyDescriptor({}, 'value', { hasOwnOnly: 'yes' }), TypeError,
+          `getPropertyDescriptor error: 'options.hasOwnOnly' is not a boolean.`);
+      });
+   });
+
+   describe('getPropertyOwner:', () =>
+   {
+      it('returns the nearest terminal property owner', () =>
+      {
+         const ancestor = { inherited: 42 };
+         const prototype = Object.create(ancestor);
+         const data = Object.create(prototype);
+         data.own = { value: true };
+
+         assert.equal(ObjectUtil.getPropertyOwner(data, 'own'), data);
+         assert.equal(ObjectUtil.getPropertyOwner(data, 'own.value'), data.own);
+         assert.equal(ObjectUtil.getPropertyOwner(data, 'inherited'), ancestor);
+         assert.isUndefined(ObjectUtil.getPropertyOwner(data, 'inherited', { hasOwnOnly: true }));
+      });
+
+      it('returns undefined for invalid, missing, non-traversable, and invalid-array paths', () =>
+      {
+         assert.isUndefined(ObjectUtil.getPropertyOwner(null, 'value'));
+         assert.isUndefined(ObjectUtil.getPropertyOwner({}, ''));
+         assert.isUndefined(ObjectUtil.getPropertyOwner({}, 'missing'));
+         assert.isUndefined(ObjectUtil.getPropertyOwner({ nested: 1 }, 'nested.value'));
+         assert.isUndefined(ObjectUtil.getPropertyOwner({ values: ['a'] }, ['values', '0']));
+      });
+
+      it('validates options.hasOwnOnly', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.getPropertyOwner({}, 'value', { hasOwnOnly: 'yes' }), TypeError,
+          `getPropertyOwner error: 'options.hasOwnOnly' is not a boolean.`);
+      });
+   });
+
    describe('hasAccessor:', () =>
    {
       it('top level', () =>
@@ -971,7 +1242,7 @@ describe('ObjectUtil:', () =>
 
       it('considers properties with undefined or null values present', () =>
       {
-         assert.equal(ObjectUtil.hasProperty({ value: undefined }, 'value'), true);
+         assert.equal(ObjectUtil.hasProperty({ value: void 0 }, 'value'), true);
          assert.equal(ObjectUtil.hasProperty({ value: null }, 'value'), true);
       });
 
@@ -1010,7 +1281,7 @@ describe('ObjectUtil:', () =>
       it('distinguishes sparse array holes from explicit undefined entries', () =>
       {
          const sparse = new Array(1);
-         const explicit = [undefined];
+         const explicit = [void 0];
 
          assert.equal(ObjectUtil.hasProperty(sparse, [0]), false);
          assert.equal(ObjectUtil.hasProperty(explicit, [0]), true);
@@ -1048,7 +1319,44 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.hasProperty(data, [1.5]), false);
          assert.equal(ObjectUtil.hasProperty(data, [0xFFFF_FFFF]), false);
       });
+
+      it('can require every path segment to be an own property', () =>
+      {
+         const nestedPrototype = { value: 42 };
+         const nested = Object.create(nestedPrototype);
+         const rootPrototype = { nested };
+         const data = Object.create(rootPrototype);
+
+         assert.isTrue(ObjectUtil.hasProperty(data, 'nested.value'));
+         assert.isFalse(ObjectUtil.hasProperty(data, 'nested.value', { hasOwnOnly: true }));
+
+         const ownData = { nested: { value: 42 } };
+         assert.isTrue(ObjectUtil.hasProperty(ownData, 'nested.value', { hasOwnOnly: true }));
+      });
+
+      it('does not invoke a terminal getter when testing existence', () =>
+      {
+         let reads = 0;
+         const data = Object.defineProperty({}, 'value', {
+            get()
+            {
+               reads++;
+               return 42;
+            }
+         });
+
+         assert.isTrue(ObjectUtil.hasProperty(data, 'value'));
+         assert.equal(reads, 0);
+      });
+
+      it('validates options.hasOwnOnly', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.hasProperty({}, 'value', { hasOwnOnly: 'yes' }), TypeError,
+          `hasProperty error: 'options.hasOwnOnly' is not a boolean.`);
+      });
    });
+
 
    it('hasPrototype:', () =>
    {
@@ -1172,6 +1480,19 @@ describe('ObjectUtil:', () =>
       if (ObjectUtil.isPlainObject(val)) { expectTypeOf(val).toEqualTypeOf<NoOpObj>(); }
    });
 
+   it('isPropertyKey', () =>
+   {
+      assert.isTrue(ObjectUtil.isPropertyKey('value'));
+      assert.isTrue(ObjectUtil.isPropertyKey(0));
+      assert.isTrue(ObjectUtil.isPropertyKey(NaN));
+      assert.isTrue(ObjectUtil.isPropertyKey(Symbol('value')));
+
+      assert.isFalse(ObjectUtil.isPropertyKey(null));
+      assert.isFalse(ObjectUtil.isPropertyKey(void 0));
+      assert.isFalse(ObjectUtil.isPropertyKey(true));
+      assert.isFalse(ObjectUtil.isPropertyKey({}));
+   });
+
    it('isRecord', () =>
    {
       class Test {}
@@ -1235,6 +1556,65 @@ describe('ObjectUtil:', () =>
          assert.isFalse(ObjectUtil.isSafeAccessor(void 0));
          assert.isFalse(ObjectUtil.isSafeAccessor(42));
          assert.isFalse(ObjectUtil.isSafeAccessor({}));
+      });
+   });
+
+   describe('isSafeAccessorPrefix:', () =>
+   {
+      it('matches equal and descendant structural paths', () =>
+      {
+         assert.isTrue(ObjectUtil.isSafeAccessorPrefix('actor.system', ['actor', 'system']));
+         assert.isTrue(ObjectUtil.isSafeAccessorPrefix('actor', 'actor.system.hp'));
+         assert.isTrue(ObjectUtil.isSafeAccessorPrefix(['actor', 'system'], ['actor', 'system', 'hp']));
+      });
+
+      it('uses SameValueZero and symbol identity semantics', () =>
+      {
+         const symbol = Symbol('branch');
+         const otherSymbol = Symbol('branch');
+
+         assert.isTrue(ObjectUtil.isSafeAccessorPrefix([symbol, NaN], [symbol, NaN, 'value']));
+         assert.isTrue(ObjectUtil.isSafeAccessorPrefix([0], [-0, 'value']));
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([symbol], [otherSymbol, 'value']));
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([0], ['0', 'value']));
+      });
+
+      it('rejects longer, mismatched, and invalid prefixes', () =>
+      {
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor.system.hp', 'actor.system'));
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor.token', 'actor.system.hp'));
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([] as unknown as any, 'actor'));
+         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor', [] as unknown as any));
+      });
+   });
+
+   describe('joinSafeAccessor:', () =>
+   {
+      it('returns existing dotted strings and losslessly joins exact string paths', () =>
+      {
+         assert.equal(ObjectUtil.joinSafeAccessor('actor.system.hp'), 'actor.system.hp');
+         assert.equal(ObjectUtil.joinSafeAccessor(['actor', 'system', 'hp']), 'actor.system.hp');
+         assert.equal(ObjectUtil.joinSafeAccessor(['actor', '', 'hp']), 'actor..hp');
+         assert.equal(ObjectUtil.joinSafeAccessor(['', 'actor']), '.actor');
+         assert.equal(ObjectUtil.joinSafeAccessor(['actor', '']), 'actor.');
+      });
+
+      describe('Errors', () =>
+      {
+         it('throws - for invalid accessors', () =>
+         {
+            assert.throws(() => ObjectUtil.joinSafeAccessor([]), TypeError,
+             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+         });
+
+         it('throws - for exact paths that cannot be represented losslessly', () =>
+         {
+            assert.throws(() => ObjectUtil.joinSafeAccessor([0]), TypeError,
+             `joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
+            assert.throws(() => ObjectUtil.joinSafeAccessor([Symbol('value')]), TypeError);
+            assert.throws(() => ObjectUtil.joinSafeAccessor(['literal.period']), TypeError);
+            assert.throws(() => ObjectUtil.joinSafeAccessor(['']), TypeError);
+         });
       });
    });
 
@@ -1386,13 +1766,13 @@ describe('ObjectUtil:', () =>
       {
          const symbol = Symbol('value');
 
-         assert.equal(ObjectUtil.safeEqual({ value: undefined }, {}), false);
-         assert.equal(ObjectUtil.safeEqual({ value: undefined }, { value: undefined }), true);
+         assert.equal(ObjectUtil.safeEqual({ value: void 0 }, {}), false);
+         assert.equal(ObjectUtil.safeEqual({ value: void 0 }, { value: void 0 }), true);
 
          assert.equal(ObjectUtil.safeEqual({ value: null }, {}), false);
          assert.equal(ObjectUtil.safeEqual({ value: null }, { value: null }), true);
 
-         assert.equal(ObjectUtil.safeEqual({ values: [undefined] }, { values: new Array(1) }), false);
+         assert.equal(ObjectUtil.safeEqual({ values: [void 0] }, { values: new Array(1) }), false);
          assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: ['a'] }), true);
          assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: [] }), false);
 
@@ -1418,7 +1798,7 @@ describe('ObjectUtil:', () =>
          const source = { nested: { value: 42 } };
 
          assert.equal(ObjectUtil.safeEqual(source, { nested: null }), false);
-         assert.equal(ObjectUtil.safeEqual(source, { nested: undefined }), false);
+         assert.equal(ObjectUtil.safeEqual(source, { nested: void 0 }), false);
          assert.equal(ObjectUtil.safeEqual(source, { nested: 42 }), false);
          assert.equal(ObjectUtil.safeEqual(source, { nested: {} }), false);
       });
@@ -1605,6 +1985,16 @@ describe('ObjectUtil:', () =>
          ]);
       });
 
+      it('does not yield function-valued ordinary object properties', () =>
+      {
+         const data = {
+            value: 42,
+            callback(): void {}
+         };
+
+         assert.deepEqual([...ObjectUtil.safeKeyIterator(data)], [['value']]);
+      });
+
       it('allows shared references that do not form a circular path', () =>
       {
          const shared = { value: 42 };
@@ -1776,6 +2166,16 @@ describe('ObjectUtil:', () =>
 
          assert.isTrue(result);
          assert.isTrue((objectNumCopy as any).d);
+      });
+
+      it('set-undefined preserves an existing defined property', () =>
+      {
+         objectNumCopy.a = 10;
+
+         const result = ObjectUtil.safeSet(objectNumCopy, 'a', 20, { operation: 'set-undefined' });
+
+         assert.isTrue(result);
+         assert.equal(objectNumCopy.a, 10);
       });
 
       it('no array accessor / string', () =>

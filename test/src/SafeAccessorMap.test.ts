@@ -252,6 +252,7 @@ describe('SafeAccessorMap', () =>
       {
          const map = new SafeAccessorMap<number>();
 
+         assert.deepEqual(collect(map.matchingEntries({})), []);
          assert.deepEqual(collect(map.matchingEntries(null)), []);
          assert.deepEqual(collect(map.matchingKeys(42)), []);
          assert.deepEqual(collect(map.matchingValues('text')), []);
