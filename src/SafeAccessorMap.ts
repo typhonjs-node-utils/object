@@ -43,7 +43,8 @@ import type { SafeAccessor }  from './functions';
  * `get`, `has`, and `set` are `O(path length)`. `delete` is also `O(path length)` and prunes unused trie nodes.
  * Normal map iteration is `O(entry count)` and follows insertion order through a linked list of terminal entries.
  * Trie-aware matching visits only reachable stored prefixes, so unavailable prefixes reject all descendants with one
- * candidate-property check.
+ * candidate-property check. Matching entry and value iterators may optionally include the property value resolved from
+ * the candidate object without performing a second path lookup.
  *
  * Stored canonical paths are copied and frozen once when first inserted. Overwriting an existing entry retains its
  * original insertion position and canonical path. Deleting and reinserting a path moves it to the end, matching normal
@@ -264,9 +265,9 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * candidate prefix is missing or cannot be traversed, every stored descendant below that prefix is rejected without
     * additional property access. Shared prefixes are therefore checked and read at most once per matching operation.
     *
-    * A terminal property is considered available when it exists, even when its value is `undefined` or `null`. The
-    * property value is read only when the trie contains stored descendants below that terminal node. This avoids
-    * invoking terminal-only getters and proxy `get` traps unnecessarily.
+    * A terminal property is considered available when it exists, even when its value is `undefined` or `null`. By
+    * default, terminal-only properties are not read, avoiding unnecessary getter and proxy `get` trap invocation. Set
+    * `includePropertyValue` to `true` to append the resolved candidate property value to each yielded tuple.
     *
     * Array matching follows the same rules as the package property-path utilities: numeric indexes must be numbers in
     * the ECMAScript array-index range, while symbol properties remain valid. String array indexes such as `'0'` are
@@ -282,52 +283,87 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @param options - Matching options.
     *
-    * @returns Iterator of canonical stored paths and their associated values.
+    * @returns Iterator of canonical stored paths and their associated mapped values, optionally followed by the
+    *          resolved candidate property value.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
     */
-   *matchingEntries(data: unknown, options?: SafeAccessorMap.Options.Match):
-    IterableIterator<[readonly PropertyKey[], V]>
+   matchingEntries(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
+    IterableIterator<[readonly PropertyKey[], V, unknown]>;
+
+   matchingEntries(data: unknown, options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }):
+    IterableIterator<[readonly PropertyKey[], V]>;
+
+   matchingEntries(data: unknown, options?: SafeAccessorMap.Options.Match):
+    IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>;
+
+   *matchingEntries(data: unknown, options: SafeAccessorMap.Options.Match = {}):
+    IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>
    {
-      for (const entry of this.#matchingEntryIterator(data, options)) { yield [entry.path, entry.value]; }
+      const includePropertyValue: boolean = options.includePropertyValue ?? false;
+
+      for (const match of this.#matchingEntryIterator(data, options))
+      {
+         yield includePropertyValue ?
+          [match.entry.path, match.entry.value, match.propertyValue] :
+          [match.entry.path, match.entry.value];
+      }
    }
 
    /**
     * Yields canonical stored paths whose complete accessors are available in a candidate value.
     *
-    * This is a projection of {@link matchingEntries} and uses the same trie-aware pruning, property semantics, and
-    * depth-first trie order. It does not allocate temporary entry tuples.
+    * This is a path-only projection of {@link matchingEntries} and uses the same trie-aware pruning, property
+    * semantics, and depth-first trie order. Candidate terminal values are never requested solely for this iterator;
+    * properties are read only when descendant traversal requires them.
     *
     * @param data - Candidate object or function to inspect.
     *
-    * @param options - Matching options.
+    * @param options - Matching options affecting property ownership.
     *
     * @returns Iterator of matching canonical property-key paths.
     *
     * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
     */
-   *matchingKeys(data: unknown, options?: SafeAccessorMap.Options.Match): IterableIterator<readonly PropertyKey[]>
+   *matchingKeys(data: unknown, options?: Pick<SafeAccessorMap.Options.Match, 'hasOwnOnly'>):
+    IterableIterator<readonly PropertyKey[]>
    {
-      for (const entry of this.#matchingEntryIterator(data, options)) { yield entry.path; }
+      for (const match of this.#matchingEntryIterator(data, options)) { yield match.entry.path; }
    }
 
    /**
-    * Yields values whose stored accessor paths are available in a candidate value.
+    * Yields mapped values whose stored accessor paths are available in a candidate value.
     *
-    * This is a projection of {@link matchingEntries} and uses the same trie-aware pruning, property semantics, and
-    * depth-first trie order. It does not allocate temporary entry tuples.
+    * By default, this returns only each value stored in the map. Set `includePropertyValue` to `true` to return
+    * `[mappedValue, propertyValue]` tuples, where `propertyValue` is resolved from the candidate data object at the
+    * matching accessor path.
     *
     * @param data - Candidate object or function to inspect.
     *
     * @param options - Matching options.
     *
-    * @returns Iterator of values associated with matching paths.
+    * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
     */
-   *matchingValues(data: unknown, options?: SafeAccessorMap.Options.Match): IterableIterator<V>
+   matchingValues(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
+    IterableIterator<[V, unknown]>;
+
+   matchingValues(data: unknown, options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }):
+    IterableIterator<V>;
+
+   matchingValues(data: unknown, options?: SafeAccessorMap.Options.Match):
+    IterableIterator<V | [V, unknown]>;
+
+   *matchingValues(data: unknown, options: SafeAccessorMap.Options.Match = {}):
+    IterableIterator<V | [V, unknown]>
    {
-      for (const entry of this.#matchingEntryIterator(data, options)) { yield entry.value; }
+      const includePropertyValue: boolean = options.includePropertyValue ?? false;
+
+      for (const match of this.#matchingEntryIterator(data, options))
+      {
+         yield includePropertyValue ? [match.entry.value, match.propertyValue] : match.entry.value;
+      }
    }
 
    /**
@@ -395,6 +431,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
       }
    }
 
+   // Internal Utility Functions -------------------------------------------------------------------------------------
+
    /**
     * Adds a newly created terminal entry to the insertion-order list.
     *
@@ -441,29 +479,53 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 
    /**
+    * Returns whether a candidate value can provide another property-path segment.
+    *
+    * Called by {@link SafeAccessorMap.matchingEntries} for the root candidate and for each value reached below a stored
+    * trie prefix. Functions are accepted because JavaScript functions may own or inherit properties.
+    *
+    * @param value - Candidate value.
+    *
+    * @returns Whether `value` is a non-null object or function.
+    */
+   static #isSafeAccessorMapTraversableValue(value: unknown): value is SafeAccessorMapTraversableValue
+   {
+      return value !== null && (typeof value === 'object' || typeof value === 'function');
+   }
+
+   /**
     * Yields terminal entries whose stored paths exist in a candidate value.
     *
     * Called by {@link matchingEntries}, {@link matchingKeys}, and {@link matchingValues}. Keeping the trie walk at the
-    * entry level lets key and value projections avoid allocating unused `[path, value]` tuples.
+    * match-record level lets all projections share one traversal while reading each candidate property at most once.
     *
     * The walk is iterative and depth-first. Each active frame pairs a trie-child iterator with the candidate value
     * reached at the same prefix. Missing or non-traversable candidate prefixes are discarded before descendant trie
     * nodes are considered.
     *
+    * Terminal-only candidate properties are read only when `includePropertyValue` is enabled. A node with descendants
+    * must always be read so its value can be tested for continued traversal. When a node is both terminal and a prefix,
+    * that single read supplies both the yielded property value and descendant traversal.
+    *
     * @param data - Candidate object or function to inspect.
     *
     * @param options - Matching options.
     *
-    * @returns Iterator of matching terminal entries.
+    * @returns Iterator of matching terminal entries and their optionally resolved candidate property values.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
     */
-   *#matchingEntryIterator(data: unknown, { hasOwnOnly = false }: SafeAccessorMap.Options.Match = {}):
-    IterableIterator<SafeAccessorMapEntry<V>>
+   *#matchingEntryIterator(data: unknown, { hasOwnOnly = false, includePropertyValue = false }:
+    SafeAccessorMap.Options.Match = {}): IterableIterator<SafeAccessorMapMatch<V>>
    {
       if (typeof hasOwnOnly !== 'boolean')
       {
          throw new TypeError(`SafeAccessorMap matching error: 'options.hasOwnOnly' is not a boolean.`);
+      }
+
+      if (typeof includePropertyValue !== 'boolean')
+      {
+         throw new TypeError(`SafeAccessorMap matching error: 'options.includePropertyValue' is not a boolean.`);
       }
 
       if (!SafeAccessorMap.#isSafeAccessorMapTraversableValue(data)) { return; }
@@ -498,16 +560,20 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          // A missing prefix rejects this node and every stored path below it.
          if (!exists) { continue; }
 
-         if (child.entry !== void 0) { yield child.entry; }
+         const hasChildren: boolean = child.children !== void 0;
+         let propertyValue: unknown;
 
-         // Terminal-only properties need no value read. Descendants require a traversable next candidate value.
-         if (child.children === void 0) { continue; }
+         // Read once when the caller requests the terminal value or descendant traversal requires the next object.
+         if (includePropertyValue || hasChildren)
+         {
+            propertyValue = (frame.value as unknown as Record<PropertyKey, unknown>)[key];
+         }
 
-         const next: unknown = (frame.value as unknown as Record<PropertyKey, unknown>)[key];
+         if (child.entry !== void 0) { yield { entry: child.entry, propertyValue }; }
 
-         if (!SafeAccessorMap.#isSafeAccessorMapTraversableValue(next)) { continue; }
+         if (!hasChildren || !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue)) { continue; }
 
-         stack.push({ value: next, iterator: child.children.entries() });
+         stack.push({ value: propertyValue, iterator: child.children!.entries() });
       }
    }
 
@@ -523,23 +589,6 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       if (entry.next !== void 0) { entry.next.previous = entry.previous; }
       else { this.#lastEntry = entry.previous; }
-   }
-
-   // Internal Utility Functions -------------------------------------------------------------------------------------
-
-   /**
-    * Returns whether a candidate value can provide another property-path segment.
-    *
-    * Called by {@link SafeAccessorMap.matchingEntries} for the root candidate and for each value reached below a stored
-    * trie prefix. Functions are accepted because JavaScript functions may own or inherit properties.
-    *
-    * @param value - Candidate value.
-    *
-    * @returns Whether `value` is a non-null object or function.
-    */
-   static #isSafeAccessorMapTraversableValue(value: unknown): value is SafeAccessorMapTraversableValue
-   {
-      return value !== null && (typeof value === 'object' || typeof value === 'function');
    }
 }
 
@@ -559,11 +608,43 @@ declare namespace SafeAccessorMap
           * @default false
           */
          hasOwnOnly?: boolean;
+
+         /**
+          * When `true`, {@link SafeAccessorMap.matchingEntries} appends the resolved candidate property value to each
+          * entry tuple and {@link SafeAccessorMap.matchingValues} returns `[mappedValue, propertyValue]` tuples.
+          *
+          * Enabling this option requires terminal-only candidate properties to be read and may therefore invoke getters
+          * or proxy `get` traps that are otherwise avoided. {@link SafeAccessorMap.matchingKeys} does not accept this
+          * option because it remains a path-only projection.
+          *
+          * @default false
+          */
+         includePropertyValue?: boolean;
       }
    }
 }
 
 export { SafeAccessorMap };
+
+// Internal Types ----------------------------------------------------------------------------------------------------
+
+/**
+ * A parent / child relationship recorded while locating a trie node for deletion.
+ *
+ * The path is retained only for the duration of {@link SafeAccessorMap.delete} so unused trie nodes can be pruned
+ * from the terminal node back toward the root.
+ */
+interface SafeAccessorMapDeleteFrame<V>
+{
+   /** Parent node containing the child mapping. */
+   parent: SafeAccessorMapNode<V>;
+
+   /** Property key mapping the parent to the child. */
+   key: PropertyKey;
+
+   /** Child node reached through {@link SafeAccessorMapDeleteFrame.key}. */
+   child: SafeAccessorMapNode<V>;
+}
 
 /**
  * A terminal value stored at a trie node.
@@ -588,6 +669,36 @@ interface SafeAccessorMapEntry<V>
 }
 
 /**
+ * Active depth-first trie frame used by {@link SafeAccessorMap.matchingEntries}.
+ *
+ * The native child-map iterator preserves each trie node's child insertion order without allocating arrays of child
+ * entries. The candidate value is the object or function corresponding to the same trie prefix.
+ */
+interface SafeAccessorMapMatchFrame<V>
+{
+   /** Candidate value reached at this trie prefix. */
+   value: SafeAccessorMapTraversableValue;
+
+   /** Iterator over the trie node's children. */
+   iterator: IterableIterator<[PropertyKey, SafeAccessorMapNode<V>]>;
+}
+
+/**
+ * Internal match result shared by matching projections.
+ *
+ * `propertyValue` is the value resolved from the candidate object when requested by the caller or required for
+ * descendant traversal. It remains `undefined` when a terminal-only property was intentionally not read.
+ */
+interface SafeAccessorMapMatch<V>
+{
+   /** Stored terminal entry reached by the trie walk. */
+   entry: SafeAccessorMapEntry<V>;
+
+   /** Candidate property value resolved at the matching terminal path. */
+   propertyValue: unknown;
+}
+
+/**
  * A node in the property-key trie.
  *
  * Each child map represents one path segment. A node may simultaneously contain a value and child nodes, allowing
@@ -603,39 +714,6 @@ interface SafeAccessorMapNode<V>
 }
 
 /**
- * A parent / child relationship recorded while locating a trie node for deletion.
- *
- * The path is retained only for the duration of {@link SafeAccessorMap.delete} so unused trie nodes can be pruned
- * from the terminal node back toward the root.
- */
-interface SafeAccessorMapDeleteFrame<V>
-{
-   /** Parent node containing the child mapping. */
-   parent: SafeAccessorMapNode<V>;
-
-   /** Property key mapping the parent to the child. */
-   key: PropertyKey;
-
-   /** Child node reached through {@link SafeAccessorMapDeleteFrame.key}. */
-   child: SafeAccessorMapNode<V>;
-}
-
-/**
  * Object or function value that can supply another property-path segment.
  */
 type SafeAccessorMapTraversableValue = object | ((...args: any[]) => any);
-
-/**
- * Active depth-first trie frame used by {@link SafeAccessorMap.matchingEntries}.
- *
- * The native child-map iterator preserves each trie node's child insertion order without allocating arrays of child
- * entries. The candidate value is the object or function corresponding to the same trie prefix.
- */
-interface SafeAccessorMapMatchFrame<V>
-{
-   /** Candidate value reached at this trie prefix. */
-   value: SafeAccessorMapTraversableValue;
-
-   /** Iterator over the trie node's children. */
-   iterator: IterableIterator<[PropertyKey, SafeAccessorMapNode<V>]>;
-}

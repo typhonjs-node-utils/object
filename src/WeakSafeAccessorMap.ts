@@ -40,6 +40,7 @@ import type { SafeAccessor }     from './functions';
  *
  * Root lookup is expected `O(1)`. Path operations retain the `O(path length)` behavior of {@link SafeAccessorMap}.
  * Trie-aware matching retains shared-prefix pruning and visits only candidate branches reachable from stored paths.
+ * Matching entry and value iterators may optionally include the property value resolved from the candidate object.
  *
  * @typeParam R - Weak root object type.
  * @typeParam V - Stored value type.
@@ -205,11 +206,11 @@ export class WeakSafeAccessorMap<R extends object, V>
    }
 
    /**
-    * Returns a trie-aware iterator of matching `[path, value]` entries for one root.
+    * Returns a trie-aware iterator of matching entries for one root.
     *
-    * Matching behavior, prefix pruning, array-index rules, inherited-property handling, and iteration order are
-    * delegated directly to {@link SafeAccessorMap.matchingEntries}. A missing root behaves as an empty path trie while
-    * still validating matching options during iterator consumption.
+    * Matching behavior, prefix pruning, array-index rules, inherited-property handling, optional candidate property
+    * values, and iteration order are delegated directly to {@link SafeAccessorMap.matchingEntries}. A missing root
+    * behaves as an empty path trie while still validating matching options during iterator consumption.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
@@ -217,18 +218,31 @@ export class WeakSafeAccessorMap<R extends object, V>
     *
     * @param options - Matching options.
     *
-    * @returns Iterator of canonical matching paths and associated values.
+    * @returns Iterator of canonical matching paths, mapped values, and optionally resolved candidate property values.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
     */
+   matchingEntries(root: R, data: unknown,
+    options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
+     IterableIterator<[readonly PropertyKey[], V, unknown]>;
+
+   matchingEntries(root: R, data: unknown,
+    options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }):
+     IterableIterator<[readonly PropertyKey[], V]>;
+
    matchingEntries(root: R, data: unknown, options?: SafeAccessorMap.Options.Match):
-    IterableIterator<[readonly PropertyKey[], V]>
+    IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>;
+
+   matchingEntries(root: R, data: unknown, options: SafeAccessorMap.Options.Match = {}):
+    IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>
    {
       WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
 
       const map: SafeAccessorMap<V> | undefined = this.#roots.get(root);
-      return map === void 0 ? WeakSafeAccessorMap.#emptySafeAccessorMap.matchingEntries(data, options) :
+
+      return map === void 0 ?
+       WeakSafeAccessorMap.#emptySafeAccessorMap.matchingEntries(data, options) :
        map.matchingEntries(data, options);
    }
 
@@ -242,14 +256,14 @@ export class WeakSafeAccessorMap<R extends object, V>
     *
     * @param data - Candidate object or function to match against stored paths.
     *
-    * @param options - Matching options.
+    * @param options - Matching options affecting property ownership.
     *
     * @returns Iterator of canonical matching accessor paths.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
     * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
     */
-   matchingKeys(root: R, data: unknown, options?: SafeAccessorMap.Options.Match):
+   matchingKeys(root: R, data: unknown, options?: Pick<SafeAccessorMap.Options.Match, 'hasOwnOnly'>):
     IterableIterator<readonly PropertyKey[]>
    {
       WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
@@ -261,10 +275,11 @@ export class WeakSafeAccessorMap<R extends object, V>
    }
 
    /**
-    * Returns a trie-aware iterator of values whose paths match a candidate value for one root.
+    * Returns a trie-aware iterator of mapped values whose paths match a candidate value for one root.
     *
-    * This delegates to {@link SafeAccessorMap.matchingValues}; see {@link matchingEntries} for complete matching
-    * semantics. A missing root produces an empty iterator.
+    * By default, mapped values are yielded directly. Set `includePropertyValue` to `true` to receive
+    * `[mappedValue, propertyValue]` tuples. A missing root produces an empty iterator while retaining normal option
+    * validation.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
@@ -272,12 +287,22 @@ export class WeakSafeAccessorMap<R extends object, V>
     *
     * @param options - Matching options.
     *
-    * @returns Iterator of values associated with matching paths.
+    * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
     */
-   matchingValues(root: R, data: unknown, options?: SafeAccessorMap.Options.Match): IterableIterator<V>
+   matchingValues(root: R, data: unknown,
+    options: SafeAccessorMap.Options.Match & { includePropertyValue: true }): IterableIterator<[V, unknown]>;
+
+   matchingValues(root: R, data: unknown,
+    options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }): IterableIterator<V>;
+
+   matchingValues(root: R, data: unknown, options?: SafeAccessorMap.Options.Match):
+    IterableIterator<V | [V, unknown]>;
+
+   matchingValues(root: R, data: unknown, options: SafeAccessorMap.Options.Match = {}):
+    IterableIterator<V | [V, unknown]>
    {
       WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
 
@@ -355,5 +380,3 @@ export class WeakSafeAccessorMap<R extends object, V>
       }
    }
 }
-
-
