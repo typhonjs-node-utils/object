@@ -43,9 +43,9 @@ describe('WeakSafeAccessorMap', () =>
       const root = {};
       const map = new WeakSafeAccessorMap<object, undefined>();
 
-      map.set(root, 'value', undefined);
+      map.set(root, 'value', void 0);
 
-      assert.equal(map.get(root, 'value'), undefined);
+      assert.equal(map.get(root, 'value'), void 0);
       assert.equal(map.has(root, 'value'), true);
    });
 
@@ -68,7 +68,7 @@ describe('WeakSafeAccessorMap', () =>
       const map = new WeakSafeAccessorMap<object, number>();
       const invalid = [] as unknown as readonly PropertyKey[];
 
-      assert.equal(map.get(root, 'value'), undefined);
+      assert.equal(map.get(root, 'value'), void 0);
       assert.equal(map.has(root, 'value'), false);
       assert.equal(map.delete(root, 'value'), false);
 
@@ -178,7 +178,7 @@ describe('WeakSafeAccessorMap', () =>
          const map = new WeakSafeAccessorMap<object, string>();
          map.set(root, 'actor.hp', 'hp').set(root, 'actor.name', 'name');
 
-         const data = { actor: { hp: 10, name: undefined } };
+         const data = { actor: { hp: 10, name: void 0 } };
 
          const entries: IterableIterator<[readonly PropertyKey[], string, unknown]> =
           map.matchingEntries(root, data, { includePropertyValue: true });
@@ -187,12 +187,12 @@ describe('WeakSafeAccessorMap', () =>
 
          assert.deepEqual(collect(entries), [
             [['actor', 'hp'], 'hp', 10],
-            [['actor', 'name'], 'name', undefined]
+            [['actor', 'name'], 'name', void 0]
          ]);
 
          assert.deepEqual(collect(values), [
             ['hp', 10],
-            ['name', undefined]
+            ['name', void 0]
          ]);
       });
 
@@ -263,6 +263,57 @@ describe('WeakSafeAccessorMap', () =>
          assert.deepEqual(collect(map.matchingValues(root, data, { hasOwnOnly: true })), []);
       });
 
+      it('passes pathPrefix and stopAt through to the per-root trie', () =>
+      {
+         const root = {};
+         const map = new WeakSafeAccessorMap<object, string>();
+         map.set(root, 'actor', 'actor');
+         map.set(root, 'actor.hp', 'hp');
+         map.set(root, 'actor.hp.value', 'hp-value');
+         map.set(root, 'actor.ac', 'ac');
+         map.set(root, 'token.x', 'x');
+
+         const data = {
+            actor: {
+               hp: { value: 10 },
+               ac: 15
+            },
+            token: { x: 1 }
+         };
+
+         assert.deepEqual(collect(map.matchingEntries(root, data, {
+            pathPrefix: 'actor',
+            stopAt: 'actor.hp',
+            includePropertyValue: true
+         })), [
+            [['actor'], 'actor', data.actor],
+            [['actor', 'hp'], 'hp', data.actor.hp],
+            [['actor', 'ac'], 'ac', 15]
+         ]);
+
+         assert.deepEqual(collect(map.matchingKeys(root, data, {
+            pathPrefix: 'actor',
+            stopAt: 'actor.hp'
+         })), [
+            ['actor'],
+            ['actor', 'hp'],
+            ['actor', 'ac']
+         ]);
+      });
+
+      it('validates path bounds for missing roots during iterator consumption', () =>
+      {
+         const root = {};
+         const map = new WeakSafeAccessorMap<object, string>();
+         const invalid = [] as unknown as readonly PropertyKey[];
+
+         assert.throws(() => collect(map.matchingEntries(root, {}, { pathPrefix: invalid })), TypeError);
+         assert.throws(() => collect(map.matchingKeys(root, {}, {
+            pathPrefix: 'actor.hp',
+            stopAt: 'actor'
+         })), RangeError);
+      });
+
       it('validates roots before returning matching iterators', () =>
       {
          const map = new WeakSafeAccessorMap<object, string>();
@@ -270,6 +321,72 @@ describe('WeakSafeAccessorMap', () =>
          assert.throws(() => map.matchingEntries(null as unknown as object, {}), TypeError);
          assert.throws(() => map.matchingKeys(1 as unknown as object, {}), TypeError);
          assert.throws(() => map.matchingValues('root' as unknown as object, {}), TypeError);
+      });
+   });
+
+   describe('subtree iterators', () =>
+   {
+      it('delegates subtree entries, keys, and values for an existing root', () =>
+      {
+         const root = {};
+         const map = new WeakSafeAccessorMap<object, string>();
+         map.set(root, 'actor', 'actor');
+         map.set(root, 'actor.hp', 'hp');
+         map.set(root, 'actor.hp.value', 'hp-value');
+         map.set(root, 'actor.ac', 'ac');
+         map.set(root, 'token.x', 'x');
+
+         assert.deepEqual(collect(map.subtreeEntries(root, {
+            pathPrefix: 'actor',
+            stopAt: 'actor.hp'
+         })), [
+            [['actor'], 'actor'],
+            [['actor', 'hp'], 'hp'],
+            [['actor', 'ac'], 'ac']
+         ]);
+
+         assert.deepEqual(collect(map.subtreeKeys(root, { pathPrefix: 'actor' })), [
+            ['actor'],
+            ['actor', 'hp'],
+            ['actor', 'hp', 'value'],
+            ['actor', 'ac']
+         ]);
+
+         assert.deepEqual(collect(map.subtreeValues(root, {
+            pathPrefix: 'actor.hp'
+         })), ['hp', 'hp-value']);
+      });
+
+      it('uses the empty delegated trie for missing roots', () =>
+      {
+         const root = {};
+         const map = new WeakSafeAccessorMap<object, string>();
+
+         assert.deepEqual(collect(map.subtreeEntries(root)), []);
+         assert.deepEqual(collect(map.subtreeKeys(root, { pathPrefix: 'actor' })), []);
+         assert.deepEqual(collect(map.subtreeValues(root, { stopAt: 'actor' })), []);
+      });
+
+      it('validates subtree options for missing roots during iteration', () =>
+      {
+         const root = {};
+         const map = new WeakSafeAccessorMap<object, string>();
+         const invalid = [] as unknown as readonly PropertyKey[];
+
+         assert.throws(() => collect(map.subtreeEntries(root, { pathPrefix: invalid })), TypeError);
+         assert.throws(() => collect(map.subtreeValues(root, {
+            pathPrefix: 'actor.hp',
+            stopAt: 'actor'
+         })), RangeError);
+      });
+
+      it('validates roots before returning subtree iterators', () =>
+      {
+         const map = new WeakSafeAccessorMap<object, string>();
+
+         assert.throws(() => map.subtreeEntries(null as unknown as object), TypeError);
+         assert.throws(() => map.subtreeKeys(1 as unknown as object), TypeError);
+         assert.throws(() => map.subtreeValues('root' as unknown as object), TypeError);
       });
    });
 });

@@ -46,7 +46,7 @@ describe('SafeAccessorMap', () =>
       assert.equal(map.get(['actors', 0, 'id']), 42);
       assert.equal(map.has(['actors', 0, 'id']), true);
       assert.equal(map.has(['actors', 0]), false);
-      assert.equal(map.get(['actors', 1, 'id']), undefined);
+      assert.equal(map.get(['actors', 1, 'id']), void 0);
    });
 
    it('distinguishes numeric, string, and symbol path segments', () =>
@@ -62,16 +62,16 @@ describe('SafeAccessorMap', () =>
       assert.equal(map.get([0]), 'number');
       assert.equal(map.get(['0']), 'string');
       assert.equal(map.get([symbolA]), 'symbol');
-      assert.equal(map.get([symbolB]), undefined);
+      assert.equal(map.get([symbolB]), void 0);
    });
 
    it('supports undefined as a stored value', () =>
    {
       const map = new SafeAccessorMap<undefined>();
 
-      map.set('value', undefined);
+      map.set('value', void 0);
 
-      assert.equal(map.get('value'), undefined);
+      assert.equal(map.get('value'), void 0);
       assert.equal(map.has('value'), true);
       assert.equal(map.has('missing'), false);
    });
@@ -326,7 +326,7 @@ describe('SafeAccessorMap', () =>
          map.set('nullValue', 'null');
          map.set('undefinedValue.child', 'child');
 
-         const data = { undefinedValue: undefined, nullValue: null };
+         const data = { undefinedValue: void 0, nullValue: null };
 
          assert.deepEqual(collect(map.matchingValues(data)), ['undefined', 'null']);
       });
@@ -366,7 +366,7 @@ describe('SafeAccessorMap', () =>
          const symbol = Symbol('value');
          const data = {
             number: 42,
-            undefinedValue: undefined,
+            undefinedValue: void 0,
             nullValue: null,
             [symbol]: 'symbol'
          };
@@ -384,14 +384,14 @@ describe('SafeAccessorMap', () =>
 
          assert.deepEqual(collect(entries), [
             [['number'], 'number-map', 42],
-            [['undefinedValue'], 'undefined-map', undefined],
+            [['undefinedValue'], 'undefined-map', void 0],
             [['nullValue'], 'null-map', null],
             [[symbol], 'symbol-map', 'symbol']
          ]);
 
          assert.deepEqual(collect(values), [
             ['number-map', 42],
-            ['undefined-map', undefined],
+            ['undefined-map', void 0],
             ['null-map', null],
             ['symbol-map', 'symbol']
          ]);
@@ -462,9 +462,10 @@ describe('SafeAccessorMap', () =>
          map.set('value', 'mapped');
          const data = { value: 5 };
 
-         assert.deepEqual(collect(map.matchingEntries(data, { includePropertyValue: false })), [
-            [['value'], 'mapped']
-         ]);
+         assert.deepEqual(collect(map.matchingEntries(data, { includePropertyValue: false })), [[['value'], 'mapped']]);
+
+         // @ts-expect-error
+         assert.deepEqual(collect(map.matchingValues(data, { includePropertyValue: void 0 })), ['mapped']);
 
          const includePropertyValue: boolean = true;
          const iterator: IterableIterator<
@@ -486,6 +487,420 @@ describe('SafeAccessorMap', () =>
          // @ts-expect-error
          assert.throws(() => collect(map.matchingValues({ value: 1 }, { includePropertyValue: 'yes' })),
           TypeError, `SafeAccessorMap matching error: 'options.includePropertyValue' is not a boolean.`);
+      });
+
+      it('restricts matching to a stored path prefix and includes the prefix entry', () =>
+      {
+         let unrelatedReads = 0;
+         const data = {
+            actor: {
+               system: {
+                  hp: 10,
+                  ac: 15
+               }
+            },
+            get token()
+            {
+               unrelatedReads++;
+               return { x: 1 };
+            }
+         };
+
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system', 'system');
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.system.ac', 'ac');
+         map.set('token.x', 'x');
+
+         assert.deepEqual(collect(map.matchingEntries(data, {
+            pathPrefix: 'actor.system',
+            includePropertyValue: true
+         })), [
+            [['actor', 'system'], 'system', data.actor.system],
+            [['actor', 'system', 'hp'], 'hp', 10],
+            [['actor', 'system', 'ac'], 'ac', 15]
+         ]);
+         assert.equal(unrelatedReads, 0);
+      });
+
+      it('starts matching at a prefix that does not itself store a value', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.system.ac', 'ac');
+
+         assert.deepEqual(collect(map.matchingKeys({
+            actor: { system: { hp: 10, ac: 15 } }
+         }, {
+            pathPrefix: 'actor.system'
+         })), [
+            ['actor', 'system', 'hp'],
+            ['actor', 'system', 'ac']
+         ]);
+      });
+
+      it('does not touch candidate data when the stored path prefix is missing', () =>
+      {
+         let reads = 0;
+         const data = Object.defineProperty({}, 'missing', {
+            get()
+            {
+               reads++;
+               return {};
+            }
+         });
+
+         const map = new SafeAccessorMap<string>();
+         map.set('present.value', 'value');
+
+         assert.deepEqual(collect(map.matchingValues(data, { pathPrefix: 'missing.branch' })), []);
+         assert.equal(reads, 0);
+      });
+
+      it('rejects missing, non-traversable, and invalid-array candidate prefixes', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system.hp', 'hp');
+         map.set([0, 'value'], 'numeric');
+         map.set(['0', 'value'], 'string');
+
+         assert.deepEqual(collect(map.matchingValues({}, { pathPrefix: 'actor.system' })), []);
+         assert.deepEqual(collect(map.matchingValues({ actor: null }, { pathPrefix: 'actor.system' })), []);
+         assert.deepEqual(collect(map.matchingValues([{ value: 1 }], {
+            pathPrefix: ['0', 'value']
+         })), []);
+         assert.deepEqual(collect(map.matchingValues([{ value: 1 }], {
+            pathPrefix: [0, 'value']
+         })), ['numeric']);
+      });
+
+      it('applies own-property matching while resolving a path prefix', () =>
+      {
+         const prototype = { actor: { hp: 10 } };
+         const data = Object.create(prototype);
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+
+         assert.deepEqual(collect(map.matchingValues(data, { pathPrefix: 'actor' })), ['hp']);
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: 'actor',
+            hasOwnOnly: true
+         })), []);
+      });
+
+      it('matches a terminal-only prefix without reading it unless requested', () =>
+      {
+         let reads = 0;
+         const data = Object.defineProperty({}, 'value', {
+            get()
+            {
+               reads++;
+               return 42;
+            }
+         });
+
+         const map = new SafeAccessorMap<string>();
+         map.set('value', 'mapped');
+
+         assert.deepEqual(collect(map.matchingEntries(data, { pathPrefix: 'value' })), [
+            [['value'], 'mapped']
+         ]);
+         assert.equal(reads, 0);
+
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: 'value',
+            includePropertyValue: true
+         })), [['mapped', 42]]);
+         assert.equal(reads, 1);
+      });
+
+      it('yields a non-traversable prefix entry and rejects its descendants', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('value', 'value');
+         map.set('value.child', 'child');
+
+         assert.deepEqual(collect(map.matchingEntries({ value: null }, {
+            pathPrefix: 'value',
+            includePropertyValue: true
+         })), [
+            [['value'], 'value', null]
+         ]);
+      });
+
+      it('includes stop entries and prunes only their descendants', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.system.hp.value', 'hp-value');
+         map.set('actor.system.ac', 'ac');
+         map.set('actor.name', 'name');
+
+         const data = {
+            actor: {
+               system: {
+                  hp: { value: 10 },
+                  ac: 15
+               },
+               name: 'Actor'
+            }
+         };
+
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: 'actor',
+            stopAt: 'actor.system.hp'
+         })), ['hp', 'ac', 'name']);
+      });
+
+      it('prunes descendants when stopAt resolves to a non-terminal trie node', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system.hp.value', 'hp-value');
+         map.set('actor.system.ac', 'ac');
+
+         const data = {
+            actor: {
+               system: {
+                  hp: { value: 10 },
+                  ac: 15
+               }
+            }
+         };
+
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: 'actor.system',
+            stopAt: 'actor.system.hp'
+         })), ['ac']);
+      });
+
+      it('stops at the selected prefix while preserving optional property values', () =>
+      {
+         let reads = 0;
+         const nested = { child: 1 };
+         const data = Object.defineProperty({}, 'prefix', {
+            get()
+            {
+               reads++;
+               return nested;
+            }
+         });
+
+         const map = new SafeAccessorMap<string>();
+         map.set('prefix', 'prefix');
+         map.set('prefix.child', 'child');
+
+         assert.deepEqual(collect(map.matchingEntries(data, {
+            pathPrefix: 'prefix',
+            stopAt: 'prefix'
+         })), [[['prefix'], 'prefix']]);
+         assert.equal(reads, 0);
+
+         assert.deepEqual(collect(map.matchingEntries(data, {
+            pathPrefix: 'prefix',
+            stopAt: 'prefix',
+            includePropertyValue: true
+         })), [[['prefix'], 'prefix', nested]]);
+         assert.equal(reads, 1);
+      });
+
+      it('ignores a valid stop path that is not stored', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+
+         assert.deepEqual(collect(map.matchingValues({ actor: { hp: 10 } }, {
+            pathPrefix: 'actor',
+            stopAt: 'actor.missing'
+         })), ['hp']);
+      });
+
+      it('supports symbol and SameValueZero numeric prefix bounds', () =>
+      {
+         const symbol = Symbol('branch');
+         const data = {
+            [symbol]: {
+               NaN: {
+                  value: 10
+               }
+            }
+         };
+         const map = new SafeAccessorMap<string>();
+         map.set([symbol, NaN], 'nan');
+         map.set([symbol, NaN, 'value'], 'value');
+
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: [symbol, NaN],
+            stopAt: [symbol, NaN, 'value']
+         })), ['nan', 'value']);
+      });
+
+      it('validates matching path bounds during iteration', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+         const invalid = [] as unknown as readonly PropertyKey[];
+
+         assert.throws(() => collect(map.matchingValues({}, { pathPrefix: invalid })), TypeError);
+         assert.throws(() => collect(map.matchingValues({}, { stopAt: invalid })), TypeError);
+
+         assert.throws(() => collect(map.matchingValues({}, {
+            pathPrefix: 'actor.hp',
+            stopAt: 'actor'
+         })), RangeError,
+          `SafeAccessorMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
+
+         assert.throws(() => collect(map.matchingValues({}, {
+            pathPrefix: 'actor',
+            stopAt: 'token'
+         })), RangeError);
+      });
+   });
+
+   describe('subtree iterators', () =>
+   {
+      it('iterates the complete trie in depth-first order', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('b.value', 'b');
+         map.set('a', 'a');
+         map.set('a.first', 'a1');
+         map.set('a.second', 'a2');
+
+         assert.deepEqual(collect(map.subtreeEntries()), [
+            [['b', 'value'], 'b'],
+            [['a'], 'a'],
+            [['a', 'first'], 'a1'],
+            [['a', 'second'], 'a2']
+         ]);
+         assert.deepEqual(collect(map.subtreeKeys()), [
+            ['b', 'value'],
+            ['a'],
+            ['a', 'first'],
+            ['a', 'second']
+         ]);
+         assert.deepEqual(collect(map.subtreeValues()), ['b', 'a', 'a1', 'a2']);
+      });
+
+      it('starts at a value-bearing path prefix and retains absolute paths', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor', 'actor');
+         map.set('actor.hp', 'hp');
+         map.set('actor.ac', 'ac');
+         map.set('token.x', 'x');
+
+         assert.deepEqual(collect(map.subtreeEntries({ pathPrefix: 'actor' })), [
+            [['actor'], 'actor'],
+            [['actor', 'hp'], 'hp'],
+            [['actor', 'ac'], 'ac']
+         ]);
+      });
+
+      it('starts at a prefix without its own entry', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.system.ac', 'ac');
+
+         assert.deepEqual(collect(map.subtreeValues({ pathPrefix: 'actor.system' })), ['hp', 'ac']);
+      });
+
+      it('returns empty results for a missing prefix and an empty map', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+
+         assert.deepEqual(collect(map.subtreeEntries({ pathPrefix: 'missing' })), []);
+
+         map.clear();
+
+         assert.deepEqual(collect(map.subtreeKeys()), []);
+      });
+
+      it('includes a stop entry and prunes its descendants while retaining siblings', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+         map.set('actor.hp.value', 'hp-value');
+         map.set('actor.ac', 'ac');
+
+         assert.deepEqual(collect(map.subtreeValues({
+            pathPrefix: 'actor',
+            stopAt: 'actor.hp'
+         })), ['hp', 'ac']);
+      });
+
+      it('prunes a non-terminal stop node', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp.value', 'hp-value');
+         map.set('actor.ac', 'ac');
+
+         assert.deepEqual(collect(map.subtreeEntries({
+            pathPrefix: 'actor',
+            stopAt: 'actor.hp'
+         })), [
+            [['actor', 'ac'], 'ac']
+         ]);
+      });
+
+      it('can stop at the selected prefix', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor', 'actor');
+         map.set('actor.hp', 'hp');
+
+         assert.deepEqual(collect(map.subtreeValues({
+            pathPrefix: 'actor',
+            stopAt: 'actor'
+         })), ['actor']);
+      });
+
+      it('ignores a valid missing stop path', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+
+         assert.deepEqual(collect(map.subtreeValues({
+            pathPrefix: 'actor',
+            stopAt: 'actor.missing'
+         })), ['hp']);
+      });
+
+      it('supports symbol and SameValueZero numeric bounds', () =>
+      {
+         const symbol = Symbol('branch');
+         const map = new SafeAccessorMap<string>();
+         map.set([symbol, NaN], 'nan');
+         map.set([symbol, NaN, 'child'], 'child');
+
+         assert.deepEqual(collect(map.subtreeEntries({
+            pathPrefix: [symbol, NaN],
+            stopAt: [symbol, NaN, 'child']
+         })), [
+            [[symbol, NaN], 'nan'],
+            [[symbol, NaN, 'child'], 'child']
+         ]);
+      });
+
+      it('validates subtree bounds during iteration', () =>
+      {
+         const map = new SafeAccessorMap<string>();
+         map.set('actor.hp', 'hp');
+         const invalid = [] as unknown as readonly PropertyKey[];
+
+         assert.throws(() => collect(map.subtreeEntries({ pathPrefix: invalid })), TypeError);
+         assert.throws(() => collect(map.subtreeKeys({ stopAt: invalid })), TypeError);
+
+         assert.throws(() => collect(map.subtreeValues({
+            pathPrefix: 'actor.hp',
+            stopAt: 'actor'
+         })), RangeError);
+
+         assert.throws(() => collect(map.subtreeValues({
+            pathPrefix: 'actor',
+            stopAt: 'token'
+         })), RangeError);
       });
    });
 });

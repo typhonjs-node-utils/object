@@ -44,7 +44,12 @@ import type { SafeAccessor }  from './functions';
  * Normal map iteration is `O(entry count)` and follows insertion order through a linked list of terminal entries.
  * Trie-aware matching visits only reachable stored prefixes, so unavailable prefixes reject all descendants with one
  * candidate-property check. Matching entry and value iterators may optionally include the property value resolved from
- * the candidate object without performing a second path lookup.
+ * the candidate object without performing a second path lookup. `pathPrefix` can begin traversal directly at a stored
+ * subtree, while `stopAt` prunes one descendant branch by trie-node identity.
+ *
+ * Candidate-independent subtree iterators reuse the same absolute bounds and visit only terminal entries beneath the
+ * selected trie node. Matching and subtree iterators use deterministic depth-first trie order rather than global
+ * insertion order.
  *
  * Stored canonical paths are copied and frozen once when first inserted. Overwriting an existing entry retains its
  * original insertion position and canonical path. Deleting and reinserting a path moves it to the end, matching normal
@@ -265,6 +270,10 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * candidate prefix is missing or cannot be traversed, every stored descendant below that prefix is rejected without
     * additional property access. Shared prefixes are therefore checked and read at most once per matching operation.
     *
+    * Set `pathPrefix` to begin matching at one absolute stored path and ignore every unrelated trie branch. The prefix
+    * itself is yielded when it stores an entry and exists in the candidate object. Set `stopAt` to match one absolute
+    * path normally while pruning every stored descendant beneath it. Returned paths always remain absolute.
+    *
     * A terminal property is considered available when it exists, even when its value is `undefined` or `null`. By
     * default, terminal-only properties are not read, avoiding unnecessary getter and proxy `get` trap invocation. Set
     * `includePropertyValue` to `true` to append the resolved candidate property value to each yielded tuple.
@@ -286,7 +295,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns Iterator of canonical stored paths and their associated mapped values, optionally followed by the
     *          resolved candidate property value.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
+    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
    matchingEntries(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[readonly PropertyKey[], V, unknown]>;
@@ -313,19 +323,20 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /**
     * Yields canonical stored paths whose complete accessors are available in a candidate value.
     *
-    * This is a path-only projection of {@link matchingEntries} and uses the same trie-aware pruning, property
-    * semantics, and depth-first trie order. Candidate terminal values are never requested solely for this iterator;
-    * properties are read only when descendant traversal requires them.
+    * This is a path-only projection of {@link matchingEntries} and uses the same trie-aware pruning, prefix / stop
+    * bounds, property semantics, and depth-first trie order. Candidate terminal values are never requested solely for
+    * this iterator; properties are read only when descendant traversal requires them.
     *
     * @param data - Candidate object or function to inspect.
     *
-    * @param options - Matching options affecting property ownership.
+    * @param options - Path-only matching options.
     *
     * @returns Iterator of matching canonical property-key paths.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *matchingKeys(data: unknown, options?: Pick<SafeAccessorMap.Options.Match, 'hasOwnOnly'>):
+   *matchingKeys(data: unknown, options?: SafeAccessorMap.Options.MatchKeys):
     IterableIterator<readonly PropertyKey[]>
    {
       for (const match of this.#matchingEntryIterator(data, options)) { yield match.entry.path; }
@@ -336,7 +347,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * By default, this returns only each value stored in the map. Set `includePropertyValue` to `true` to return
     * `[mappedValue, propertyValue]` tuples, where `propertyValue` is resolved from the candidate data object at the
-    * matching accessor path.
+    * matching accessor path. Prefix and stop bounds follow the semantics documented by {@link matchingEntries}.
     *
     * @param data - Candidate object or function to inspect.
     *
@@ -344,7 +355,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
+    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
    matchingValues(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[V, unknown]>;
@@ -364,6 +376,65 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
       {
          yield includePropertyValue ? [match.entry.value, match.propertyValue] : match.entry.value;
       }
+   }
+
+   /**
+    * Yields stored entries from one trie subtree without inspecting a candidate data object.
+    *
+    * `pathPrefix` selects the absolute trie node where traversal begins. The prefix entry is included when the exact
+    * path stores a value, even when it has no descendants. A missing stored prefix produces an empty iterator.
+    * `stopAt` includes its own entry when present and prunes all descendants beneath that node.
+    *
+    * Subtree traversal uses deterministic depth-first trie order rather than global insertion order. Returned
+    * canonical paths remain absolute and are reused from their stored entries.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of canonical stored paths and mapped values.
+    *
+    * @throws {TypeError} If either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   *subtreeEntries(options: SafeAccessorMap.Options.Subtree = {}):
+    IterableIterator<[readonly PropertyKey[], V]>
+   {
+      for (const entry of this.#subtreeEntryIterator(options)) { yield [entry.path, entry.value]; }
+   }
+
+   /**
+    * Yields canonical stored paths from one trie subtree.
+    *
+    * This is a path-only projection of {@link subtreeEntries}. It performs no candidate object access and allocates no
+    * temporary entry tuples.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of canonical stored property-key paths.
+    *
+    * @throws {TypeError} If either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   *subtreeKeys(options: SafeAccessorMap.Options.Subtree = {}): IterableIterator<readonly PropertyKey[]>
+   {
+      for (const entry of this.#subtreeEntryIterator(options)) { yield entry.path; }
+   }
+
+   /**
+    * Yields mapped values from one trie subtree.
+    *
+    * This is a value-only projection of {@link subtreeEntries}. It performs no candidate object access and allocates no
+    * temporary entry tuples.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of mapped values.
+    *
+    * @throws {TypeError} If either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   *subtreeValues(options: SafeAccessorMap.Options.Subtree = {}): IterableIterator<V>
+   {
+      for (const entry of this.#subtreeEntryIterator(options)) { yield entry.value; }
    }
 
    /**
@@ -479,10 +550,44 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 
    /**
+    * Returns whether one normalized path is an exact prefix of another using native `Map` key semantics.
+    *
+    * The equality check implements SameValueZero so numeric `NaN` segments compare as equal while `0` and `-0`
+    * naturally compare as equal through strict equality. Symbol segments continue to compare by identity.
+    *
+    * Called by {@link SafeAccessorMap#resolveTraversalScope} when both `pathPrefix` and `stopAt` are supplied.
+    *
+    * @param prefix - Candidate prefix path.
+    *
+    * @param path - Complete path that must equal or descend from `prefix`.
+    *
+    * @returns Whether `prefix` is an exact structural prefix of `path`.
+    */
+   static #isSafeAccessorMapPathPrefix(prefix: readonly PropertyKey[], path: readonly PropertyKey[]): boolean
+   {
+      if (prefix.length > path.length) { return false; }
+
+      for (let index: number = 0; index < prefix.length; index++)
+      {
+         const prefixKey: PropertyKey = prefix[index];
+         const pathKey: PropertyKey = path[index];
+
+         // SameValueZero differs from strict equality only for NaN; PropertyKey excludes all other numeric edge cases.
+         if (prefixKey !== pathKey && !(typeof prefixKey === 'number' && typeof pathKey === 'number' &&
+          Number.isNaN(prefixKey) && Number.isNaN(pathKey)))
+         {
+            return false;
+         }
+      }
+
+      return true;
+   }
+
+   /**
     * Returns whether a candidate value can provide another property-path segment.
     *
-    * Called by {@link SafeAccessorMap.matchingEntries} for the root candidate and for each value reached below a stored
-    * trie prefix. Functions are accepted because JavaScript functions may own or inherit properties.
+    * Called by matching traversal for the root candidate and for each value reached below a stored trie prefix.
+    * Functions are accepted because JavaScript functions may own or inherit properties.
     *
     * @param value - Candidate value.
     *
@@ -499,13 +604,16 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * Called by {@link matchingEntries}, {@link matchingKeys}, and {@link matchingValues}. Keeping the trie walk at the
     * match-record level lets all projections share one traversal while reading each candidate property at most once.
     *
-    * The walk is iterative and depth-first. Each active frame pairs a trie-child iterator with the candidate value
-    * reached at the same prefix. Missing or non-traversable candidate prefixes are discarded before descendant trie
-    * nodes are considered.
+    * When `pathPrefix` is present, the corresponding trie node is located before candidate data is touched. The same
+    * absolute prefix is then resolved against the candidate exactly once. Its terminal entry is yielded when present,
+    * and its child iterator becomes the first traversal frame. Without a prefix, traversal starts at the trie root.
+    *
+    * `stopAt` is resolved to trie-node identity once. Reaching that node still yields its terminal entry, but its child
+    * iterator is never pushed, pruning the complete descendant branch without repeated path comparisons.
     *
     * Terminal-only candidate properties are read only when `includePropertyValue` is enabled. A node with descendants
-    * must always be read so its value can be tested for continued traversal. When a node is both terminal and a prefix,
-    * that single read supplies both the yielded property value and descendant traversal.
+    * must be read so its value can be tested for continued traversal. When a node is both terminal and a prefix, that
+    * single read supplies both the yielded property value and descendant traversal.
     *
     * @param data - Candidate object or function to inspect.
     *
@@ -513,11 +621,16 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of matching terminal entries and their optionally resolved candidate property values.
     *
-    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
+    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *#matchingEntryIterator(data: unknown, { hasOwnOnly = false, includePropertyValue = false }:
+   *#matchingEntryIterator(data: unknown, options: SafeAccessorMap.Options.MatchKeys |
     SafeAccessorMap.Options.Match = {}): IterableIterator<SafeAccessorMapMatch<V>>
    {
+      const hasOwnOnly: boolean = options.hasOwnOnly ?? false;
+      const includePropertyValue: boolean = 'includePropertyValue' in options ?
+       options.includePropertyValue ?? false : false;
+
       if (typeof hasOwnOnly !== 'boolean')
       {
          throw new TypeError(`SafeAccessorMap matching error: 'options.hasOwnOnly' is not a boolean.`);
@@ -528,13 +641,66 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          throw new TypeError(`SafeAccessorMap matching error: 'options.includePropertyValue' is not a boolean.`);
       }
 
-      if (!SafeAccessorMap.#isSafeAccessorMapTraversableValue(data)) { return; }
+      const { pathPrefix, startNode, stopNode } = this.#resolveTraversalScope(options);
 
-      const rootChildren: Map<PropertyKey, SafeAccessorMapNode<V>> | undefined = this.#root.children;
+      // Resolve trie bounds before touching candidate data so a missing stored prefix rejects the operation cheaply.
+      if (startNode === void 0 || !SafeAccessorMap.#isSafeAccessorMapTraversableValue(data)) { return; }
 
-      if (rootChildren === void 0) { return; }
+      let stack: SafeAccessorMapMatchFrame<V>[];
 
-      const stack: SafeAccessorMapMatchFrame<V>[] = [{ value: data, iterator: rootChildren.entries() }];
+      if (pathPrefix !== void 0)
+      {
+         let candidate: SafeAccessorMapTraversableValue = data;
+         let propertyValue: unknown;
+
+         // Resolve the selected absolute prefix against the candidate once before entering general subtree traversal.
+         for (let index: number = 0; index < pathPrefix.length; index++)
+         {
+            const key: PropertyKey = pathPrefix[index];
+
+            // Arrays reject string indexes and non-index string properties consistently at every prefix depth.
+            if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndex(key)) { return; }
+
+            const exists: boolean = hasOwnOnly ? Object.hasOwn(candidate, key) : key in candidate;
+
+            if (!exists) { return; }
+
+            const isFinal: boolean = index === pathPrefix.length - 1;
+            const requiresRead: boolean = !isFinal || includePropertyValue ||
+             (startNode !== stopNode && startNode.children !== void 0);
+
+            propertyValue = void 0;
+
+            if (requiresRead)
+            {
+               propertyValue = (candidate as unknown as Record<PropertyKey, unknown>)[key];
+            }
+
+            if (!isFinal)
+            {
+               if (!SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue)) { return; }
+               candidate = propertyValue;
+            }
+         }
+
+         if (startNode.entry !== void 0) { yield { entry: startNode.entry, propertyValue }; }
+
+         if (startNode === stopNode || startNode.children === void 0 ||
+          !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue))
+         {
+            return;
+         }
+
+         stack = [{ value: propertyValue, iterator: startNode.children.entries() }];
+      }
+      else
+      {
+         const rootChildren: Map<PropertyKey, SafeAccessorMapNode<V>> | undefined = startNode.children;
+
+         if (rootChildren === void 0) { return; }
+
+         stack = [{ value: data, iterator: rootChildren.entries() }];
+      }
 
       while (stack.length > 0)
       {
@@ -550,10 +716,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          const [key, child] = result.value;
 
          // Arrays deliberately reject string indexes and non-index string properties to match SafeAccessor traversal.
-         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndex(key))
-         {
-            continue;
-         }
+         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndex(key)) { continue; }
 
          const exists: boolean = hasOwnOnly ? Object.hasOwn(frame.value, key) : key in frame.value;
 
@@ -561,19 +724,110 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          if (!exists) { continue; }
 
          const hasChildren: boolean = child.children !== void 0;
+         const isStopNode: boolean = child === stopNode;
          let propertyValue: unknown;
 
-         // Read once when the caller requests the terminal value or descendant traversal requires the next object.
-         if (includePropertyValue || hasChildren)
+         // A stopped node does not need a value read for descendants, but includePropertyValue still requests it.
+         if (includePropertyValue || (hasChildren && !isStopNode))
          {
             propertyValue = (frame.value as unknown as Record<PropertyKey, unknown>)[key];
          }
 
          if (child.entry !== void 0) { yield { entry: child.entry, propertyValue }; }
 
-         if (!hasChildren || !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue)) { continue; }
+         if (isStopNode || !hasChildren ||
+          !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue))
+         {
+            continue;
+         }
 
          stack.push({ value: propertyValue, iterator: child.children!.entries() });
+      }
+   }
+
+   /**
+    * Normalizes and resolves the common absolute path bounds used by matching and subtree traversal.
+    *
+    * Accessor validation occurs before trie lookup so an invalid bound always throws, including on an empty map.
+    * `stopAt` must equal or descend from `pathPrefix`; this prevents silently accepting a stop boundary that cannot be
+    * reached by the selected subtree. Missing valid trie paths are represented by an undefined node and produce an
+    * empty iterator without allocating traversal frames.
+    *
+    * @param options - Common traversal options.
+    *
+    * @returns Normalized prefix plus resolved start and stop trie nodes.
+    *
+    * @throws {TypeError} If either accessor option is invalid.
+    * @throws {RangeError} If `stopAt` is outside `pathPrefix`.
+    */
+   #resolveTraversalScope({ pathPrefix, stopAt }: SafeAccessorMap.Options.Common = {}):
+    SafeAccessorMapTraversalScope<V>
+   {
+      const prefixPath: readonly PropertyKey[] | undefined = pathPrefix === void 0 ?
+       void 0 : normalizeSafeAccessor(pathPrefix);
+      const stopPath: readonly PropertyKey[] | undefined = stopAt === void 0 ?
+       void 0 : normalizeSafeAccessor(stopAt);
+
+      if (prefixPath !== void 0 && stopPath !== void 0 &&
+       !SafeAccessorMap.#isSafeAccessorMapPathPrefix(prefixPath, stopPath))
+      {
+         throw new RangeError(`SafeAccessorMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
+      }
+
+      return {
+         pathPrefix: prefixPath,
+         startNode: prefixPath === void 0 ? this.#root : this.#findNode(prefixPath),
+         stopNode: stopPath === void 0 ? void 0 : this.#findNode(stopPath)
+      };
+   }
+
+   /**
+    * Yields terminal entries from one bounded trie subtree without inspecting candidate data.
+    *
+    * The selected start node is yielded first when it stores an entry, followed by a depth-first walk of its children.
+    * Native child-map iterators preserve trie sibling creation order without allocating child arrays. `stopAt` is
+    * compared by resolved node identity and prunes descendants while retaining the stopped node's own entry.
+    *
+    * Called by {@link subtreeEntries}, {@link subtreeKeys}, and {@link subtreeValues}.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of terminal entries in deterministic trie order.
+    *
+    * @throws {TypeError} If either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   *#subtreeEntryIterator(options: SafeAccessorMap.Options.Subtree = {}):
+    IterableIterator<SafeAccessorMapEntry<V>>
+   {
+      const { startNode, stopNode } = this.#resolveTraversalScope(options);
+
+      if (startNode === void 0) { return; }
+
+      if (startNode.entry !== void 0) { yield startNode.entry; }
+
+      if (startNode === stopNode || startNode.children === void 0) { return; }
+
+      const stack: SafeAccessorMapSubtreeFrame<V>[] = [{ iterator: startNode.children.entries() }];
+
+      while (stack.length > 0)
+      {
+         const frame: SafeAccessorMapSubtreeFrame<V> = stack[stack.length - 1];
+         const result: IteratorResult<[PropertyKey, SafeAccessorMapNode<V>]> = frame.iterator.next();
+
+         if (result.done)
+         {
+            stack.pop();
+            continue;
+         }
+
+         const child: SafeAccessorMapNode<V> = result.value[1];
+
+         if (child.entry !== void 0) { yield child.entry; }
+
+         if (child === stopNode || child.children === void 0) { continue; }
+
+         stack.push({ iterator: child.children.entries() });
       }
    }
 
@@ -597,29 +851,48 @@ declare namespace SafeAccessorMap
    export namespace Options
    {
       /**
-       * Options controlling trie-aware matching of stored paths against a candidate value.
+       * Common absolute trie bounds shared by matching and subtree iterators.
        */
-      export interface Match
+      export interface Common
+      {
+         pathPrefix?: SafeAccessor;
+         stopAt?: SafeAccessor;
+      }
+
+      /**
+       * Options shared by every candidate-object matching iterator.
+       */
+      export interface MatchCommon extends Common
       {
          /**
-          * When `true`, every path segment must be an own property of the value reached at that depth. When `false`,
-          * inherited properties follow normal JavaScript lookup semantics.
+          * When `true`, every path segment must be an own property of the
+          * candidate value reached at that depth.
           *
           * @default false
           */
          hasOwnOnly?: boolean;
+      }
 
-         /**
-          * When `true`, {@link SafeAccessorMap.matchingEntries} appends the resolved candidate property value to each
-          * entry tuple and {@link SafeAccessorMap.matchingValues} returns `[mappedValue, propertyValue]` tuples.
-          *
-          * Enabling this option requires terminal-only candidate properties to be read and may therefore invoke getters
-          * or proxy `get` traps that are otherwise avoided. {@link SafeAccessorMap.matchingKeys} does not accept this
-          * option because it remains a path-only projection.
-          *
-          * @default false
-          */
+      /**
+       * Options for matching path iteration.
+       */
+      export interface MatchKeys extends MatchCommon
+      {
+      }
+
+      /**
+       * Options for matching entry and mapped-value iteration.
+       */
+      export interface Match extends MatchCommon
+      {
          includePropertyValue?: boolean;
+      }
+
+      /**
+       * Options for candidate-independent subtree iteration.
+       */
+      export interface Subtree extends Common
+      {
       }
    }
 }
@@ -711,6 +984,30 @@ interface SafeAccessorMapNode<V>
 
    /** Terminal entry when a value is stored at this exact path. */
    entry?: SafeAccessorMapEntry<V>;
+}
+
+/**
+ * Active depth-first frame used by candidate-independent subtree traversal.
+ */
+interface SafeAccessorMapSubtreeFrame<V>
+{
+   /** Iterator over one trie node's children. */
+   iterator: IterableIterator<[PropertyKey, SafeAccessorMapNode<V>]>;
+}
+
+/**
+ * Resolved common traversal bounds shared by matching and subtree iterators.
+ */
+interface SafeAccessorMapTraversalScope<V>
+{
+   /** Normalized absolute prefix, or `undefined` when traversal begins at the trie root. */
+   pathPrefix?: readonly PropertyKey[];
+
+   /** Trie node where traversal begins; missing stored prefixes resolve to `undefined`. */
+   startNode?: SafeAccessorMapNode<V>;
+
+   /** Trie node whose descendants must be pruned, when the stop path exists. */
+   stopNode?: SafeAccessorMapNode<V>;
 }
 
 /**

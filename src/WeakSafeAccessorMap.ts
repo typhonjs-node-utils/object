@@ -41,6 +41,8 @@ import type { SafeAccessor }     from './functions';
  * Root lookup is expected `O(1)`. Path operations retain the `O(path length)` behavior of {@link SafeAccessorMap}.
  * Trie-aware matching retains shared-prefix pruning and visits only candidate branches reachable from stored paths.
  * Matching entry and value iterators may optionally include the property value resolved from the candidate object.
+ * Prefix-bounded matching and candidate-independent subtree iteration retain the corresponding behavior of
+ * {@link SafeAccessorMap}.
  *
  * @typeParam R - Weak root object type.
  * @typeParam V - Stored value type.
@@ -48,7 +50,7 @@ import type { SafeAccessor }     from './functions';
 export class WeakSafeAccessorMap<R extends object, V>
 {
    /**
-    * Shared empty trie used by matching methods when a weak root has no associated map.
+    * Shared empty trie used by matching and subtree methods when a weak root has no associated map.
     *
     * Delegating to an empty {@link SafeAccessorMap} preserves normal matching-option validation without allocating a
     * temporary iterator implementation or duplicating matching semantics in {@link WeakSafeAccessorMap}.
@@ -70,8 +72,8 @@ export class WeakSafeAccessorMap<R extends object, V>
     * Removes every root association in constant time.
     *
     * The prior `WeakMap` and all path tries reachable only through it become eligible for garbage collection. Any
-    * iterator already returned by a matching method retains its direct reference to the corresponding path trie and
-    * may continue independently.
+    * iterator already returned by a matching or subtree method retains its direct reference to the corresponding path
+    * trie and may continue independently.
     */
    clear(): void
    {
@@ -208,9 +210,10 @@ export class WeakSafeAccessorMap<R extends object, V>
    /**
     * Returns a trie-aware iterator of matching entries for one root.
     *
-    * Matching behavior, prefix pruning, array-index rules, inherited-property handling, optional candidate property
-    * values, and iteration order are delegated directly to {@link SafeAccessorMap.matchingEntries}. A missing root
-    * behaves as an empty path trie while still validating matching options during iterator consumption.
+    * Matching behavior, prefix pruning, `pathPrefix` / `stopAt` bounds, array-index rules, inherited-property
+    * handling, optional candidate property values, and iteration order are delegated directly to
+    * {@link SafeAccessorMap.matchingEntries}. A missing root behaves as an empty path trie while still validating
+    * matching options during iterator consumption.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
@@ -220,8 +223,8 @@ export class WeakSafeAccessorMap<R extends object, V>
     *
     * @returns Iterator of canonical matching paths, mapped values, and optionally resolved candidate property values.
     *
-    * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
+    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
    matchingEntries(root: R, data: unknown,
     options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
@@ -249,21 +252,21 @@ export class WeakSafeAccessorMap<R extends object, V>
    /**
     * Returns a trie-aware iterator of canonical matching paths for one root.
     *
-    * This delegates to {@link SafeAccessorMap.matchingKeys}; see {@link matchingEntries} for complete matching
-    * semantics. A missing root produces an empty iterator.
+    * This delegates to {@link SafeAccessorMap.matchingKeys}; see {@link matchingEntries} for complete matching,
+    * path-bound, and stop-bound semantics. A missing root produces an empty iterator while retaining option validation.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
     * @param data - Candidate object or function to match against stored paths.
     *
-    * @param options - Matching options affecting property ownership.
+    * @param options - Path-only matching options.
     *
     * @returns Iterator of canonical matching accessor paths.
     *
-    * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   matchingKeys(root: R, data: unknown, options?: Pick<SafeAccessorMap.Options.Match, 'hasOwnOnly'>):
+   matchingKeys(root: R, data: unknown, options?: SafeAccessorMap.Options.MatchKeys):
     IterableIterator<readonly PropertyKey[]>
    {
       WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
@@ -278,7 +281,8 @@ export class WeakSafeAccessorMap<R extends object, V>
     * Returns a trie-aware iterator of mapped values whose paths match a candidate value for one root.
     *
     * By default, mapped values are yielded directly. Set `includePropertyValue` to `true` to receive
-    * `[mappedValue, propertyValue]` tuples. A missing root produces an empty iterator while retaining normal option
+    * `[mappedValue, propertyValue]` tuples. Prefix and stop bounds are delegated to
+    * {@link SafeAccessorMap.matchingValues}. A missing root produces an empty iterator while retaining normal option
     * validation.
     *
     * @param root - Weak root object or function identifying the stored path trie.
@@ -289,8 +293,8 @@ export class WeakSafeAccessorMap<R extends object, V>
     *
     * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
-    * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `options.hasOwnOnly` or `options.includePropertyValue` is not a boolean.
+    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
    matchingValues(root: R, data: unknown,
     options: SafeAccessorMap.Options.Match & { includePropertyValue: true }): IterableIterator<[V, unknown]>;
@@ -310,6 +314,84 @@ export class WeakSafeAccessorMap<R extends object, V>
 
       return map === void 0 ? WeakSafeAccessorMap.#emptySafeAccessorMap.matchingValues(data, options) :
        map.matchingValues(data, options);
+   }
+
+   /**
+    * Returns a bounded subtree entry iterator for one weak root.
+    *
+    * Candidate-independent subtree behavior, absolute `pathPrefix` selection, descendant pruning through `stopAt`,
+    * and deterministic trie order are delegated to {@link SafeAccessorMap.subtreeEntries}. A missing root behaves as
+    * an empty trie while still validating supplied accessors and prefix containment during iterator consumption.
+    *
+    * @param root - Weak root object or function identifying the stored path trie.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of canonical stored paths and mapped values.
+    *
+    * @throws {TypeError} If `root` or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   subtreeEntries(root: R, options: SafeAccessorMap.Options.Subtree = {}):
+    IterableIterator<[readonly PropertyKey[], V]>
+   {
+      WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
+
+      const map: SafeAccessorMap<V> | undefined = this.#roots.get(root);
+
+      return map === void 0 ? WeakSafeAccessorMap.#emptySafeAccessorMap.subtreeEntries(options) :
+       map.subtreeEntries(options);
+   }
+
+   /**
+    * Returns a bounded subtree key iterator for one weak root.
+    *
+    * This delegates to {@link SafeAccessorMap.subtreeKeys}. A missing root produces an empty iterator while retaining
+    * normal option validation.
+    *
+    * @param root - Weak root object or function identifying the stored path trie.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of canonical stored accessor paths.
+    *
+    * @throws {TypeError} If `root` or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   subtreeKeys(root: R, options: SafeAccessorMap.Options.Subtree = {}):
+    IterableIterator<readonly PropertyKey[]>
+   {
+      WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
+
+      const map: SafeAccessorMap<V> | undefined = this.#roots.get(root);
+
+      return map === void 0 ? WeakSafeAccessorMap.#emptySafeAccessorMap.subtreeKeys(options) :
+       map.subtreeKeys(options);
+   }
+
+   /**
+    * Returns a bounded subtree value iterator for one weak root.
+    *
+    * This delegates to {@link SafeAccessorMap.subtreeValues}. A missing root produces an empty iterator while retaining
+    * normal option validation.
+    *
+    * @param root - Weak root object or function identifying the stored path trie.
+    *
+    * @param options - Subtree bounds.
+    *
+    * @returns Iterator of mapped values.
+    *
+    * @throws {TypeError} If `root` or either accessor option is invalid.
+    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    */
+   subtreeValues(root: R, options: SafeAccessorMap.Options.Subtree = {}): IterableIterator<V>
+   {
+      WeakSafeAccessorMap.#assertWeakSafeAccessorMapRoot(root);
+
+      const map: SafeAccessorMap<V> | undefined = this.#roots.get(root);
+
+      return map === void 0 ? WeakSafeAccessorMap.#emptySafeAccessorMap.subtreeValues(options) :
+       map.subtreeValues(options);
    }
 
    /**
