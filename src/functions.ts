@@ -198,15 +198,15 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
       throw new TypeError(`deepMerge error: 'sourceObj' is not an object.`);
    }
 
-   for (let cntr: number = 0; cntr < sourceObj.length; cntr++)
+   for (let i: number = 0; i < sourceObj.length; i++)
    {
-      if (!isMergeObjectValue(sourceObj[cntr]))
+      if (!isMergeObjectValue(sourceObj[i]))
       {
-         throw new TypeError(`deepMerge error: 'sourceObj[${cntr}]' is not an object.`);
+         throw new TypeError(`deepMerge error: 'sourceObj[${i}]' is not an object.`);
       }
 
       // Preflight every source before mutating the target so a circular source cannot leave a partial merge behind.
-      assertNoCircularPlainObject(sourceObj[cntr]);
+      assertNoCircularPlainObject(sourceObj[i]);
    }
 
    if (sourceObj.length === 1)
@@ -742,6 +742,59 @@ export function isRecord(value: unknown): value is Record<string, unknown>
 }
 
 /**
+ * Determines whether a value is a valid safe accessor.
+ *
+ * A valid accessor is either:
+ *
+ * - A non-empty dotted string.
+ * - A non-empty readonly array containing only string, number, or symbol property keys.
+ *
+ * This function validates the accessor representation only. Numeric array-index constraints are evaluated during
+ * traversal because whether a numeric key is required depends on the value reached at runtime.
+ *
+ * @param value - Value to validate.
+ *
+ * @returns Whether the value is a valid {@link SafeAccessor}.
+ */
+export function isSafeAccessor(value: unknown): value is SafeAccessor
+{
+   if (typeof value === 'string') { return value.length > 0; }
+
+   if (!Array.isArray(value) || value.length === 0) { return false; }
+
+   for (let i: number = 0, l: number = value.length; i < l; i++)
+   {
+      const keyType: string = typeof value[i];
+
+      if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return false; }
+   }
+
+   return true;
+}
+
+/**
+ * Converts a safe accessor to its canonical readonly property-key array representation.
+ *
+ * Dotted strings are split on `.` while property-key arrays are returned unchanged. Exact array accessors should be
+ * used for symbols, numeric array indexes, empty-string keys, and property names containing literal periods.
+ *
+ * @param accessor - Accessor to normalize.
+ *
+ * @returns The accessor as a readonly property-key array.
+ *
+ * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+ */
+export function normalizeSafeAccessor(accessor: SafeAccessor): readonly PropertyKey[]
+{
+   if (!isSafeAccessor(accessor))
+   {
+      throw new TypeError(`normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+   }
+
+   return typeof accessor === 'string' ? accessor.split('.') : accessor;
+}
+
+/**
  * Safely returns keys on an object or an empty array if not an object.
  *
  * @param object - An object.
@@ -806,11 +859,11 @@ export function safeAccess<T extends object, const P extends SafeAccessor, R = D
    const keys: readonly PropertyKey[] = typeof accessor === 'string' ? accessor.split('.') : accessor;
    let result: any = data;
 
-   for (let cntr: number = 0; cntr < keys.length; cntr++)
+   for (let i: number = 0; i < keys.length; i++)
    {
       if (!isTraversableValue(result)) { return defaultValue as any; }
 
-      const key: PropertyKey = keys[cntr];
+      const key: PropertyKey = keys[i];
       const keyType: string = typeof key;
 
       if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol') { return defaultValue as any; }
@@ -994,9 +1047,9 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
    let result = false;
    let target: any = data;
 
-   for (let cntr: number = 0; cntr < access.length; cntr++)
+   for (let i: number = 0; i < access.length; i++)
    {
-      const key: PropertyKey = access[cntr];
+      const key: PropertyKey = access[i];
       const keyType: string = typeof key;
 
       if (keyType !== 'string' && keyType !== 'number' && keyType !== 'symbol')
@@ -1013,9 +1066,9 @@ export function safeSet(data: object, accessor: SafeAccessor, value: any,
 
       if (Array.isArray(target) && keyType !== 'symbol' && !isArrayIndex(key)) { return false; }
 
-      if (cntr === 0 && access.length === 1 && !createMissing && !(key in (target as any))) { return false; }
+      if (i === 0 && access.length === 1 && !createMissing && !(key in (target as any))) { return false; }
 
-      if (cntr === access.length - 1)
+      if (i === access.length - 1)
       {
          switch (operation)
          {
@@ -1364,9 +1417,9 @@ function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arra
          if (arrayIndex)
          {
             // Array elements are leaf comparisons by design; object-valued entries are not recursively expanded.
-            for (let cntr: number = 0; cntr < frame.array.length; cntr++)
+            for (let i: number = 0; i < frame.array.length; i++)
             {
-               yield frame.path.concat(cntr);
+               yield frame.path.concat(i);
             }
          }
       }
@@ -1431,11 +1484,11 @@ function resolvePropertyPath(data: object, accessor: readonly PropertyKey[]): un
 {
    let result: any = data;
 
-   for (let cntr: number = 0; cntr < accessor.length; cntr++)
+   for (let i: number = 0; i < accessor.length; i++)
    {
       if (!isTraversableValue(result)) { return unresolvedProperty; }
 
-      const key: PropertyKey = accessor[cntr];
+      const key: PropertyKey = accessor[i];
       const keyType: string = typeof key;
 
       /* v8 ignore start */

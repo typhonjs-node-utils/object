@@ -1110,6 +1110,86 @@ describe('ObjectUtil:', () =>
       if (ObjectUtil.isRecord(val)) { expectTypeOf(val).toEqualTypeOf<Record<string, unknown>>(); }
    });
 
+   describe('isSafeAccessor:', () =>
+   {
+      it('returns true for a non-empty dotted string accessor', () =>
+      {
+         assert.isTrue(ObjectUtil.isSafeAccessor('level1.value'));
+      });
+
+      it('returns false for an empty string accessor', () =>
+      {
+         assert.isFalse(ObjectUtil.isSafeAccessor(''));
+      });
+
+      it('returns true for a non-empty property-key array', () =>
+      {
+         const symbol = Symbol('value');
+
+         assert.isTrue(ObjectUtil.isSafeAccessor(['level1', 0, symbol]));
+      });
+
+      it('returns true for an exact empty-string property key', () =>
+      {
+         assert.isTrue(ObjectUtil.isSafeAccessor(['']));
+      });
+
+      it('returns false for an empty accessor array', () =>
+      {
+         assert.isFalse(ObjectUtil.isSafeAccessor([]));
+      });
+
+      it('returns false when an accessor array contains an invalid key', () =>
+      {
+         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', true]));
+
+         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', null]));
+
+         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', {}]));
+      });
+
+      it('returns false for non-accessor values', () =>
+      {
+         assert.isFalse(ObjectUtil.isSafeAccessor(null));
+         assert.isFalse(ObjectUtil.isSafeAccessor(void 0));
+         assert.isFalse(ObjectUtil.isSafeAccessor(42));
+         assert.isFalse(ObjectUtil.isSafeAccessor({}));
+      });
+   });
+
+   describe('normalizeSafeAccessor:', () =>
+   {
+      it('splits a dotted string accessor into property keys', () =>
+      {
+         assert.deepEqual(ObjectUtil.normalizeSafeAccessor('level1.level2.value'), ['level1', 'level2', 'value']);
+      });
+
+      it('preserves empty path segments in dotted strings', () =>
+      {
+         assert.deepEqual(ObjectUtil.normalizeSafeAccessor('level1..value'), ['level1', '', 'value']);
+      });
+
+      it('returns a property-key array unchanged', () =>
+      {
+         const symbol = Symbol('value');
+         const accessor = ['level1', 0, symbol] as const;
+
+         const result = ObjectUtil.normalizeSafeAccessor(accessor);
+
+         assert.equal(result, accessor);
+      });
+
+      it('supports an exact empty-string property key', () =>
+      {
+         const accessor = [''] as const;
+
+         const result = ObjectUtil.normalizeSafeAccessor(accessor);
+
+         assert.equal(result, accessor);
+         assert.deepEqual(result, ['']);
+      });
+   });
+
    it('objectKeys', () =>
    {
       // @ts-expect-error

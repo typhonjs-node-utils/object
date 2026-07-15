@@ -75,6 +75,28 @@ describe('API Errors:', () =>
       });
    });
 
+   describe('normalizeSafeAccessor:', () =>
+   {
+      it('throws for an empty string accessor', () =>
+      {
+         assert.throws(() => ObjectUtil.normalizeSafeAccessor(''), TypeError,
+          `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+      });
+
+      it('throws for an empty accessor array', () =>
+      {
+         assert.throws(() => ObjectUtil.normalizeSafeAccessor([]), TypeError,
+          `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+      });
+
+      it('throws when an accessor array contains an invalid key', () =>
+      {
+         // @ts-expect-error
+         assert.throws(() => ObjectUtil.normalizeSafeAccessor(['level1', true]), TypeError,
+          `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+      });
+   });
+
    describe('safeEqual:', () =>
    {
       it('safeEqual throws when the source contains a circular path', () =>
