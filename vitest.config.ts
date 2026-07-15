@@ -8,7 +8,7 @@ export default defineConfig({
       include: ['./test/**/*.test.ts'],
       coverage: {
          include: ['src/**'],
-         exclude: ['test/**', 'src/plugin.ts'], // TODO: Eventually test the plugin.
+         exclude: ['test/**'],
          provider: 'v8',
          reporter: ['text', 'json', 'html']
       },

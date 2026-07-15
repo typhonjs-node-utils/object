@@ -18,9 +18,9 @@ export default () =>
 {
    return [
       {   // This bundle is for the Node distribution.
-         input: 'src/functions.ts',
+         input: 'src/index.ts',
          output: [{
-            file: 'dist/functions.js',
+            file: 'dist/index.js',
             format: 'es',
             generatedCode: { constBindings: true },
             sourcemap,
@@ -30,21 +30,6 @@ export default () =>
             typescript({ include: ['src/**/*'] }),
             generateDTS.plugin(dtsPluginOptions)
          ]
-      },
-      {   // This bundle is for the Node distribution.
-         input: 'src/plugin.ts',
-         external: ['./functions.js'],
-         output: [{
-            file: 'dist/plugin.js',
-            format: 'es',
-            generatedCode: { constBindings: true },
-            sourcemap,
-         }],
-         plugins: [
-            resolve(resolveOptions),
-            typescript({ include: ['src/**/*'] }),
-            generateDTS.plugin(dtsPluginOptions)
-         ]
-      },
+      }
    ];
 };
