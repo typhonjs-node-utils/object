@@ -604,6 +604,20 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
 }
 
 /**
+ * Returns whether a value is a valid ECMAScript array index.
+ *
+ * The maximum array index is `2^32 - 2`; `2^32 - 1` is reserved and does not update an array's `length`.
+ *
+ * @param value - Candidate numeric property key.
+ *
+ * @returns Whether `value` is an integer in the ECMAScript array-index range.
+ */
+export function isArrayIndex(value: unknown): value is number
+{
+   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
+}
+
+/**
  * Tests for whether an _object_ is async iterable.
  *
  * @param value - Any value.
@@ -1278,24 +1292,6 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
    }
 
    return keys;
-}
-
-/**
- * Returns whether a value is a valid ECMAScript array index.
- *
- * The maximum array index is `2^32 - 2`; `2^32 - 1` is reserved and does not update an array's `length`.
- *
- * Called by:
- * - {@link safeAccess} and {@link safeSet} for runtime array-path validation.
- * - {@link resolvePropertyPath}, and therefore {@link hasProperty} / {@link safeEqual}.
- *
- * @param value - Candidate numeric property key.
- *
- * @returns Whether `value` is an integer in the ECMAScript array-index range.
- */
-function isArrayIndex(value: unknown): value is number
-{
-   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
 }
 
 /**
