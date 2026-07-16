@@ -114,7 +114,7 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
 /**
  * Concatenates one or more property paths into a newly allocated exact property-key path.
  *
- * Every accessor is normalized before concatenation. Dotted strings therefore contribute one segment per delimiter,
+ * Every path is normalized before concatenation. Dotted strings therefore contribute one segment per delimiter,
  * while array accessors preserve numbers, symbols, empty-string keys, and literal periods exactly. The returned array
  * is independent of every input array and may be retained or modified by the caller without affecting those inputs.
  *
@@ -124,13 +124,13 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
  * // ['actor', 'system', 'attributes', 'hp', 'value']
  * ```
  *
- * @param accessor - First accessor to concatenate.
+ * @param accessor - First path to concatenate.
  *
  * @param accessors - Additional accessors appended in order.
  *
- * @returns A newly allocated exact property-key accessor.
+ * @returns A newly allocated exact property-key path.
  *
- * @throws {TypeError} If any argument is not a valid {@link PropertyPath} or no accessor is supplied at runtime.
+ * @throws {TypeError} If any argument is not a valid {@link PropertyPath} or no path is supplied at runtime.
  */
 export function concatPropertyPath(accessor: PropertyPath, ...accessors: PropertyPath[]): readonly PropertyKey[]
 {
@@ -159,7 +159,7 @@ export function concatPropertyPath(accessor: PropertyPath, ...accessors: Propert
  *
  * @param data - Object containing the property path.
  *
- * @param accessor - Dotted or exact property-key accessor.
+ * @param accessor - Dotted or exact property-key path.
  *
  * @param options - Deletion options.
  *
@@ -549,11 +549,11 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
  *
  * Unlike {@link safeAccess}, this function returns a present nullish property unchanged. A missing or invalid path
  * returns `undefined`; use {@link hasProperty} when that result must be distinguished from a present `undefined`
- * property. Array indexes require numeric keys through an exact array accessor.
+ * property. Array indexes require numeric keys through an exact array property-key path.
  *
  * @param data - Object to inspect.
  *
- * @param accessor - Dotted or exact property-key accessor.
+ * @param path - Dotted or exact property-key path.
  *
  * @param options - Property lookup options.
  *
@@ -589,7 +589,7 @@ export function getProperty<T extends object, const P extends PropertyPath>(data
  *
  * @param data - Object to inspect.
  *
- * @param accessor - Dotted or exact property-key accessor.
+ * @param accessor - Dotted or exact property-key path.
  *
  * @param options - Property lookup options.
  *
@@ -621,7 +621,7 @@ export function getPropertyDescriptor(data: object, accessor: PropertyPath,
  *
  * @param data - Object to inspect.
  *
- * @param accessor - Dotted or exact property-key accessor.
+ * @param accessor - Dotted or exact property-key path.
  *
  * @param options - Property lookup options.
  *
@@ -685,23 +685,23 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
 }
 
 /**
- * Determines whether an accessor path exists on an object.
+ * Determines whether an property path exists on an object.
  *
  * Traversal aborts immediately when a property is missing, an intermediate value cannot be traversed, or an invalid
  * array index is encountered. Properties whose values are `undefined` or `null` are considered present. The terminal
  * property value is not read, so a getter at the final segment is not invoked merely to test existence.
  *
- * Array indexes may only be accessed by number through the array accessor form.
+ * Array indexes may only be accessed by number through the array property-key form.
  *
  * @param data - An object to inspect.
  *
- * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
+ * @param accessor - A dotted string path or an array of exact string, number, or symbol property keys.
  *
  * @param options - Property lookup options.
  *
  * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `false`.
  *
- * @returns Whether the complete accessor path exists.
+ * @returns Whether the complete property path exists.
  *
  * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
@@ -890,8 +890,8 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
 /**
  * Determines whether a value is a JavaScript property key.
  *
- * Property keys are strings, numbers, or symbols. Numbers are accepted because exact accessor arrays preserve numeric
- * array indexes and ordinary JavaScript property access coerces numeric object keys as usual.
+ * Property keys are strings, numbers, or symbols. Numbers are accepted because exact property-key arrays preserve
+ * numeric array indexes and ordinary JavaScript property access coerces numeric object keys as usual.
  *
  * @param value - Candidate property key.
  *
@@ -935,12 +935,12 @@ export function isRecord(value: unknown): value is Record<string, unknown>
 /**
  * Determines whether a value is a valid property path.
  *
- * A valid accessor is either:
+ * A valid path is either:
  *
  * - A non-empty dotted string.
  * - A non-empty readonly array containing only string, number, or symbol property keys.
  *
- * This function validates the accessor representation only. Numeric array-index constraints are evaluated during
+ * This function validates the property path representation only. Numeric array-index constraints are evaluated during
  * traversal because whether a numeric key is required depends on the value reached at runtime.
  *
  * @param value - Value to validate.
@@ -968,11 +968,11 @@ export function isPropertyPath(value: unknown): value is PropertyPath
  * semantics: strings compare by value, symbols by identity, `0` equals `-0`, and numeric `NaN` segments compare as
  * equal. Numeric and string segments remain distinct.
  *
- * Invalid accessor values return `false` rather than throwing, matching predicate conventions.
+ * Invalid path values return `false` rather than throwing, matching predicate conventions.
  *
- * @param prefix - Candidate prefix accessor.
+ * @param prefix - Candidate prefix path.
  *
- * @param accessor - Complete accessor that must equal or descend from `prefix`.
+ * @param accessor - Complete path that must equal or descend from `prefix`.
  *
  * @returns Whether `prefix` is an exact structural prefix of `accessor`.
  */
@@ -1001,18 +1001,18 @@ export function isPropertyPathPrefix(prefix: PropertyPath, accessor: PropertyPat
 }
 
 /**
- * Converts a property path to an equivalent dotted string accessor when that conversion is lossless.
+ * Converts a property path to an equivalent dotted string path when that conversion is lossless.
  *
- * Exact accessor arrays containing numbers, symbols, or string segments with literal periods cannot be represented by
- * dotted-string syntax without changing their property-path semantics and are rejected. Empty segments are retained,
+ * Exact property-key arrays containing numbers, symbols, or string segments with literal periods cannot be represented
+ * by dotted-string syntax without changing their property-path semantics and are rejected. Empty segments are retained,
  * so `['level1', '', 'value']` becomes `'level1..value'`. The exact single empty-string key `['']` is rejected because
  * an empty dotted string is not a valid {@link PropertyPath}.
  *
  * @param accessor - Accessor to convert.
  *
- * @returns An equivalent dotted string accessor.
+ * @returns An equivalent dotted string property path.
  *
- * @throws {TypeError} If `accessor` is invalid or cannot be represented losslessly as a dotted string accessor.
+ * @throws {TypeError} If `accessor` is invalid or cannot be represented losslessly as a dotted string property path.
  */
 export function joinPropertyPath(accessor: PropertyPath): string
 {
@@ -1022,7 +1022,7 @@ export function joinPropertyPath(accessor: PropertyPath): string
    {
       if (typeof key !== 'string' || key.includes('.'))
       {
-         throw new TypeError(`joinPropertyPath error: 'accessor' cannot be represented as a dotted string accessor.`);
+         throw new TypeError(`joinPropertyPath error: 'path' cannot be represented as a dotted string property path.`);
       }
    }
 
@@ -1030,7 +1030,7 @@ export function joinPropertyPath(accessor: PropertyPath): string
 
    if (result.length === 0)
    {
-      throw new TypeError(`joinPropertyPath error: 'accessor' cannot be represented as a dotted string accessor.`);
+      throw new TypeError(`joinPropertyPath error: 'path' cannot be represented as a dotted string property path.`);
    }
 
    return result;
@@ -1052,7 +1052,7 @@ export function normalizePropertyPath(accessor: PropertyPath): readonly Property
 {
    if (!isPropertyPath(accessor))
    {
-      throw new TypeError(`normalizePropertyPath error: 'accessor' is not a valid property path.`);
+      throw new TypeError(`normalizePropertyPath error: 'path' is not a valid property path.`);
    }
 
    return typeof accessor === 'string' ? accessor.split('.') : accessor;
@@ -1091,25 +1091,25 @@ export function objectSize(object: any): number
 }
 
 /**
- * Provides a way to safely access an object's data / entries using either a dotted accessor string or an array of
+ * Provides a way to safely access an object's data / entries using either a dotted property path string or an array of
  * exact property keys.
  *
- * Array indexes may only be accessed by number through the array accessor form.
+ * Array indexes may only be accessed by number through the array property-key form.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
+ * @param accessor - A dotted string property path or an array of exact string, number, or symbol property keys.
  *
- * @param [defaultValue] - (Optional) A default value to return if an entry for accessor is not found.
+ * @param [defaultValue] - (Optional) A default value to return if an entry for property path is not found.
  *
- * @returns The value referenced by the accessor.
+ * @returns The value referenced by the path.
  *
  * @typeParam T - Type of data.
  * @typeParam P - Accessor type.
  * @typeParam R - Return value / Inferred deep access type or any provided default value type.
  */
 export function safeAccess<T extends object, const P extends PropertyPath, R = DeepAccess<T, P>>(data: T,
-                                                                                                 accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
+ accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
   DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
 {
    const result: unknown = getProperty(data, accessor);
@@ -1143,10 +1143,10 @@ export function safeEqual<T extends object>(source: T, target: object,
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
-   for (const accessor of pathKeyIterator(source, options))
+   for (const path of pathKeyIterator(source, options))
    {
-      const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, accessor);
-      const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, accessor);
+      const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, path);
+      const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, path);
 
       if (sourceResolution === void 0 || targetResolution === void 0 ||
        sourceResolution.value !== targetResolution.value)
@@ -1159,12 +1159,12 @@ export function safeEqual<T extends object>(source: T, target: object,
 }
 
 /**
- * Returns an iterator of property-key accessor arrays useful with {@link safeAccess} and {@link safeSet} by traversing
+ * Returns an iterator of property-key path arrays useful with {@link safeAccess} and {@link safeSet} by traversing
  * the given object. Enumerable string and symbol keys are included, and array indexes are emitted as numbers.
  *
  * Note: Keys are only generated for ordinary objects and arrays; {@link Map} and {@link Set} are not indexed.
  *
- * @param data - An object to traverse for accessor keys.
+ * @param data - An object to traverse for property path keys.
  *
  * @param [options] - Options.
  *
@@ -1233,38 +1233,37 @@ export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 }
 
 /**
- * Provides a way to safely set an object's data / entries using either a dotted accessor string or an array of exact
- * property keys. Array indexes may only be accessed by number through the array accessor form.
+ * Provides a way to safely set an object's data / entries using either a dotted path string or an array of exact
+ * property keys. Array indexes may only be accessed by number through the array property-key form.
  *
  * @param data - An object to access entry data.
  *
- * @param accessor - A dotted string accessor or an array of exact string, number, or symbol property keys.
+ * @param accessor - A dotted string path or an array of exact string, number, or symbol property keys.
  *
  * The string keys `__proto__`, `prototype`, and `constructor` are rejected to prevent prototype-pollution access
  * paths. ECMAScript well-known symbols, such as `Symbol.toStringTag`, `Symbol.iterator`, and `Symbol.toPrimitive`,
  * are also rejected because they modify built-in language protocols and object behavior. User-created symbols and
  * symbols from {@link Symbol.for} remain valid.
  *
- * @param value - A new value to set if an entry for accessor is found.
+ * @param value - A new value to set if an entry for path is found.
  *
  * @param [options] - Options.
  *
  * @param [options.operation] - Operation to perform including: `add`, `div`, `mult`, `set`, `set-undefined`, `sub`;
  *        default: `set`.
  *
- * @param [options.createMissing] - If `true` missing accessor entries will be created as objects automatically;
+ * @param [options.createMissing] - If `true` missing path entries will be created as objects automatically;
  *        default: `false`.
  *
  * @returns True if successful.
  */
-export function safeSet(data: object, accessor: PropertyPath, value: any,
-                        { operation = 'set', createMissing = false }:
-  { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
+export function safeSet(data: object, accessor: PropertyPath, value: any, { operation = 'set', createMissing = false }:
+ { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
    if (typeof accessor !== 'string' && !Array.isArray(accessor))
    {
-      throw new TypeError(`safeSet error: 'accessor' is not a string or an array of property keys.`);
+      throw new TypeError(`safeSet error: 'path' is not a string or an array of property keys.`);
    }
    if (typeof operation !== 'string') { throw new TypeError(`safeSet error: 'options.operation' is not a string.`); }
    if (operation !== 'add' && operation !== 'div' && operation !== 'mult' && operation !== 'set' &&
@@ -1293,7 +1292,7 @@ export function safeSet(data: object, accessor: PropertyPath, value: any,
 
       if (!isPropertyKey(key))
       {
-         throw new TypeError(`safeSet error: 'accessor' contains an entry that is not a property key.`);
+         throw new TypeError(`safeSet error: 'path' contains an entry that is not a property key.`);
       }
 
       // Block prototype-pollution strings and built-in protocol symbols before reading or creating any path segment.
@@ -1619,7 +1618,7 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
 }
 
 /**
- * Yields accessor paths for array indexes and enumerable symbol properties attached to arrays.
+ * Yields property-key paths for array indexes and enumerable symbol properties attached to arrays.
  *
  * Numeric indexes are yielded immediately to preserve the established iterator ordering and are intentionally treated
  * as leaves, even when an indexed value is an object. Symbol properties receive normal recursive traversal. A private
@@ -1635,7 +1634,7 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
  * @param objectStack - Primary object traversal stack owned by {@link pathKeyIterator}.
  * @param ancestors - Active path ancestors used for circular-reference detection.
  *
- * @returns An iterator of readonly property-key accessor paths.
+ * @returns An iterator of readonly property-key paths.
  */
 function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
  hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>):
@@ -1707,7 +1706,7 @@ function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayInd
  * Resolves an exact property-key path and returns terminal ownership metadata.
  *
  * The resolver centralizes array-index rules, own-only behavior, inherited property ownership, descriptor lookup, and
- * single-read traversal for all accessor-based property utilities. Intermediate properties are read exactly once.
+ * single-read traversal for all path-based property utilities. Intermediate properties are read exactly once.
  * The terminal property is read only when `readValue` is enabled, allowing existence, descriptor, owner, and deletion
  * operations to avoid invoking a final getter.
  *
@@ -1729,7 +1728,7 @@ function resolvePropertyPath(data: object, accessor: readonly PropertyKey[],
    {
       const key: PropertyKey = accessor[index];
 
-      /* v8 ignore start -- callers normalize / validate SafeAccessor before resolution. */
+      /* v8 ignore start -- callers normalize / validate PropertyPath before resolution. */
       if (!isPropertyKey(key)) { return void 0; }
       /* v8 ignore stop */
 
@@ -1769,7 +1768,7 @@ function resolvePropertyPath(data: object, accessor: readonly PropertyKey[],
 
       candidate = next;
 
-      /* v8 ignore start - SafeAccessor paths are always non-empty */
+      /* v8 ignore start - PropertyPath paths are always non-empty */
    }
 
    return void 0;
@@ -1817,7 +1816,7 @@ interface PropertyPathResolution
    /** Own descriptor defining the terminal property. */
    descriptor: PropertyDescriptor;
 
-   /** Final accessor key. */
+   /** Final path key. */
    key: PropertyKey;
 
    /** Object or function that owns the terminal property. */
@@ -1857,7 +1856,7 @@ type DeepAccess<T, P extends PropertyPath> =
    : undefined;
 
 /**
- * Infers a dotted string accessor in object T. Primitive and array traversal is rejected, matching runtime behavior.
+ * Infers a dotted string path in object T. Primitive and array traversal is rejected, matching runtime behavior.
  */
 type DeepAccessString<T, P extends string> =
  T extends object
@@ -1873,8 +1872,8 @@ type DeepAccessString<T, P extends string> =
   : undefined;
 
 /**
- * Infers a readonly tuple accessor in object T. Array traversal accepts only numeric or symbol keys, matching runtime
- * behavior. Primitive traversal is rejected. A non-tuple accessor array returns `unknown`.
+ * Infers a readonly tuple path in object T. Array traversal accepts only numeric or symbol keys, matching runtime
+ * behavior. Primitive traversal is rejected. A non-tuple path array returns `unknown`.
  */
 type DeepAccessArray<T, P extends readonly PropertyKey[]> =
  number extends P['length']
