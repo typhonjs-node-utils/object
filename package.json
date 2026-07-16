@@ -8,22 +8,17 @@
     "Michael Leahy <support@typhonjs.io> (https://github.com/typhonrt)"
   ],
   "type": "module",
-  "main": "./dist/functions.js",
   "exports": {
     ".": {
-      "types": "./dist/functions.d.ts",
-      "import": "./dist/functions.js"
-    },
-    "./plugin": {
-      "types": "./dist/plugin.d.ts",
-      "import": "./dist/plugin.js"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
     },
     "./package.json": "./package.json"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@rollup/plugin-typescript": "^12.3.0",
-    "@typhonjs-build-test/esm-d-ts": "^0.3.0",
+    "@typhonjs-build-test/esm-d-ts": "^0.4.0",
     "@typhonjs-typedoc/typedoc-pkg": "^0.4.2",
     "@vitest/coverage-v8": "^3.2.4",
     "@vitest/ui": "^3.2.4",
@@ -31,7 +26,7 @@
     "klona": "^2.0.6",
     "rollup": "^4.62.2",
     "tslib": "^2.8.1",
-    "typescript" : "^5.9.3",
+    "typescript" : "^6.0.3",
     "vitest": "^3.2.4"
   },
   "engines": {

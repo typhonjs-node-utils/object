@@ -3,7 +3,6 @@
     "module": "es2022",
     "moduleResolution": "Bundler",
     "target": "es2022",
-    "baseUrl": ".",
 
     "sourceMap": true,
     "inlineSources": true,
