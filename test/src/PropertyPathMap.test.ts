@@ -246,6 +246,161 @@ describe('PropertyPathMap', () =>
       assert.throws(() => map.delete(invalid), TypeError);
    });
 
+   describe('defensive limits', () =>
+   {
+      it('validates constructor limits', () =>
+      {
+         assert.throws(() => new PropertyPathMap(null, null), TypeError,
+          `PropertyPathMap error: 'options' is not an object.`);
+
+         for (const option of ['maxEntries', 'maxNodes', 'maxPathDepth', 'maxTraversalResults',
+          'maxTraversalVisits'] as const)
+         {
+            assert.throws(() => new PropertyPathMap(null, { [option]: -1 }), TypeError);
+            assert.throws(() => new PropertyPathMap(null, { [option]: 1.5 }), TypeError);
+         }
+      });
+
+      it('enforces path depth before any trie mutation or lookup', () =>
+      {
+         const map = new PropertyPathMap<number>(null, { maxPathDepth: 2 });
+
+         assert.throws(() => map.set('a.b.c', 1), RangeError);
+         assert.equal(map.size, 0);
+         assert.equal(map.nodeCount, 0);
+
+         assert.throws(() => map.get('a.b.c'), RangeError);
+         assert.throws(() => map.has('a.b.c'), RangeError);
+         assert.throws(() => map.delete('a.b.c'), RangeError);
+      });
+
+      it('adds an entry to an existing non-terminal trie prefix without allocating nodes', () =>
+      {
+         const map = new PropertyPathMap<number>();
+         map.set('a.b', 1);
+
+         assert.equal(map.nodeCount, 2);
+
+         map.set('a', 2);
+
+         assert.equal(map.nodeCount, 2);
+         assert.equal(map.size, 2);
+         assert.equal(map.get('a'), 2);
+         assert.equal(map.get('a.b'), 1);
+      });
+
+      it('enforces entry limits atomically while allowing overwrites', () =>
+      {
+         const map = new PropertyPathMap<number>(null, { maxEntries: 1 });
+
+         map.set('first', 1);
+         map.set('first', 2);
+
+         assert.throws(() => map.set('second', 2), RangeError,
+          `PropertyPathMap error: Insertion exceeds configured 'maxEntries' of 1.`);
+         assert.equal(map.size, 1);
+         assert.equal(map.nodeCount, 1);
+         assert.equal(map.get('first'), 2);
+         assert.equal(map.has('second'), false);
+      });
+
+      it('enforces node limits atomically and releases pruned capacity', () =>
+      {
+         const map = new PropertyPathMap<number>(null, { maxNodes: 2 });
+
+         map.set('a.b', 1);
+         assert.equal(map.nodeCount, 2);
+
+         assert.throws(() => map.set('a.c', 2), RangeError,
+          `PropertyPathMap error: Insertion exceeds configured 'maxNodes' of 2.`);
+         assert.equal(map.nodeCount, 2);
+         assert.equal(map.has('a.c'), false);
+
+         assert.isTrue(map.delete('a.b'));
+         assert.equal(map.nodeCount, 0);
+
+         map.set('a.c', 2);
+         assert.equal(map.nodeCount, 2);
+         assert.equal(map.get('a.c'), 2);
+      });
+
+      it('resets node accounting on clear', () =>
+      {
+         const map = new PropertyPathMap<number>();
+         map.set('a.b', 1).set('a.c', 2);
+
+         assert.equal(map.nodeCount, 3);
+         map.clear();
+         assert.equal(map.nodeCount, 0);
+      });
+
+      it('applies limits while initializing constructor entries', () =>
+      {
+         assert.throws(() => new PropertyPathMap<number>([
+            ['first', 1],
+            ['second', 2]
+         ], { maxEntries: 1 }), RangeError);
+      });
+
+      it('validates iterator option objects', () =>
+      {
+         const map = new PropertyPathMap<number>();
+         map.set('value', 1);
+
+         assert.throws(() => collect(map.entries(null)), TypeError,
+          `PropertyPathMap iteration error: 'options' is not an object.`);
+         assert.throws(() => collect(map.matchingValues({ value: 1 }, null)), TypeError,
+          `PropertyPathMap matching error: 'options' is not an object.`);
+         assert.throws(() => collect(map.subtreeValues(null)), TypeError,
+          `PropertyPathMap traversal error: 'options' is not an object.`);
+      });
+
+      it('bounds insertion-order entries, keys, and values iterators', () =>
+      {
+         const map = new PropertyPathMap<number>();
+         map.set('deep.value', 1).set('first', 2).set('second', 3);
+
+         assert.deepEqual(collect(map.entries({ maxDepth: 1 })), [
+            [['first'], 2],
+            [['second'], 3]
+         ]);
+         assert.deepEqual(collect(map.keys({ maxResults: 1 })), [['deep', 'value']]);
+         assert.deepEqual(collect(map.values({ maxResults: 2 })), [1, 2]);
+         assert.deepEqual(collect(map.entries({ maxResults: 0 })), []);
+
+         assert.throws(() => collect(map.entries({ maxDepth: 1, maxVisits: 1 })), RangeError,
+          `PropertyPathMap iteration error: Traversal exceeded 'options.maxVisits'.`);
+      });
+
+      it('applies constructor result caps to default iteration while forEach visits all stored entries', () =>
+      {
+         const map = new PropertyPathMap<number>(null, {
+            maxEntries: 2,
+            maxTraversalResults: 1
+         });
+         const values: number[] = [];
+
+         map.set('first', 1).set('second', 2);
+
+         assert.deepEqual([...map], [[['first'], 1]]);
+
+         map.forEach((value) => values.push(value));
+         assert.deepEqual(values, [1, 2]);
+      });
+
+      it('keeps per-call iterator limits beneath constructor caps', () =>
+      {
+         const map = new PropertyPathMap<number>(null, {
+            maxTraversalResults: 1,
+            maxTraversalVisits: 1
+         });
+         map.set('first', 1).set('second', 2);
+
+         assert.deepEqual(collect(map.values({ maxResults: 100 })), [1]);
+         assert.throws(() => collect(map.entries({ maxDepth: 0, maxVisits: 100 })), RangeError);
+      });
+   });
+
    describe('matching iterators', () =>
    {
       it('returns empty results for non-traversable data and an empty map', () =>
@@ -735,6 +890,91 @@ describe('PropertyPathMap', () =>
          })), ['nan', 'value']);
       });
 
+      it('applies maxDepth relative to pathPrefix across matching projections', () =>
+      {
+         const map = new PropertyPathMap<string>();
+         map.set('actor', 'actor');
+         map.set('actor.system', 'system');
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.name', 'name');
+
+         const data = { actor: { system: { hp: 10 }, name: 'Actor' } };
+
+         assert.deepEqual(collect(map.matchingEntries(data, {
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), [
+            [['actor'], 'actor'],
+            [['actor', 'system'], 'system'],
+            [['actor', 'name'], 'name']
+         ]);
+         assert.deepEqual(collect(map.matchingKeys(data, {
+            pathPrefix: 'actor',
+            maxDepth: 0
+         })), [['actor']]);
+         assert.deepEqual(collect(map.matchingValues(data, {
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), ['actor', 'system', 'name']);
+      });
+
+      it('does not read descendants beyond maxDepth', () =>
+      {
+         let reads = 0;
+         const actor = Object.defineProperty({}, 'system', {
+            enumerable: true,
+            get()
+            {
+               reads++;
+               return { hp: 10 };
+            }
+         });
+         const map = new PropertyPathMap<string>();
+         map.set('actor', 'actor').set('actor.system.hp', 'hp');
+
+         assert.deepEqual(collect(map.matchingValues({ actor }, {
+            pathPrefix: 'actor',
+            maxDepth: 0
+         })), ['actor']);
+         assert.equal(reads, 0);
+      });
+
+      it('limits matching results and visits before later candidate reads', () =>
+      {
+         let reads = 0;
+         const data = {
+            first: 1,
+            get second()
+            {
+               reads++;
+               return 2;
+            }
+         };
+         const map = new PropertyPathMap<string>();
+         map.set('first', 'first').set('second', 'second');
+
+         assert.deepEqual(collect(map.matchingValues(data, { maxResults: 1 })), ['first']);
+         assert.equal(reads, 0);
+
+         assert.throws(() => collect(map.matchingValues(data, {
+            includePropertyValue: true,
+            maxVisits: 1
+         })), RangeError, `PropertyPathMap traversal error: Traversal exceeded 'options.maxVisits'.`);
+         assert.equal(reads, 0);
+      });
+
+      it('validates matching numeric limits and configured path depth', () =>
+      {
+         const map = new PropertyPathMap<string>(null, { maxPathDepth: 2 });
+         map.set('actor.hp', 'hp');
+
+         assert.throws(() => collect(map.matchingValues({}, { maxDepth: -1 })), TypeError);
+         assert.throws(() => collect(map.matchingValues({}, { maxResults: 1.5 })), TypeError);
+         // @ts-expect-error
+         assert.throws(() => collect(map.matchingValues({}, { maxVisits: 'bad' })), TypeError);
+         assert.throws(() => collect(map.matchingValues({}, { pathPrefix: 'actor.hp.value' })), RangeError);
+      });
+
       it('validates matching path bounds during iteration', () =>
       {
          const map = new PropertyPathMap<string>();
@@ -882,6 +1122,54 @@ describe('PropertyPathMap', () =>
             [[symbol, NaN], 'nan'],
             [[symbol, NaN, 'child'], 'child']
          ]);
+      });
+
+      it('applies maxDepth relative to pathPrefix across subtree projections', () =>
+      {
+         const map = new PropertyPathMap<string>();
+         map.set('actor', 'actor');
+         map.set('actor.system', 'system');
+         map.set('actor.system.hp', 'hp');
+         map.set('actor.name', 'name');
+
+         assert.deepEqual(collect(map.subtreeEntries({
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), [
+            [['actor'], 'actor'],
+            [['actor', 'system'], 'system'],
+            [['actor', 'name'], 'name']
+         ]);
+         assert.deepEqual(collect(map.subtreeKeys({
+            pathPrefix: 'actor',
+            maxDepth: 0
+         })), [['actor']]);
+         assert.deepEqual(collect(map.subtreeValues({
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), ['actor', 'system', 'name']);
+      });
+
+      it('limits subtree results and visits', () =>
+      {
+         const map = new PropertyPathMap<string>();
+         map.set('first', 'first').set('second', 'second');
+
+         assert.deepEqual(collect(map.subtreeValues({ maxResults: 1 })), ['first']);
+         assert.throws(() => collect(map.subtreeEntries({ maxVisits: 1 })), RangeError,
+          `PropertyPathMap traversal error: Traversal exceeded 'options.maxVisits'.`);
+      });
+
+      it('validates subtree numeric limits and configured path depth', () =>
+      {
+         const map = new PropertyPathMap<string>(null, { maxPathDepth: 2 });
+         map.set('actor.hp', 'hp');
+
+         assert.throws(() => collect(map.subtreeValues({ maxDepth: -1 })), TypeError);
+         assert.throws(() => collect(map.subtreeValues({ maxResults: 1.5 })), TypeError);
+         // @ts-expect-error
+         assert.throws(() => collect(map.subtreeValues({ maxVisits: 'bad' })), TypeError);
+         assert.throws(() => collect(map.subtreeValues({ stopAt: 'actor.hp.value' })), RangeError);
       });
 
       it('validates subtree bounds during iteration', () =>

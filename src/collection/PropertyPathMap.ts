@@ -1,9 +1,27 @@
 import {
-   isArrayIndex,
-   isPropertyPathPrefix,
-   normalizePropertyPath }    from '../functions';
+   assertPropertyPathOptionsObject,
+   consumePropertyPathTraversalResult,
+   consumePropertyPathTraversalVisit,
+   createPropertyPathTraversalBudget,
+   DEFAULT_PROPERTY_PATH_DEPTH_LIMIT,
+   DEFAULT_PROPERTY_PATH_ENTRY_LIMIT,
+   DEFAULT_PROPERTY_PATH_NODE_LIMIT,
+   DEFAULT_PROPERTY_PATH_RESULT_LIMIT,
+   DEFAULT_PROPERTY_PATH_VISIT_LIMIT,
+   isArrayIndexValue,
+   isPropertyPathTraversableValue,
+   normalizePropertyPathLimit,
+   normalizePropertyPathTraversalBounds,
+   normalizePropertyPathValue }                     from '../internal/PropertyPathTraversal';
 
-import type { PropertyPath }  from '../types';
+import type {
+   NormalizedPropertyPathTraversalBounds,
+   PropertyPathTraversalBudget,
+   PropertyPathTraversableValue }                     from '../internal/PropertyPathTraversal';
+
+import type {
+   PropertyPath,
+   PropertyPathTraversalLimits }                     from '../types';
 
 /**
  * Stores values by structural {@link PropertyPath} paths using a property-key trie.
@@ -39,6 +57,21 @@ import type { PropertyPath }  from '../types';
  * - Symbols compare by identity.
  * - Numeric and string segments remain distinct (`0` is not `'0'`).
  *
+ * ## Defensive limits
+ *
+ * Every instance applies configurable limits to stored path depth, terminal entries, allocated trie nodes, yielded
+ * traversal results, and traversal visits. Storage limits are preflighted before mutation, so failed insertion cannot
+ * leave a partial trie branch. Per-call `maxDepth`, `maxResults`, and `maxVisits` options may reduce, but never exceed,
+ * the constructor traversal caps.
+ *
+ * Reaching `maxResults` ends an iterator normally after the configured number of results. Exceeding `maxVisits` throws
+ * before another candidate property or trie node is processed during the iterative walk. Path normalization and fixed-
+ * depth trie scope lookup are bounded separately by `maxPathDepth`. These limits do not measure the retained size of
+ * mapped values or individual property keys.
+ *
+ * Candidate-object matching may invoke getters and proxy traps when descendant traversal or an explicitly requested
+ * terminal property value requires a read. Exceptions from those operations are intentionally propagated.
+ *
  * ## Complexity
  *
  * `get`, `has`, and `set` are `O(path length)`. `delete` is also `O(path length)` and prunes unused trie nodes.
@@ -49,8 +82,8 @@ import type { PropertyPath }  from '../types';
  * subtree, while `stopAt` prunes one descendant branch by trie-node identity.
  *
  * Candidate-independent subtree iterators reuse the same absolute bounds and visit only terminal entries beneath the
- * selected trie node. Matching and subtree iterators use deterministic depth-first trie order rather than global
- * insertion order.
+ * selected trie node. `maxDepth` is relative to `pathPrefix`, or to the trie root when no prefix is supplied. Matching
+ * and subtree iterators use deterministic depth-first trie order rather than global insertion order.
  *
  * Stored canonical paths are copied and frozen once when first inserted. Overwriting an existing entry retains its
  * original insertion position and canonical path. Deleting and reinserting a path moves it to the end, matching normal
@@ -76,15 +109,56 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /** Number of exact paths currently storing values. */
    #size = 0;
 
+   /** Number of allocated non-root trie nodes. */
+   #nodeCount = 0;
+
+   /** Maximum accepted path depth. */
+   readonly #maxPathDepth: number;
+
+   /** Maximum number of stored terminal entries. */
+   readonly #maxEntries: number;
+
+   /** Maximum number of allocated non-root trie nodes. */
+   readonly #maxNodes: number;
+
+   /** Maximum results permitted by one traversal. */
+   readonly #maxTraversalResults: number;
+
+   /** Maximum visits permitted by one traversal. */
+   readonly #maxTraversalVisits: number;
+
    /**
     * Creates a new path map and optionally initializes it from accessor / value pairs.
     *
-    * Later duplicate paths overwrite earlier values without changing the original insertion position.
+    * Later duplicate paths overwrite earlier values without changing the original insertion position. Resource limits
+    * are validated before initial entries are inserted and apply to every subsequent operation.
     *
     * @param entries - Optional initial accessor / value entries.
+    *
+    * @param options - Defensive storage and traversal limits.
+    *
+    * @param options.maxEntries - Maximum number of exact stored paths; default: `65536`.
+    * @param options.maxNodes - Maximum number of allocated non-root trie nodes; default: `262144`.
+    * @param options.maxPathDepth - Maximum number of property-key segments in any stored path; default: `256`.
+    * @param options.maxTraversalResults - Maximum results produced by one iterator unless reduced per call; default:
+    *        `65536`.
+    * @param options.maxTraversalVisits - Maximum properties or trie nodes inspected by one iterator unless reduced per
+    *        call; default: `262144`.
+    *
+    * @throws {TypeError} If a constructor option is not a non-negative safe integer.
+    * @throws {RangeError} If an initial entry exceeds a configured storage limit.
     */
-   constructor(entries?: Iterable<readonly [PropertyPath, V]> | null)
+   constructor(entries?: Iterable<readonly [PropertyPath, V]> | null,
+    options: PropertyPathMap.Options.Constructor = {})
    {
+      const limits: PropertyPathMapLimits = normalizePropertyPathMapLimits(options);
+
+      this.#maxPathDepth = limits.maxPathDepth;
+      this.#maxEntries = limits.maxEntries;
+      this.#maxNodes = limits.maxNodes;
+      this.#maxTraversalResults = limits.maxTraversalResults;
+      this.#maxTraversalVisits = limits.maxTraversalVisits;
+
       if (entries === void 0 || entries === null) { return; }
 
       for (const [accessor, value] of entries) { this.set(accessor, value); }
@@ -96,6 +170,16 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    get size(): number
    {
       return this.#size;
+   }
+
+   /**
+    * Number of allocated non-root trie nodes.
+    *
+    * This value is maintained incrementally and may be used to monitor current trie resource consumption.
+    */
+   get nodeCount(): number
+   {
+      return this.#nodeCount;
    }
 
    /**
@@ -118,6 +202,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
       this.#firstEntry = void 0;
       this.#lastEntry = void 0;
       this.#size = 0;
+      this.#nodeCount = 0;
    }
 
    /**
@@ -134,10 +219,11 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns `true` when an entry existed and was removed; otherwise `false`.
     *
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured `maxPathDepth`.
     */
    delete(accessor: PropertyPath): boolean
    {
-      const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
+      const path: readonly PropertyKey[] = this.#normalizeStoredPath(accessor);
       const frames: PropertyPathMapDeleteFrame<V>[] = [];
       let node: PropertyPathMapNode<V> = this.#root;
 
@@ -169,6 +255,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
          if (child.entry !== void 0 || (child.children?.size ?? 0) > 0) { break; }
 
          parent.children?.delete(key);
+         this.#nodeCount--;
 
          // Avoid retaining empty child maps on otherwise reusable prefix nodes.
          if (parent.children?.size === 0) { delete parent.children; }
@@ -180,24 +267,27 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /**
     * Returns an insertion-order iterator of `[path, value]` pairs.
     *
-    * Paths are canonical frozen arrays owned by this map. Each yielded tuple is newly allocated, but the path itself
-    * is reused across iterations.
+    * Paths are canonical frozen arrays owned by this map. `maxDepth` is measured from the trie root, `maxResults`
+    * truncates the iterator normally, and `maxVisits` throws when exceeded. Yielded entries retain insertion order.
+    *
+    * @param options - Optional insertion-order traversal limits.
     *
     * @returns Entry iterator.
+    *
+    * @throws {TypeError} If a numeric traversal option is invalid.
+    * @throws {RangeError} If `options.maxVisits` is exceeded.
     */
-   *entries(): IterableIterator<[readonly PropertyKey[], V]>
+   *entries(options: PropertyPathMap.Options.Iteration = {}): IterableIterator<[readonly PropertyKey[], V]>
    {
-      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
-      {
-         yield [entry.path, entry.value];
-      }
+      for (const entry of this.#insertionEntryIterator(options)) { yield [entry.path, entry.value]; }
    }
 
    /**
     * Invokes a callback once for every entry in insertion order.
     *
     * The callback arguments follow `Map.prototype.forEach`: value, key, then map. The key is the canonical readonly
-    * property-key array associated with the stored entry.
+    * property-key array associated with the stored entry. Unlike the explicit iterator methods, `forEach` always
+    * visits the complete map, which is already bounded by the configured `maxEntries` storage limit.
     *
     * @param callback - Function invoked for each entry.
     *
@@ -223,10 +313,11 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns Stored value or `undefined` when the exact path is absent.
     *
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured `maxPathDepth`.
     */
    get(accessor: PropertyPath): V | undefined
    {
-      return this.#findNode(normalizePropertyPath(accessor))?.entry?.value;
+      return this.#findNode(this.#normalizeStoredPath(accessor))?.entry?.value;
    }
 
    /**
@@ -239,14 +330,17 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns Whether the exact path stores a value.
     *
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured `maxPathDepth`.
     */
    has(accessor: PropertyPath): boolean
    {
-      return this.#findNode(normalizePropertyPath(accessor))?.entry !== void 0;
+      return this.#findNode(this.#normalizeStoredPath(accessor))?.entry !== void 0;
    }
 
    /**
     * Returns the default insertion-order iterator of `[path, value]` pairs.
+    *
+    * Constructor-level traversal result and visit caps apply. Use {@link entries} when per-call limits are required.
     */
    [Symbol.iterator](): IterableIterator<[readonly PropertyKey[], V]>
    {
@@ -256,14 +350,18 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /**
     * Returns an insertion-order iterator of canonical property-key paths.
     *
+    * `maxDepth` is measured from the trie root, `maxResults` truncates normally, and `maxVisits` throws when exceeded.
+    *
+    * @param options - Optional insertion-order traversal limits.
+    *
     * @returns Key iterator.
+    *
+    * @throws {TypeError} If a numeric traversal option is invalid.
+    * @throws {RangeError} If `options.maxVisits` is exceeded.
     */
-   *keys(): IterableIterator<readonly PropertyKey[]>
+   *keys(options: PropertyPathMap.Options.Iteration = {}): IterableIterator<readonly PropertyKey[]>
    {
-      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
-      {
-         yield entry.path;
-      }
+      for (const entry of this.#insertionEntryIterator(options)) { yield entry.path; }
    }
 
    /**
@@ -290,6 +388,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * Matching uses depth-first trie order, with sibling branches following the order in which their first trie nodes
     * were created. This order is deterministic for an unchanged map but is not the map's global insertion order.
+    * `maxDepth` is relative to `pathPrefix`, or to the trie root when no prefix is supplied. `maxResults` truncates
+    * normally, while `maxVisits` throws before another candidate property or trie node is processed.
     *
     * @param data - Candidate object or function to inspect. Non-traversable values produce an empty iterator.
     *
@@ -298,8 +398,9 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns Iterator of canonical stored paths and their associated mapped values, optionally followed by the
     *          resolved candidate property value.
     *
-    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If a path bound exceeds configured limits, `options.stopAt` is outside
+    *          `options.pathPrefix`, or `options.maxVisits` is exceeded.
     */
    matchingEntries(data: unknown, options: PropertyPathMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[readonly PropertyKey[], V, unknown]>;
@@ -313,6 +414,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    *matchingEntries(data: unknown, options: PropertyPathMap.Options.Match = {}):
     IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>
    {
+      assertPropertyPathOptionsObject(options, 'PropertyPathMap matching');
+
       const includePropertyValue: boolean = options.includePropertyValue ?? false;
 
       for (const match of this.#matchingEntryIterator(data, options))
@@ -336,8 +439,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of matching canonical property-key paths.
     *
-    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    *matchingKeys(data: unknown, options?: PropertyPathMap.Options.MatchKeys):
     IterableIterator<readonly PropertyKey[]>
@@ -358,8 +461,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
-    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    matchingValues(data: unknown, options: PropertyPathMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[V, unknown]>;
@@ -373,6 +476,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    *matchingValues(data: unknown, options: PropertyPathMap.Options.Match = {}):
     IterableIterator<V | [V, unknown]>
    {
+      assertPropertyPathOptionsObject(options, 'PropertyPathMap matching');
+
       const includePropertyValue: boolean = options.includePropertyValue ?? false;
 
       for (const match of this.#matchingEntryIterator(data, options))
@@ -389,14 +494,15 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * `stopAt` includes its own entry when present and prunes all descendants beneath that node.
     *
     * Subtree traversal uses deterministic depth-first trie order rather than global insertion order. Returned
-    * canonical paths remain absolute and are reused from their stored entries.
+    * canonical paths remain absolute and are reused from their stored entries. `maxDepth` is relative to `pathPrefix`,
+    * or to the trie root when no prefix is supplied. `maxResults` truncates normally, while `maxVisits` throws.
     *
     * @param options - Subtree bounds.
     *
     * @returns Iterator of canonical stored paths and mapped values.
     *
-    * @throws {TypeError} If either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a numeric limit or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    *subtreeEntries(options: PropertyPathMap.Options.Subtree = {}):
     IterableIterator<[readonly PropertyKey[], V]>
@@ -414,8 +520,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of canonical stored property-key paths.
     *
-    * @throws {TypeError} If either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a numeric limit or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    *subtreeKeys(options: PropertyPathMap.Options.Subtree = {}): IterableIterator<readonly PropertyKey[]>
    {
@@ -432,8 +538,8 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Iterator of mapped values.
     *
-    * @throws {TypeError} If either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a numeric limit or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    *subtreeValues(options: PropertyPathMap.Options.Subtree = {}): IterableIterator<V>
    {
@@ -443,8 +549,9 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /**
     * Stores a value at an exact structural path.
     *
-    * Missing trie nodes are allocated lazily. Overwriting an existing path updates only its value, preserving size and
-    * insertion order. A new entry copies and freezes its normalized path once for stable iteration.
+    * Existing trie nodes are inspected first so path depth, entry count, and node count limits can be validated before
+    * any mutation occurs. Overwriting an existing path updates only its value, preserving size and insertion order.
+    * A new entry copies and freezes its normalized path once for stable iteration.
     *
     * @param accessor - Dotted or exact property-key accessor.
     *
@@ -453,35 +560,64 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @returns This map.
     *
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path depth, entry count, or trie node count limit would be exceeded.
     */
    set(accessor: PropertyPath, value: V): this
    {
-      const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
+      const path: readonly PropertyKey[] = this.#normalizeStoredPath(accessor);
       let node: PropertyPathMapNode<V> = this.#root;
+      let missingIndex = -1;
 
-      // Allocate only the missing suffix; existing prefixes are shared by every related path.
-      for (const key of path)
+      // Preflight the existing prefix without allocating nodes so every configured resource limit can fail atomically.
+      for (let index: number = 0; index < path.length; index++)
       {
-         const children: Map<PropertyKey, PropertyPathMapNode<V>> = node.children ??= new Map();
-         let child: PropertyPathMapNode<V> | undefined = children.get(key);
+         const child: PropertyPathMapNode<V> | undefined = node.children?.get(path[index]);
 
          if (child === void 0)
          {
-            child = {};
-            children.set(key, child);
+            missingIndex = index;
+            break;
          }
 
          node = child;
       }
 
-      if (node.entry !== void 0)
+      if (missingIndex === -1 && node.entry !== void 0)
       {
          // Match native Map overwrite behavior: update the value without changing insertion order or size.
          node.entry.value = value;
          return this;
       }
 
-      // Array accessors are returned unchanged by normalizeSafeAccessor, so copy before retaining the path.
+      const missingNodes: number = missingIndex === -1 ? 0 : path.length - missingIndex;
+
+      if (this.#size >= this.#maxEntries)
+      {
+         throw new RangeError(`PropertyPathMap error: Insertion exceeds configured 'maxEntries' of ` +
+          `${this.#maxEntries}.`);
+      }
+
+      if (missingNodes > this.#maxNodes - this.#nodeCount)
+      {
+         throw new RangeError(`PropertyPathMap error: Insertion exceeds configured 'maxNodes' of ` +
+          `${this.#maxNodes}.`);
+      }
+
+      // Allocate only the preflighted missing suffix; existing prefixes remain shared by related paths.
+      if (missingIndex !== -1)
+      {
+         for (let index: number = missingIndex; index < path.length; index++)
+         {
+            const children: Map<PropertyKey, PropertyPathMapNode<V>> = node.children ??= new Map();
+            const child: PropertyPathMapNode<V> = {};
+
+            children.set(path[index], child);
+            node = child;
+         }
+
+         this.#nodeCount += missingNodes;
+      }
+
       const canonicalPath: readonly PropertyKey[] = Object.freeze(Array.from(path));
       const entry: PropertyPathMapEntry<V> = { path: canonicalPath, value };
 
@@ -495,17 +631,78 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    /**
     * Returns an insertion-order iterator of stored values.
     *
+    * `maxDepth` is measured from the trie root, `maxResults` truncates normally, and `maxVisits` throws when exceeded.
+    *
+    * @param options - Optional insertion-order traversal limits.
+    *
     * @returns Value iterator.
+    *
+    * @throws {TypeError} If a numeric traversal option is invalid.
+    * @throws {RangeError} If `options.maxVisits` is exceeded.
     */
-   *values(): IterableIterator<V>
+   *values(options: PropertyPathMap.Options.Iteration = {}): IterableIterator<V>
    {
-      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
-      {
-         yield entry.value;
-      }
+      for (const entry of this.#insertionEntryIterator(options)) { yield entry.value; }
    }
 
    // Internal Utility Functions -------------------------------------------------------------------------------------
+
+   /**
+    * Returns insertion-order entries constrained by optional defensive traversal limits.
+    */
+   *#insertionEntryIterator(options: PropertyPathMap.Options.Iteration = {}):
+    IterableIterator<PropertyPathMapEntry<V>>
+   {
+      assertPropertyPathOptionsObject(options, 'PropertyPathMap iteration');
+
+      const bounds: NormalizedPropertyPathTraversalBounds = normalizePropertyPathTraversalBounds({
+         maxDepth: options.maxDepth,
+         maxResults: options.maxResults,
+         maxVisits: options.maxVisits
+      }, {
+         errorPrefix: 'PropertyPathMap iteration',
+         prefixOption: 'pathPrefix',
+         stopOption: 'stopAt',
+         defaultMaxResults: this.#maxTraversalResults,
+         defaultMaxVisits: this.#maxTraversalVisits,
+         maxResultsLimit: this.#maxTraversalResults,
+         maxVisitsLimit: this.#maxTraversalVisits
+      });
+      const budget: PropertyPathTraversalBudget = createPropertyPathTraversalBudget(bounds,
+       'PropertyPathMap iteration');
+      const maxPathLength: number = Math.min(bounds.maxPathLength, this.#maxPathDepth);
+
+      if (budget.maxResults === 0) { return; }
+
+      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
+      {
+         if (budget.results >= budget.maxResults) { return; }
+
+         consumePropertyPathTraversalVisit(budget);
+
+         if (entry.path.length > maxPathLength) { continue; }
+         consumePropertyPathTraversalResult(budget);
+
+         yield entry;
+      }
+   }
+
+   /**
+    * Normalizes a stored path and enforces the configured path-depth limit before trie access.
+    */
+   #normalizeStoredPath(accessor: PropertyPath): readonly PropertyKey[]
+   {
+      const path: readonly PropertyKey[] = normalizePropertyPathValue(accessor,
+       `normalizePropertyPath error: 'path' is not a valid property path.`);
+
+      if (path.length > this.#maxPathDepth)
+      {
+         throw new RangeError(`PropertyPathMap error: Path depth ${path.length} exceeds configured ` +
+          `'maxPathDepth' of ${this.#maxPathDepth}.`);
+      }
+
+      return path;
+   }
 
    /**
     * Adds a newly created terminal entry to the insertion-order list.
@@ -553,49 +750,25 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 
    /**
-    * Returns whether a candidate value can provide another property-path segment.
-    *
-    * Called by matching traversal for the root candidate and for each value reached below a stored trie prefix.
-    * Functions are accepted because JavaScript functions may own or inherit properties.
-    *
-    * @param value - Candidate value.
-    *
-    * @returns Whether `value` is a non-null object or function.
-    */
-   static #isPropertyPathMapTraversableValue(value: unknown): value is PropertyPathMapTraversableValue
-   {
-      return value !== null && (typeof value === 'object' || typeof value === 'function');
-   }
-
-   /**
     * Yields terminal entries whose stored paths exist in a candidate value.
     *
-    * Called by {@link matchingEntries}, {@link matchingKeys}, and {@link matchingValues}. Keeping the trie walk at the
-    * match-record level lets all projections share one traversal while reading each candidate property at most once.
-    *
-    * When `pathPrefix` is present, the corresponding trie node is located before candidate data is touched. The same
-    * absolute prefix is then resolved against the candidate exactly once. Its terminal entry is yielded when present,
-    * and its child iterator becomes the first traversal frame. Without a prefix, traversal starts at the trie root.
-    *
-    * `stopAt` is resolved to trie-node identity once. Reaching that node still yields its terminal entry, but its child
-    * iterator is never pushed, pruning the complete descendant branch without repeated path comparisons.
-    *
-    * Terminal-only candidate properties are read only when `includePropertyValue` is enabled. A node with descendants
-    * must be read so its value can be tested for continued traversal. When a node is both terminal and a prefix, that
-    * single read supplies both the yielded property value and descendant traversal.
+    * Matching traversal shares normalized prefix, stop, depth, result, and visit bounds with subtree and object-path
+    * traversal. Candidate properties are read only when a descendant must be traversed or a terminal property value
+    * is explicitly requested. Getter and proxy exceptions are intentionally propagated.
     *
     * @param data - Candidate object or function to inspect.
-    *
     * @param options - Matching options.
     *
-    * @returns Iterator of matching terminal entries and their optionally resolved candidate property values.
+    * @returns Iterator of matching terminal entries and optionally resolved candidate property values.
     *
-    * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    *#matchingEntryIterator(data: unknown, options: PropertyPathMap.Options.MatchKeys |
     PropertyPathMap.Options.Match = {}): IterableIterator<PropertyPathMapMatch<V>>
    {
+      assertPropertyPathOptionsObject(options, 'PropertyPathMap matching');
+
       const hasOwnOnly: boolean = options.hasOwnOnly ?? false;
       const includePropertyValue: boolean = 'includePropertyValue' in options ?
        options.includePropertyValue ?? false : false;
@@ -610,33 +783,44 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
          throw new TypeError(`PropertyPathMap matching error: 'options.includePropertyValue' is not a boolean.`);
       }
 
-      const { pathPrefix, startNode, stopNode } = this.#resolveTraversalScope(options);
+      const { bounds, startNode, stopNode } = this.#resolveTraversalScope(options);
+      const budget: PropertyPathTraversalBudget = createPropertyPathTraversalBudget(bounds,
+       'PropertyPathMap traversal');
 
       // Resolve trie bounds before touching candidate data so a missing stored prefix rejects the operation cheaply.
-      if (startNode === void 0 || !PropertyPathMap.#isPropertyPathMapTraversableValue(data)) { return; }
+      if (budget.maxResults === 0 || startNode === void 0 ||
+       !isPropertyPathTraversableValue(data))
+      {
+         return;
+      }
 
+      const startPathLength: number = bounds.prefixPath?.length ?? 0;
       let stack: PropertyPathMapMatchFrame<V>[];
 
-      if (pathPrefix !== void 0)
+      if (bounds.prefixPath !== void 0)
       {
-         let candidate: PropertyPathMapTraversableValue = data;
+         let candidate: PropertyPathTraversableValue = data;
          let propertyValue: unknown;
 
          // Resolve the selected absolute prefix against the candidate once before entering general subtree traversal.
-         for (let index: number = 0; index < pathPrefix.length; index++)
+         for (let index: number = 0; index < bounds.prefixPath.length; index++)
          {
-            const key: PropertyKey = pathPrefix[index];
+            consumePropertyPathTraversalVisit(budget);
+
+            const key: PropertyKey = bounds.prefixPath[index];
 
             // Arrays reject string indexes and non-index string properties consistently at every prefix depth.
-            if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndex(key)) { return; }
+            if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndexValue(key)) { return; }
 
             const exists: boolean = hasOwnOnly ? Object.hasOwn(candidate, key) : key in candidate;
 
             if (!exists) { return; }
 
-            const isFinal: boolean = index === pathPrefix.length - 1;
-            const requiresRead: boolean = !isFinal || includePropertyValue ||
-             (startNode !== stopNode && startNode.children !== void 0);
+            const isFinal: boolean = index === bounds.prefixPath.length - 1;
+            const canDescend: boolean = isFinal && startPathLength < bounds.maxPathLength &&
+             startNode !== stopNode && startNode.children !== void 0;
+            const requiresRead: boolean = !isFinal ||
+             (isFinal && ((startNode.entry !== void 0 && includePropertyValue) || canDescend));
 
             propertyValue = void 0;
 
@@ -647,32 +831,39 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
             if (!isFinal)
             {
-               if (!PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue)) { return; }
+               if (!isPropertyPathTraversableValue(propertyValue)) { return; }
                candidate = propertyValue;
             }
          }
 
-         if (startNode.entry !== void 0) { yield { entry: startNode.entry, propertyValue }; }
+         if (startNode.entry !== void 0)
+         {
+            consumePropertyPathTraversalResult(budget);
+            yield { entry: startNode.entry, propertyValue };
+         }
 
-         if (startNode === stopNode || startNode.children === void 0 ||
-          !PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue))
+         if (budget.results >= budget.maxResults || startPathLength >= bounds.maxPathLength ||
+          startNode === stopNode || startNode.children === void 0 ||
+          !isPropertyPathTraversableValue(propertyValue))
          {
             return;
          }
 
-         stack = [{ value: propertyValue, iterator: startNode.children.entries() }];
+         stack = [{ value: propertyValue, iterator: startNode.children.entries(), pathLength: startPathLength }];
       }
       else
       {
          const rootChildren: Map<PropertyKey, PropertyPathMapNode<V>> | undefined = startNode.children;
 
-         if (rootChildren === void 0) { return; }
+         if (rootChildren === void 0 || bounds.maxPathLength === 0) { return; }
 
-         stack = [{ value: data, iterator: rootChildren.entries() }];
+         stack = [{ value: data, iterator: rootChildren.entries(), pathLength: 0 }];
       }
 
       while (stack.length > 0)
       {
+         if (budget.results >= budget.maxResults) { return; }
+
          const frame: PropertyPathMapMatchFrame<V> = stack[stack.length - 1];
          const result: IteratorResult<[PropertyKey, PropertyPathMapNode<V>]> = frame.iterator.next();
 
@@ -682,104 +873,134 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
             continue;
          }
 
+         consumePropertyPathTraversalVisit(budget);
+
          const [key, child] = result.value;
+         const childPathLength: number = frame.pathLength + 1;
 
          // Arrays deliberately reject string indexes and non-index string properties to match PropertyPath traversal.
-         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndex(key)) { continue; }
+         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndexValue(key)) { continue; }
 
          const exists: boolean = hasOwnOnly ? Object.hasOwn(frame.value, key) : key in frame.value;
 
          // A missing prefix rejects this node and every stored path below it.
          if (!exists) { continue; }
 
-         const hasChildren: boolean = child.children !== void 0;
          const isStopNode: boolean = child === stopNode;
+         const canDescend: boolean = child.children !== void 0 && !isStopNode &&
+          childPathLength < bounds.maxPathLength;
          let propertyValue: unknown;
 
-         // A stopped node does not need a value read for descendants, but includePropertyValue still requests it.
-         if (includePropertyValue || (hasChildren && !isStopNode))
+         // Terminal-only properties are not read unless explicitly requested.
+         if ((child.entry !== void 0 && includePropertyValue) || canDescend)
          {
             propertyValue = (frame.value as unknown as Record<PropertyKey, unknown>)[key];
          }
 
-         if (child.entry !== void 0) { yield { entry: child.entry, propertyValue }; }
+         if (child.entry !== void 0)
+         {
+            consumePropertyPathTraversalResult(budget);
+            yield { entry: child.entry, propertyValue };
+         }
 
-         if (isStopNode || !hasChildren ||
-          !PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue))
+         if (budget.results >= budget.maxResults || !canDescend ||
+          !isPropertyPathTraversableValue(propertyValue))
          {
             continue;
          }
 
-         stack.push({ value: propertyValue, iterator: child.children!.entries() });
+         stack.push({ value: propertyValue, iterator: child.children!.entries(), pathLength: childPathLength });
       }
    }
 
    /**
-    * Normalizes and resolves the common absolute path bounds used by matching and subtree traversal.
+    * Normalizes and resolves common absolute path and resource bounds used by every trie traversal.
     *
-    * Accessor validation occurs before trie lookup so an invalid bound always throws, including on an empty map.
-    * `stopAt` must equal or descend from `pathPrefix`; this prevents silently accepting a stop boundary that cannot be
-    * reached by the selected subtree. Missing valid trie paths are represented by an undefined node and produce an
-    * empty iterator without allocating traversal frames.
-    *
-    * @param options - Common traversal options.
-    *
-    * @returns Normalized prefix plus resolved start and stop trie nodes.
-    *
-    * @throws {TypeError} If either accessor option is invalid.
-    * @throws {RangeError} If `stopAt` is outside `pathPrefix`.
+    * Accessor and numeric validation occur before trie or candidate access. Per-call result and visit limits may reduce,
+    * but never exceed, the constructor-level traversal caps.
     */
-   #resolveTraversalScope({ pathPrefix, stopAt }: PropertyPathMap.Options.Common = {}):
-    PropertyPathMapTraversalScope<V>
+   #resolveTraversalScope(options: PropertyPathMap.Options.Common = {}): PropertyPathMapTraversalScope<V>
    {
-      const prefixPath: readonly PropertyKey[] | undefined = pathPrefix === void 0 ?
-       void 0 : normalizePropertyPath(pathPrefix);
-      const stopPath: readonly PropertyKey[] | undefined = stopAt === void 0 ?
-       void 0 : normalizePropertyPath(stopAt);
+      assertPropertyPathOptionsObject(options, 'PropertyPathMap traversal');
 
-      if (prefixPath !== void 0 && stopPath !== void 0 && !isPropertyPathPrefix(prefixPath, stopPath))
+      const { pathPrefix, stopAt, maxDepth, maxResults, maxVisits } = options;
+      const normalized: NormalizedPropertyPathTraversalBounds = normalizePropertyPathTraversalBounds({
+         prefixPath: pathPrefix,
+         stopPath: stopAt,
+         maxDepth,
+         maxResults,
+         maxVisits
+      }, {
+         errorPrefix: 'PropertyPathMap traversal',
+         prefixOption: 'pathPrefix',
+         stopOption: 'stopAt',
+         defaultMaxResults: this.#maxTraversalResults,
+         defaultMaxVisits: this.#maxTraversalVisits,
+         maxResultsLimit: this.#maxTraversalResults,
+         maxVisitsLimit: this.#maxTraversalVisits,
+         stopOutsideMessage: `PropertyPathMap traversal error: 'options.stopAt' is outside ` +
+          `'options.pathPrefix'.`
+      });
+
+      if (normalized.prefixPath !== void 0 && normalized.prefixPath.length > this.#maxPathDepth)
       {
-         throw new RangeError(`PropertyPathMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
+         throw new RangeError(`PropertyPathMap traversal error: 'options.pathPrefix' exceeds configured ` +
+          `'maxPathDepth' of ${this.#maxPathDepth}.`);
       }
 
+      if (normalized.stopPath !== void 0 && normalized.stopPath.length > this.#maxPathDepth)
+      {
+         throw new RangeError(`PropertyPathMap traversal error: 'options.stopAt' exceeds configured ` +
+          `'maxPathDepth' of ${this.#maxPathDepth}.`);
+      }
+
+      const bounds: NormalizedPropertyPathTraversalBounds = {
+         ...normalized,
+         maxPathLength: Math.min(normalized.maxPathLength, this.#maxPathDepth)
+      };
+
       return {
-         pathPrefix: prefixPath,
-         startNode: prefixPath === void 0 ? this.#root : this.#findNode(prefixPath),
-         stopNode: stopPath === void 0 ? void 0 : this.#findNode(stopPath)
+         bounds,
+         startNode: bounds.prefixPath === void 0 ? this.#root : this.#findNode(bounds.prefixPath),
+         stopNode: bounds.stopPath === void 0 ? void 0 : this.#findNode(bounds.stopPath)
       };
    }
 
    /**
     * Yields terminal entries from one bounded trie subtree without inspecting candidate data.
-    *
-    * The selected start node is yielded first when it stores an entry, followed by a depth-first walk of its children.
-    * Native child-map iterators preserve trie sibling creation order without allocating child arrays. `stopAt` is
-    * compared by resolved node identity and prunes descendants while retaining the stopped node's own entry.
-    *
-    * Called by {@link subtreeEntries}, {@link subtreeKeys}, and {@link subtreeValues}.
-    *
-    * @param options - Subtree bounds.
-    *
-    * @returns Iterator of terminal entries in deterministic trie order.
-    *
-    * @throws {TypeError} If either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
    *#subtreeEntryIterator(options: PropertyPathMap.Options.Subtree = {}):
     IterableIterator<PropertyPathMapEntry<V>>
    {
-      const { startNode, stopNode } = this.#resolveTraversalScope(options);
+      const { bounds, startNode, stopNode } = this.#resolveTraversalScope(options);
+      const budget: PropertyPathTraversalBudget = createPropertyPathTraversalBudget(bounds,
+       'PropertyPathMap traversal');
 
-      if (startNode === void 0) { return; }
+      if (budget.maxResults === 0 || startNode === void 0) { return; }
 
-      if (startNode.entry !== void 0) { yield startNode.entry; }
+      const startPathLength: number = bounds.prefixPath?.length ?? 0;
 
-      if (startNode === stopNode || startNode.children === void 0) { return; }
+      if (startNode.entry !== void 0)
+      {
+         consumePropertyPathTraversalResult(budget);
+         yield startNode.entry;
+      }
 
-      const stack: PropertyPathMapSubtreeFrame<V>[] = [{ iterator: startNode.children.entries() }];
+      if (budget.results >= budget.maxResults || startPathLength >= bounds.maxPathLength ||
+       startNode === stopNode || startNode.children === void 0)
+      {
+         return;
+      }
+
+      const stack: PropertyPathMapSubtreeFrame<V>[] = [{
+         iterator: startNode.children.entries(),
+         pathLength: startPathLength
+      }];
 
       while (stack.length > 0)
       {
+         if (budget.results >= budget.maxResults) { return; }
+
          const frame: PropertyPathMapSubtreeFrame<V> = stack[stack.length - 1];
          const result: IteratorResult<[PropertyKey, PropertyPathMapNode<V>]> = frame.iterator.next();
 
@@ -789,13 +1010,24 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
             continue;
          }
 
+         consumePropertyPathTraversalVisit(budget);
+
          const child: PropertyPathMapNode<V> = result.value[1];
+         const childPathLength: number = frame.pathLength + 1;
 
-         if (child.entry !== void 0) { yield child.entry; }
+         if (child.entry !== void 0)
+         {
+            consumePropertyPathTraversalResult(budget);
+            yield child.entry;
+         }
 
-         if (child === stopNode || child.children === void 0) { continue; }
+         if (budget.results >= budget.maxResults || childPathLength >= bounds.maxPathLength ||
+          child === stopNode || child.children === void 0)
+         {
+            continue;
+         }
 
-         stack.push({ iterator: child.children.entries() });
+         stack.push({ iterator: child.children.entries(), pathLength: childPathLength });
       }
    }
 
@@ -827,11 +1059,63 @@ declare namespace PropertyPathMap
    export namespace Options
    {
       /**
-       * Common absolute trie bounds shared by matching and subtree iterators.
+       * Constructor-level defensive limits applied to storage and every iterator.
        */
-      export interface Common
+      export interface Constructor
       {
+         /**
+          * Maximum number of exact stored paths. Overwriting an existing path does not consume another entry.
+          *
+          * @default 65536
+          */
+         maxEntries?: number;
+
+         /**
+          * Maximum number of allocated non-root trie nodes. Shared path prefixes consume one node per unique segment.
+          *
+          * @default 262144
+          */
+         maxNodes?: number;
+
+         /**
+          * Maximum number of property-key segments in a stored or queried path.
+          *
+          * @default 256
+          */
+         maxPathDepth?: number;
+
+         /**
+          * Maximum results produced by one iterator unless reduced per call. Reaching the limit truncates normally.
+          *
+          * @default 65536
+          */
+         maxTraversalResults?: number;
+
+         /**
+          * Maximum properties or trie nodes processed during iterator traversal unless reduced per call. Exceeding the limit
+          * throws a `RangeError`.
+          *
+          * @default 262144
+          */
+         maxTraversalVisits?: number;
+      }
+
+      /**
+       * Limits for insertion-order entries, keys, and values iterators.
+       */
+      export interface Iteration extends PropertyPathTraversalLimits
+      {
+      }
+
+      /**
+       * Common absolute trie bounds and defensive limits shared by matching and subtree iterators.
+       */
+      export interface Common extends PropertyPathTraversalLimits
+      {
+         /** Absolute stored path selecting the trie subtree where traversal begins. */
          pathPrefix?: PropertyPath;
+
+         /** Absolute stored path whose entry is included while every descendant beneath it is pruned. */
          stopAt?: PropertyPath;
       }
 
@@ -841,32 +1125,26 @@ declare namespace PropertyPathMap
       export interface MatchCommon extends Common
       {
          /**
-          * When `true`, every path segment must be an own property of the
-          * candidate value reached at that depth.
+          * When `true`, every path segment must be an own property of the candidate value reached at that depth.
           *
           * @default false
           */
          hasOwnOnly?: boolean;
       }
 
-      /**
-       * Options for matching path iteration.
-       */
+      /** Options for matching path iteration. */
       export interface MatchKeys extends MatchCommon
       {
       }
 
-      /**
-       * Options for matching entry and mapped-value iteration.
-       */
+      /** Options for matching entry and mapped-value iteration. */
       export interface Match extends MatchCommon
       {
+         /** Whether matching entries / values also include the property value resolved from candidate data. */
          includePropertyValue?: boolean;
       }
 
-      /**
-       * Options for candidate-independent subtree iteration.
-       */
+      /** Options for candidate-independent subtree iteration. */
       export interface Subtree extends Common
       {
       }
@@ -874,6 +1152,41 @@ declare namespace PropertyPathMap
 }
 
 export { PropertyPathMap };
+
+/**
+ * Fully normalized constructor limits retained by one map instance.
+ */
+interface PropertyPathMapLimits
+{
+   maxEntries: number;
+   maxNodes: number;
+   maxPathDepth: number;
+   maxTraversalResults: number;
+   maxTraversalVisits: number;
+}
+
+/**
+ * Validates and applies defaults to constructor-level resource limits.
+ */
+function normalizePropertyPathMapLimits(options: PropertyPathMap.Options.Constructor): PropertyPathMapLimits
+{
+   assertPropertyPathOptionsObject(options, 'PropertyPathMap');
+
+   return {
+      maxEntries: normalizePropertyPathLimit(options.maxEntries, DEFAULT_PROPERTY_PATH_ENTRY_LIMIT,
+       `PropertyPathMap error: 'options.maxEntries' is not a non-negative safe integer.`),
+      maxNodes: normalizePropertyPathLimit(options.maxNodes, DEFAULT_PROPERTY_PATH_NODE_LIMIT,
+       `PropertyPathMap error: 'options.maxNodes' is not a non-negative safe integer.`),
+      maxPathDepth: normalizePropertyPathLimit(options.maxPathDepth, DEFAULT_PROPERTY_PATH_DEPTH_LIMIT,
+       `PropertyPathMap error: 'options.maxPathDepth' is not a non-negative safe integer.`),
+      maxTraversalResults: normalizePropertyPathLimit(options.maxTraversalResults,
+       DEFAULT_PROPERTY_PATH_RESULT_LIMIT,
+       `PropertyPathMap error: 'options.maxTraversalResults' is not a non-negative safe integer.`),
+      maxTraversalVisits: normalizePropertyPathLimit(options.maxTraversalVisits,
+       DEFAULT_PROPERTY_PATH_VISIT_LIMIT,
+       `PropertyPathMap error: 'options.maxTraversalVisits' is not a non-negative safe integer.`)
+   };
+}
 
 // Internal Types ----------------------------------------------------------------------------------------------------
 
@@ -926,10 +1239,13 @@ interface PropertyPathMapEntry<V>
 interface PropertyPathMapMatchFrame<V>
 {
    /** Candidate value reached at this trie prefix. */
-   value: PropertyPathMapTraversableValue;
+   value: PropertyPathTraversableValue;
 
    /** Iterator over the trie node's children. */
    iterator: IterableIterator<[PropertyKey, PropertyPathMapNode<V>]>;
+
+   /** Absolute property-path length represented by this frame. */
+   pathLength: number;
 }
 
 /**
@@ -969,6 +1285,9 @@ interface PropertyPathMapSubtreeFrame<V>
 {
    /** Iterator over one trie node's children. */
    iterator: IterableIterator<[PropertyKey, PropertyPathMapNode<V>]>;
+
+   /** Absolute property-path length represented by this frame. */
+   pathLength: number;
 }
 
 /**
@@ -976,8 +1295,8 @@ interface PropertyPathMapSubtreeFrame<V>
  */
 interface PropertyPathMapTraversalScope<V>
 {
-   /** Normalized absolute prefix, or `undefined` when traversal begins at the trie root. */
-   pathPrefix?: readonly PropertyKey[];
+   /** Shared normalized path and resource bounds. */
+   bounds: NormalizedPropertyPathTraversalBounds;
 
    /** Trie node where traversal begins; missing stored prefixes resolve to `undefined`. */
    startNode?: PropertyPathMapNode<V>;
@@ -986,7 +1305,3 @@ interface PropertyPathMapTraversalScope<V>
    stopNode?: PropertyPathMapNode<V>;
 }
 
-/**
- * Object or function value that can supply another property-path segment.
- */
-type PropertyPathMapTraversableValue = object | ((...args: any[]) => any);

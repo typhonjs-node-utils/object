@@ -157,6 +157,48 @@ describe('WeakPropertyPathMap', () =>
        `WeakPropertyPathMap error: 'root' is not an object or function.`);
    });
 
+   describe('defensive limits', () =>
+   {
+      it('validates constructor limits', () =>
+      {
+         assert.throws(() => new WeakPropertyPathMap<object, number>(null), TypeError);
+         assert.throws(() => new WeakPropertyPathMap<object, number>({ maxEntries: -1 }), TypeError);
+      });
+
+      it('applies storage limits independently to each root', () =>
+      {
+         const rootA = {};
+         const rootB = {};
+         const map = new WeakPropertyPathMap<object, number>({ maxEntries: 1 });
+
+         map.set(rootA, 'value', 1);
+         map.set(rootB, 'value', 2);
+
+         assert.throws(() => map.set(rootA, 'other', 3), RangeError);
+         assert.equal(map.get(rootA, 'value'), 1);
+         assert.equal(map.get(rootB, 'value'), 2);
+      });
+
+      it('does not retain a root when its first insertion exceeds a resource limit', () =>
+      {
+         const root = {};
+         const map = new WeakPropertyPathMap<object, number>({ maxPathDepth: 1 });
+
+         assert.throws(() => map.set(root, 'too.deep', 1), RangeError);
+         assert.isFalse(map.hasRoot(root));
+      });
+
+      it('validates configured path depth for absent-root exact operations', () =>
+      {
+         const root = {};
+         const map = new WeakPropertyPathMap<object, number>({ maxPathDepth: 1 });
+
+         assert.throws(() => map.get(root, 'too.deep'), RangeError);
+         assert.throws(() => map.has(root, 'too.deep'), RangeError);
+         assert.throws(() => map.delete(root, 'too.deep'), RangeError);
+      });
+   });
+
    describe('matching iterators', () =>
    {
       it('delegates matching entries, keys, and values for an existing root', () =>
@@ -301,6 +343,41 @@ describe('WeakPropertyPathMap', () =>
          ]);
       });
 
+      it('passes maxDepth, maxResults, and maxVisits through to matching iterators', () =>
+      {
+         const root = {};
+         const map = new WeakPropertyPathMap<object, string>();
+         map.set(root, 'actor', 'actor');
+         map.set(root, 'actor.hp', 'hp');
+         map.set(root, 'actor.hp.value', 'value');
+         map.set(root, 'actor.ac', 'ac');
+
+         const data = { actor: { hp: { value: 10 }, ac: 15 } };
+
+         assert.deepEqual(collect(map.matchingEntries(root, data, {
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), [
+            [['actor'], 'actor'],
+            [['actor', 'hp'], 'hp'],
+            [['actor', 'ac'], 'ac']
+         ]);
+         assert.deepEqual(collect(map.matchingKeys(root, data, { maxResults: 1 })), [['actor']]);
+         assert.deepEqual(collect(map.matchingValues(root, data, { maxResults: 2 })), ['actor', 'hp']);
+         assert.throws(() => collect(map.matchingValues(root, data, { maxVisits: 1 })), RangeError);
+      });
+
+      it('applies traversal caps for missing roots', () =>
+      {
+         const root = {};
+         const map = new WeakPropertyPathMap<object, string>({ maxPathDepth: 1 });
+
+         assert.throws(() => collect(map.matchingKeys(root, {}, {
+            pathPrefix: 'too.deep'
+         })), RangeError);
+         assert.throws(() => collect(map.matchingKeys(root, {}, { maxVisits: -1 })), TypeError);
+      });
+
       it('validates path bounds for missing roots during iterator consumption', () =>
       {
          const root = {};
@@ -365,6 +442,28 @@ describe('WeakPropertyPathMap', () =>
          assert.deepEqual(collect(map.subtreeEntries(root)), []);
          assert.deepEqual(collect(map.subtreeKeys(root, { pathPrefix: 'actor' })), []);
          assert.deepEqual(collect(map.subtreeValues(root, { stopAt: 'actor' })), []);
+      });
+
+      it('passes maxDepth, maxResults, and maxVisits through to subtree iterators', () =>
+      {
+         const root = {};
+         const map = new WeakPropertyPathMap<object, string>();
+         map.set(root, 'actor', 'actor');
+         map.set(root, 'actor.hp', 'hp');
+         map.set(root, 'actor.hp.value', 'value');
+         map.set(root, 'actor.ac', 'ac');
+
+         assert.deepEqual(collect(map.subtreeEntries(root, {
+            pathPrefix: 'actor',
+            maxDepth: 1
+         })), [
+            [['actor'], 'actor'],
+            [['actor', 'hp'], 'hp'],
+            [['actor', 'ac'], 'ac']
+         ]);
+         assert.deepEqual(collect(map.subtreeKeys(root, { maxResults: 1 })), [['actor']]);
+         assert.deepEqual(collect(map.subtreeValues(root, { maxResults: 2 })), ['actor', 'hp']);
+         assert.throws(() => collect(map.subtreeValues(root, { maxVisits: 1 })), RangeError);
       });
 
       it('validates subtree options for missing roots during iteration', () =>

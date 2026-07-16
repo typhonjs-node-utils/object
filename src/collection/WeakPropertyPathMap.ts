@@ -1,7 +1,10 @@
-import { normalizePropertyPath } from '../functions';
-import { PropertyPathMap }       from './PropertyPathMap';
+import {
+   assertPropertyPathOptionsObject,
+   isPropertyPathTraversableValue } from '../internal/PropertyPathTraversal';
 
-import type { PropertyPath }     from '../types';
+import { PropertyPathMap }          from './PropertyPathMap';
+
+import type { PropertyPath }        from '../types';
 
 /**
  * Associates structural {@link PropertyPath} paths with values beneath weakly held root objects.
@@ -36,6 +39,17 @@ import type { PropertyPath }     from '../types';
  * - `undefined` is a valid stored value; use {@link has} to distinguish it from an absent path.
  * - Deleting the final path for a root also removes that root from the internal `WeakMap` immediately.
  *
+ * ## Defensive limits
+ *
+ * The constructor accepts the same storage and traversal limits as {@link PropertyPathMap}. Limits apply independently
+ * to each root trie, and a failed first insertion is validated before the root is retained. Aggregate limits across all
+ * roots are intentionally unavailable because tracking weak roots globally would require strong retention and violate
+ * weak-collection semantics.
+ *
+ * Matching and subtree iterators support `maxDepth`, `maxResults`, and `maxVisits` through the delegated
+ * {@link PropertyPathMap} options. Candidate getters and proxy traps may execute when matching requires property reads;
+ * their exceptions are intentionally propagated.
+ *
  * ## Complexity
  *
  * Root lookup is expected `O(1)`. Path operations retain the `O(path length)` behavior of {@link PropertyPathMap}.
@@ -51,16 +65,33 @@ import type { PropertyPath }     from '../types';
  */
 export class WeakPropertyPathMap<R extends object, V>
 {
-   /**
-    * Shared empty trie used by matching and subtree methods when a weak root has no associated map.
-    *
-    * Delegating to an empty {@link PropertyPathMap} preserves normal matching-option validation without allocating a
-    * temporary iterator implementation or duplicating matching semantics in {@link WeakPropertyPathMap}.
-    */
-   static readonly #emptyPropertyPathMap: PropertyPathMap<never> = new PropertyPathMap();
-
    /** Weak root-to-trie associations. Reassigned by {@link clear}. */
    #roots: WeakMap<R, PropertyPathMap<V>> = new WeakMap();
+
+   /** Defensive limits applied independently to every per-root trie. */
+   readonly #options: Readonly<PropertyPathMap.Options.Constructor>;
+
+   /** Empty configured trie used to preserve validation semantics for missing roots. */
+   readonly #emptyPropertyPathMap: PropertyPathMap<never>;
+
+   /**
+    * Creates a weak property-path map with limits applied independently to every live root trie.
+    *
+    * Because weak roots are not enumerable, aggregate limits across all live roots cannot be tracked without retaining
+    * those roots strongly. Constructor limits therefore apply per root while preserving normal weak-key collection
+    * semantics.
+    *
+    * @param options - Per-root storage and traversal limits accepted by {@link PropertyPathMap}.
+    *
+    * @throws {TypeError} If `options` is invalid or a limit is not a non-negative safe integer.
+    */
+   constructor(options: PropertyPathMap.Options.Constructor = {})
+   {
+      assertPropertyPathOptionsObject(options, 'WeakPropertyPathMap');
+
+      this.#options = Object.freeze({ ...options });
+      this.#emptyPropertyPathMap = new PropertyPathMap<never>(null, this.#options);
+   }
 
    /**
     * Provides the standard object tag used by `Object.prototype.toString`.
@@ -96,6 +127,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
    delete(root: R, accessor: PropertyPath): boolean
    {
@@ -103,12 +135,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0)
-      {
-         // Preserve PropertyPathMap validation semantics even when no per-root trie exists.
-         normalizePropertyPath(accessor);
-         return false;
-      }
+      if (map === void 0) { return this.#emptyPropertyPathMap.delete(accessor); }
 
       if (!map.delete(accessor)) { return false; }
 
@@ -147,6 +174,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
    get(root: R, accessor: PropertyPath): V | undefined
    {
@@ -154,12 +182,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0)
-      {
-         // Validate absent-root queries consistently with a populated PropertyPathMap.
-         normalizePropertyPath(accessor);
-         return void 0;
-      }
+      if (map === void 0) { return this.#emptyPropertyPathMap.get(accessor); }
 
       return map.get(accessor);
    }
@@ -175,6 +198,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
    has(root: R, accessor: PropertyPath): boolean
    {
@@ -182,11 +206,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0)
-      {
-         normalizePropertyPath(accessor);
-         return false;
-      }
+      if (map === void 0) { return this.#emptyPropertyPathMap.has(accessor); }
 
       return map.has(accessor);
    }
@@ -212,10 +232,10 @@ export class WeakPropertyPathMap<R extends object, V>
    /**
     * Returns a trie-aware iterator of matching entries for one root.
     *
-    * Matching behavior, prefix pruning, `pathPrefix` / `stopAt` bounds, array-index rules, inherited-property
-    * handling, optional candidate property values, and iteration order are delegated directly to
-    * {@link PropertyPathMap.matchingEntries}. A missing root behaves as an empty path trie while still validating
-    * matching options during iterator consumption.
+    * Matching behavior, prefix pruning, `pathPrefix` / `stopAt` bounds, `maxDepth`, result / visit budgets,
+    * array-index rules, inherited-property handling, optional candidate property values, and iteration order are
+    * delegated directly to {@link PropertyPathMap.matchingEntries}. A missing root behaves as an empty configured trie
+    * while still validating matching options during iterator consumption.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
@@ -225,8 +245,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of canonical matching paths, mapped values, and optionally resolved candidate property values.
     *
-    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    matchingEntries(root: R, data: unknown,
     options: PropertyPathMap.Options.Match & { includePropertyValue: true }):
@@ -247,7 +267,7 @@ export class WeakPropertyPathMap<R extends object, V>
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
       return map === void 0 ?
-       WeakPropertyPathMap.#emptyPropertyPathMap.matchingEntries(data, options) :
+       this.#emptyPropertyPathMap.matchingEntries(data, options) :
        map.matchingEntries(data, options);
    }
 
@@ -265,8 +285,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of canonical matching accessor paths.
     *
-    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    matchingKeys(root: R, data: unknown, options?: PropertyPathMap.Options.MatchKeys):
     IterableIterator<readonly PropertyKey[]>
@@ -275,7 +295,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      return map === void 0 ? WeakPropertyPathMap.#emptyPropertyPathMap.matchingKeys(data, options) :
+      return map === void 0 ? this.#emptyPropertyPathMap.matchingKeys(data, options) :
        map.matchingKeys(data, options);
    }
 
@@ -295,8 +315,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of mapped values or mapped-value / candidate-property-value tuples.
     *
-    * @throws {TypeError} If `root` is invalid, a boolean option has an invalid type, or an accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a boolean, numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    matchingValues(root: R, data: unknown,
     options: PropertyPathMap.Options.Match & { includePropertyValue: true }): IterableIterator<[V, unknown]>;
@@ -314,7 +334,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      return map === void 0 ? WeakPropertyPathMap.#emptyPropertyPathMap.matchingValues(data, options) :
+      return map === void 0 ? this.#emptyPropertyPathMap.matchingValues(data, options) :
        map.matchingValues(data, options);
    }
 
@@ -322,8 +342,9 @@ export class WeakPropertyPathMap<R extends object, V>
     * Returns a bounded subtree entry iterator for one weak root.
     *
     * Candidate-independent subtree behavior, absolute `pathPrefix` selection, descendant pruning through `stopAt`,
-    * and deterministic trie order are delegated to {@link PropertyPathMap.subtreeEntries}. A missing root behaves as
-    * an empty trie while still validating supplied accessors and prefix containment during iterator consumption.
+    * relative `maxDepth`, result / visit budgets, and deterministic trie order are delegated to
+    * {@link PropertyPathMap.subtreeEntries}. A missing root behaves as an empty configured trie while still validating
+    * all options during iterator consumption.
     *
     * @param root - Weak root object or function identifying the stored path trie.
     *
@@ -331,8 +352,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of canonical stored paths and mapped values.
     *
-    * @throws {TypeError} If `root` or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    subtreeEntries(root: R, options: PropertyPathMap.Options.Subtree = {}):
     IterableIterator<[readonly PropertyKey[], V]>
@@ -341,7 +362,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      return map === void 0 ? WeakPropertyPathMap.#emptyPropertyPathMap.subtreeEntries(options) :
+      return map === void 0 ? this.#emptyPropertyPathMap.subtreeEntries(options) :
        map.subtreeEntries(options);
    }
 
@@ -357,8 +378,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of canonical stored accessor paths.
     *
-    * @throws {TypeError} If `root` or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    subtreeKeys(root: R, options: PropertyPathMap.Options.Subtree = {}):
     IterableIterator<readonly PropertyKey[]>
@@ -367,7 +388,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      return map === void 0 ? WeakPropertyPathMap.#emptyPropertyPathMap.subtreeKeys(options) :
+      return map === void 0 ? this.#emptyPropertyPathMap.subtreeKeys(options) :
        map.subtreeKeys(options);
    }
 
@@ -383,8 +404,8 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @returns Iterator of mapped values.
     *
-    * @throws {TypeError} If `root` or either accessor option is invalid.
-    * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
+    * @throws {TypeError} If `root`, a numeric limit, or path option is invalid.
+    * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
     */
    subtreeValues(root: R, options: PropertyPathMap.Options.Subtree = {}): IterableIterator<V>
    {
@@ -392,7 +413,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      return map === void 0 ? WeakPropertyPathMap.#emptyPropertyPathMap.subtreeValues(options) :
+      return map === void 0 ? this.#emptyPropertyPathMap.subtreeValues(options) :
        map.subtreeValues(options);
    }
 
@@ -413,6 +434,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
     * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the per-root path depth, entry count, or trie node count limit would be exceeded.
     */
    set(root: R, accessor: PropertyPath, value: V): this
    {
@@ -422,11 +444,10 @@ export class WeakPropertyPathMap<R extends object, V>
 
       if (map === void 0)
       {
-         // Normalize before retaining the root so failed validation cannot create an empty association.
-         const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
-
-         map = new PropertyPathMap<V>();
-         map.set(path, value);
+         // Configure and populate the trie before retaining the root so failed validation or resource limits cannot
+         // leave an empty weak-root association behind.
+         map = new PropertyPathMap<V>(null, this.#options);
+         map.set(accessor, value);
          this.#roots.set(root, map);
       }
       else
@@ -451,14 +472,7 @@ export class WeakPropertyPathMap<R extends object, V>
     */
    static #assertWeakPropertyPathMapRoot(value: unknown): asserts value is object
    {
-      if (value === null)
-      {
-         throw new TypeError(`WeakPropertyPathMap error: 'root' is not an object or function.`);
-      }
-
-      const valueType: string = typeof value;
-
-      if (valueType !== 'object' && valueType !== 'function')
+      if (!isPropertyPathTraversableValue(value))
       {
          throw new TypeError(`WeakPropertyPathMap error: 'root' is not an object or function.`);
       }

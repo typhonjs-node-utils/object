@@ -1,4 +1,25 @@
-import type { PropertyPath } from './types';
+import {
+   assertPropertyPathOptionsObject,
+   consumePropertyPathTraversalResult,
+   consumePropertyPathTraversalVisit,
+   createPropertyPathTraversalBudget,
+   isArrayIndexValue,
+   isNormalizedPropertyPathEqual,
+   isNormalizedPropertyPathPrefix,
+   isPropertyPathTraversableValue,
+   isPropertyKeyValue,
+   isPropertyPathValue,
+   normalizePropertyPathTraversalBounds,
+   normalizePropertyPathValue }                     from './internal/PropertyPathTraversal';
+
+import type {
+   PathKeyIteratorOptions,
+   PropertyPath }                                    from './types';
+
+import type {
+   NormalizedPropertyPathTraversalBounds,
+   PropertyPathTraversalBudget,
+   PropertyPathTraversableValue }                     from './internal/PropertyPathTraversal';
 
 /**
  * Asserts that a value is an object, not null, and not an array.
@@ -800,7 +821,7 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
  */
 export function isArrayIndex(value: unknown): value is number
 {
-   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
+   return isArrayIndexValue(value);
 }
 
 /**
@@ -934,8 +955,7 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
  */
 export function isPropertyKey(value: unknown): value is PropertyKey
 {
-   const valueType: string = typeof value;
-   return valueType === 'string' || valueType === 'number' || valueType === 'symbol';
+   return isPropertyKeyValue(value);
 }
 
 /**
@@ -988,16 +1008,7 @@ export function isRecord(value: unknown): value is Record<string, unknown>
  */
 export function isPropertyPath(value: unknown): value is PropertyPath
 {
-   if (typeof value === 'string') { return value.length > 0; }
-
-   if (!Array.isArray(value) || value.length === 0) { return false; }
-
-   for (let i: number = 0, l: number = value.length; i < l; i++)
-   {
-      if (!isPropertyKey(value[i])) { return false; }
-   }
-
-   return true;
+   return isPropertyPathValue(value);
 }
 
 /**
@@ -1021,24 +1032,7 @@ export function isPropertyPathPrefix(prefix: PropertyPath, path: PropertyPath): 
 {
    if (!isPropertyPath(prefix) || !isPropertyPath(path)) { return false; }
 
-   const prefixPath: readonly PropertyKey[] = normalizePropertyPath(prefix);
-   const normPath: readonly PropertyKey[] = normalizePropertyPath(path);
-
-   if (prefixPath.length > normPath.length) { return false; }
-
-   for (let index: number = 0; index < prefixPath.length; index++)
-   {
-      const prefixKey: PropertyKey = prefixPath[index];
-      const normPathKey: PropertyKey = normPath[index];
-
-      if (prefixKey !== normPathKey && !(typeof prefixKey === 'number' && typeof normPathKey === 'number' &&
-       Number.isNaN(prefixKey) && Number.isNaN(normPathKey)))
-      {
-         return false;
-      }
-   }
-
-   return true;
+   return isNormalizedPropertyPathPrefix(normalizePropertyPath(prefix), normalizePropertyPath(path));
 }
 
 /**
@@ -1095,12 +1089,7 @@ export function joinPropertyPath(path: PropertyPath): string
  */
 export function normalizePropertyPath(path: PropertyPath): readonly PropertyKey[]
 {
-   if (!isPropertyPath(path))
-   {
-      throw new TypeError(`normalizePropertyPath error: 'path' is not a valid property path.`);
-   }
-
-   return typeof path === 'string' ? path.split('.') : path;
+   return normalizePropertyPathValue(path, `normalizePropertyPath error: 'path' is not a valid property path.`);
 }
 
 /**
@@ -1141,30 +1130,65 @@ export function objectSize(object: any): number
 
 /**
  * Returns an iterator of property-key path arrays useful with {@link safeAccess} and {@link safeSet} by traversing
- * the given object. Enumerable string and symbol keys are included, and array indexes are emitted as numbers.
+ * the given object. Enumerable string and symbol keys are included, and numeric array indexes may be enabled.
  *
- * Note: Keys are only generated for ordinary objects and arrays; {@link Map} and {@link Set} are not indexed.
+ * Traversal may be bounded by absolute property paths relative to `data`. `prefixPath` selects one branch and keeps
+ * all yielded paths absolute. `stopPath` yields the selected path itself and prunes every descendant beneath it.
+ * `maxDepth` limits traversal relative to `prefixPath`, or relative to the root when no prefix is supplied. Properties
+ * reached at the maximum depth are yielded as terminal paths and are not traversed further.
+ *
+ * `maxResults` limits the number of yielded paths. `maxVisits` limits the number of enumerable properties and array
+ * indexes inspected; exceeding this budget throws before another property value is read. These limits reduce exposure
+ * to unexpectedly broad objects, sparse arrays with extreme lengths, getters, and proxy traps. Exceptions raised by
+ * getters or proxy operations are intentionally propagated.
+ *
+ * When both path bounds are supplied, `stopPath` must equal or descend from `prefixPath`. If `maxDepth` is also
+ * supplied, traversal stops at whichever boundary is reached first.
+ *
+ * Note: Keys are only generated for ordinary objects and arrays; {@link Map} and {@link Set} are not indexed. Array
+ * elements are treated as terminal paths even when their values are objects.
  *
  * @category Object Traversal and Comparison
  *
  * @param data - An object to traverse for property path keys.
  *
- * @param [options] - Options.
+ * @param [options] - Traversal options.
  *
- * @param [options.arrayIndex] - Set to `false` to exclude numeric array indexes. Enumerable symbol properties
- *        on arrays remain included; default: `true`.
+ * @param [options.arrayIndex] - Set to `true` to include numeric array indexes. Enumerable symbol properties on arrays
+ *        remain included; default: `false`.
  *
  * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
- * @returns Safe key iterator.
+ * @param [options.maxDepth] - Maximum number of property-key segments traversed beneath `prefixPath`, or beneath the
+ *        root when no prefix is supplied. A value of `0` yields only the prefix itself when selected; default:
+ *        unlimited.
+ *
+ * @param [options.maxResults] - Maximum number of paths yielded; default: `65536`.
+ *
+ * @param [options.maxVisits] - Maximum number of enumerable properties or array indexes inspected; default: `262144`.
+ *
+ * @param [options.prefixPath] - Absolute property path selecting the branch where traversal begins. Returned paths
+ *        remain absolute. A missing or non-enumerable prefix produces an empty iterator.
+ *
+ * @param [options.stopPath] - Absolute property path to yield as a terminal path while pruning all descendants beneath
+ *        it. When `prefixPath` is supplied, this path must equal or descend from it.
+ *
+ * @returns An iterator of absolute readonly property-key paths.
+ *
+ * @throws {TypeError} If `data`, a boolean option, a numeric limit, or a property-path option is invalid.
+ * @throws {RangeError} If `options.stopPath` is outside `options.prefixPath` or `options.maxVisits` is exceeded.
  */
-export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly = true }:
- { arrayIndex?: boolean, hasOwnOnly?: boolean } = {}): IterableIterator<readonly PropertyKey[]>
+export function* pathKeyIterator(data: object, options: PathKeyIteratorOptions = {}):
+ IterableIterator<readonly PropertyKey[]>
 {
    if (typeof data !== 'object' || data === null)
    {
       throw new TypeError(`pathKeyIterator error: 'data' is not an object.`);
    }
+
+   assertPropertyPathOptionsObject(options, 'pathKeyIterator');
+
+   const { arrayIndex = false, hasOwnOnly = true, maxDepth, maxResults, maxVisits, prefixPath, stopPath } = options;
 
    if (typeof arrayIndex !== 'boolean')
    {
@@ -1176,6 +1200,21 @@ export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
       throw new TypeError(`pathKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
+   const bounds: NormalizedPropertyPathTraversalBounds = normalizePropertyPathTraversalBounds({
+      prefixPath,
+      stopPath,
+      maxDepth,
+      maxResults,
+      maxVisits
+   }, {
+      errorPrefix: 'pathKeyIterator',
+      prefixOption: 'prefixPath',
+      stopOption: 'stopPath'
+   });
+   const budget: PropertyPathTraversalBudget = createPropertyPathTraversalBudget(bounds, 'pathKeyIterator');
+
+   if (budget.maxResults === 0 || (bounds.prefixPath === void 0 && bounds.maxPathLength === 0)) { return; }
+
    // Ancestors are tracked per active path, not globally. Shared objects may therefore appear at multiple valid
    // paths while a true reference back to an ancestor still throws.
    const rootAncestors: ReadonlySet<object> = new Set([data]);
@@ -1183,32 +1222,59 @@ export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 
    while (stack.length > 0)
    {
+      if (budget.results >= budget.maxResults) { return; }
+
       const { obj, path, ancestors } = stack.pop()!;
 
       if (Array.isArray(obj))
       {
-         yield* iterateArrayPaths(obj, path, arrayIndex, hasOwnOnly, stack, ancestors);
+         yield* iterateArrayPaths(obj, path, arrayIndex, hasOwnOnly, stack, ancestors, bounds, budget);
          continue;
       }
 
       for (const key of getEnumerablePropertyKeys(obj, hasOwnOnly))
       {
+         if (budget.results >= budget.maxResults) { return; }
+
+         consumePropertyPathTraversalVisit(budget);
+
          const fullPath: readonly PropertyKey[] = path.concat(key);
+         const isWithinPrefix: boolean = bounds.prefixPath === void 0 ||
+          isNormalizedPropertyPathPrefix(bounds.prefixPath, fullPath);
+         const leadsToPrefix: boolean = !isWithinPrefix && bounds.prefixPath !== void 0 &&
+          isNormalizedPropertyPathPrefix(fullPath, bounds.prefixPath);
+
+         if (!isWithinPrefix && !leadsToPrefix) { continue; }
+
          const value: any = (obj as any)[key];
+
+         // stopPath and maxDepth both convert the current property to a terminal path. This check occurs before cycle
+         // tracking or child scheduling so bounded traversal never inspects descendants beyond the active boundary.
+         if ((bounds.stopPath !== void 0 && isNormalizedPropertyPathEqual(fullPath, bounds.stopPath)) ||
+          fullPath.length === bounds.maxPathLength)
+         {
+            if (typeof value !== 'function')
+            {
+               consumePropertyPathTraversalResult(budget);
+               yield fullPath;
+            }
+            continue;
+         }
 
          if (Array.isArray(value))
          {
             // Array index paths are emitted inline to preserve established ordering instead of deferring the array to
             // the primary LIFO object stack.
             yield* iterateArrayPaths(value, fullPath, arrayIndex, hasOwnOnly, stack,
-             extendPropertyAncestors(ancestors, value));
+             extendPropertyAncestors(ancestors, value), bounds, budget);
          }
          else if (typeof value === 'object' && value !== null)
          {
             stack.push({ obj: value, path: fullPath, ancestors: extendPropertyAncestors(ancestors, value) });
          }
-         else if (typeof value !== 'function')
+         else if (isWithinPrefix && typeof value !== 'function')
          {
+            consumePropertyPathTraversalResult(budget);
             yield fullPath;
          }
       }
@@ -1252,6 +1318,8 @@ export function safeAccess<T extends object, const P extends PropertyPath, R = D
  *
  * Note: The source and target should be ordinary objects or arrays; {@link Map} and {@link Set} entries are not
  * compared. Present properties whose values are `undefined` or `null` remain distinct from missing properties.
+ * Comparison disables the normal {@link pathKeyIterator} result cap so a successful result is never based on a
+ * silently truncated path set. The visit budget remains enforced to bound unexpectedly broad source objects.
  *
  * @category Object Traversal and Comparison
  *
@@ -1261,18 +1329,24 @@ export function safeAccess<T extends object, const P extends PropertyPath, R = D
  *
  * @param [options] - Options.
  *
- * @param [options.arrayIndex] - Set to `false` to exclude equality testing for numeric array indexes; default: `true`.
+ * @param [options.arrayIndex] - Set to `true` to include equality testing for numeric array indexes; default: `false`.
  *
  * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
+ * @param [options.maxVisits] - Maximum number of enumerable source properties or array indexes inspected; default:
+ *        `262144`.
+ *
  * @returns True if equal.
+ *
+ * @throws {TypeError} If an option is invalid.
+ * @throws {RangeError} If `options.maxVisits` is exceeded.
  */
 export function safeEqual<T extends object>(source: T, target: object,
- options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }): target is T
+ options?: { arrayIndex?: boolean, hasOwnOnly?: boolean, maxVisits?: number }): target is T
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
-   for (const path of pathKeyIterator(source, options))
+   for (const path of pathKeyIterator(source, { ...options, maxResults: Number.MAX_SAFE_INTEGER }))
    {
       const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, path);
       const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, path);
@@ -1390,7 +1464,7 @@ export function safeSet(data: object, path: PropertyPath, value: any, { operatio
             (target as any)[key] = next;
          }
 
-         if (!isTraversableValue(next)) { return false; }
+         if (!isPropertyPathTraversableValue(next)) { return false; }
          target = next;
       }
    }
@@ -1614,25 +1688,6 @@ function isBlockedPrototypeKey(key: PropertyKey): boolean
 }
 
 /**
- * Returns whether a value can participate as an intermediate JavaScript property-path target.
- *
- * Functions are included because they are objects for property-access purposes even though `typeof` reports
- * `"function"`. Primitive boxing is intentionally not performed, keeping all path utilities consistent.
- *
- * Called by:
- * - {@link safeAccess} and {@link safeSet} during path traversal.
- * - {@link resolvePropertyPath}, and therefore {@link hasProperty} / {@link safeEqual}.
- *
- * @param value - Candidate intermediate path value.
- *
- * @returns Whether properties may be traversed directly on `value`.
- */
-function isTraversableValue(value: unknown): value is object | ((...args: any[]) => any)
-{
-   return value !== null && (typeof value === 'object' || typeof value === 'function');
-}
-
-/**
  * Returns whether a value is accepted as a top-level {@link deepMerge} target or source.
  *
  * This deliberately accepts class instances whose intrinsic tag is `[object Object]`, preserving legacy behavior for
@@ -1679,7 +1734,8 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
  *
  * Numeric indexes are yielded immediately to preserve the established iterator ordering and are intentionally treated
  * as leaves, even when an indexed value is an object. Symbol properties receive normal recursive traversal. A private
- * array stack avoids recursive generator calls for nested arrays reached through symbols.
+ * array stack avoids recursive generator calls for nested arrays reached through symbols. Shared traversal bounds and
+ * budgets preserve the same defensive semantics as {@link pathKeyIterator}.
  *
  * Called by:
  * - {@link pathKeyIterator} for root arrays and arrays encountered as object-property values.
@@ -1690,11 +1746,14 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
  * @param hasOwnOnly - Whether inherited enumerable symbol properties should be excluded.
  * @param objectStack - Primary object traversal stack owned by {@link pathKeyIterator}.
  * @param ancestors - Active path ancestors used for circular-reference detection.
+ * @param bounds - Shared normalized traversal bounds.
+ * @param budget - Shared traversal result and visit accounting.
  *
  * @returns An iterator of readonly property-key paths.
  */
 function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
- hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>):
+ hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>,
+ bounds: NormalizedPropertyPathTraversalBounds, budget: PropertyPathTraversalBudget):
   IterableIterator<readonly PropertyKey[]>
 {
    // A dedicated iterative stack avoids recursive generator delegation for symbol-linked nested arrays.
@@ -1702,6 +1761,8 @@ function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayInd
 
    while (stack.length > 0)
    {
+      if (budget.results >= budget.maxResults) { return; }
+
       const frame: ArrayTraversalEntry = stack[stack.length - 1];
 
       if (!frame.indexesYielded)
@@ -1711,9 +1772,21 @@ function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayInd
          if (arrayIndex)
          {
             // Array elements are leaf comparisons by design; object-valued entries are not recursively expanded.
-            for (let i: number = 0; i < frame.array.length; i++)
+            for (let index: number = 0; index < frame.array.length; index++)
             {
-               yield frame.path.concat(i);
+               if (budget.results >= budget.maxResults) { return; }
+
+               consumePropertyPathTraversalVisit(budget);
+
+               const fullPath: readonly PropertyKey[] = frame.path.concat(index);
+
+               // Numeric array indexes are terminal by design, so a prefix below an indexed value cannot be traversed.
+               if (fullPath.length <= bounds.maxPathLength && (bounds.prefixPath === void 0 ||
+                isNormalizedPropertyPathPrefix(bounds.prefixPath, fullPath)))
+               {
+                  consumePropertyPathTraversalResult(budget);
+                  yield fullPath;
+               }
             }
          }
       }
@@ -1730,9 +1803,31 @@ function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayInd
          continue;
       }
 
+      consumePropertyPathTraversalVisit(budget);
+
       const key: symbol = frame.symbols[frame.symbolIndex++];
       const fullPath: readonly PropertyKey[] = frame.path.concat(key);
+      const isWithinPrefix: boolean = bounds.prefixPath === void 0 ||
+       isNormalizedPropertyPathPrefix(bounds.prefixPath, fullPath);
+      const leadsToPrefix: boolean = !isWithinPrefix && bounds.prefixPath !== void 0 &&
+       isNormalizedPropertyPathPrefix(fullPath, bounds.prefixPath);
+
+      if (!isWithinPrefix && !leadsToPrefix) { continue; }
+
+      // Array frames are scheduled only below the active depth boundary, so every direct symbol child is guaranteed
+      // to be at or within the absolute maximum path length.
       const value: any = (frame.array as any)[key];
+
+      if ((bounds.stopPath !== void 0 && isNormalizedPropertyPathEqual(fullPath, bounds.stopPath)) ||
+       fullPath.length === bounds.maxPathLength)
+      {
+         if (typeof value !== 'function')
+         {
+            consumePropertyPathTraversalResult(budget);
+            yield fullPath;
+         }
+         continue;
+      }
 
       if (Array.isArray(value))
       {
@@ -1752,8 +1847,9 @@ function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayInd
             ancestors: extendPropertyAncestors(frame.ancestors, value)
          });
       }
-      else if (typeof value !== 'function')
+      else if (isWithinPrefix && typeof value !== 'function')
       {
+         consumePropertyPathTraversalResult(budget);
          yield fullPath;
       }
    }
@@ -1821,7 +1917,7 @@ function resolvePropertyPath(data: object, path: readonly PropertyKey[],
 
       const next: unknown = (candidate as Record<PropertyKey, unknown>)[key];
 
-      if (!isTraversableValue(next)) { return void 0; }
+      if (!isPropertyPathTraversableValue(next)) { return void 0; }
 
       candidate = next;
 
@@ -1873,11 +1969,6 @@ interface PropertyPathResolution
    /** Terminal property value when requested; otherwise `undefined`. */
    value: unknown;
 }
-
-/**
- * Object or function that can provide a direct JavaScript property-path segment.
- */
-type PropertyPathTraversableValue = object | ((...args: any[]) => any);
 
 /**
  * Stack frame for ordinary-object traversal in {@link pathKeyIterator}.

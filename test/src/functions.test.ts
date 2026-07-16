@@ -1707,7 +1707,7 @@ describe('ObjectUtil:', () =>
       it('all mixed paths (as path arrays)', () =>
       {
          const output = [];
-         const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED)];
+         const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED, { arrayIndex: true })];
 
          for (const path of paths) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, path)); }
 
@@ -1761,7 +1761,7 @@ describe('ObjectUtil:', () =>
          assert.isTrue(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ORIG));
 
          assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, { a: 2 }));
-         assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ONE_MOD));
+         assert.isFalse(ObjectUtil.safeEqual(s_OBJECT_MIXED, s_OBJECT_MIXED_ONE_MOD, { arrayIndex: true }));
       });
 
       it('distinguishes missing, undefined, null, arrays, and symbols', () =>
@@ -1774,9 +1774,9 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeEqual({ value: null }, {}), false);
          assert.equal(ObjectUtil.safeEqual({ value: null }, { value: null }), true);
 
-         assert.equal(ObjectUtil.safeEqual({ values: [void 0] }, { values: new Array(1) }), false);
-         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: ['a'] }), true);
-         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: [] }), false);
+         assert.equal(ObjectUtil.safeEqual({ values: [void 0] }, { values: new Array(1) }, { arrayIndex: true }), false);
+         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: ['a'] }, { arrayIndex: true }), true);
+         assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: [] }, { arrayIndex: true }), false);
 
          assert.equal(ObjectUtil.safeEqual({ [symbol]: 42 }, { [symbol]: 42 }), true);
          assert.equal(ObjectUtil.safeEqual({ [symbol]: 42 }, {}), false);
@@ -1813,6 +1813,13 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeEqual(source, { first: { value: 42 }, second: { value: 42 } }), true);
       });
 
+      it('enforces a source traversal visit budget without result truncation', () =>
+      {
+         assert.throws(() => ObjectUtil.safeEqual({ first: 1, second: 2 }, { first: 1, second: 2 }, {
+            maxVisits: 1
+         }), RangeError, `pathKeyIterator error: Traversal exceeded 'options.maxVisits'.`);
+      });
+
       describe('Errors', () =>
       {
          it('throws - when the source contains a circular path', () =>
@@ -1830,7 +1837,7 @@ describe('ObjectUtil:', () =>
    {
       it('all paths', () =>
       {
-         const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED)];
+         const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED, { arrayIndex: true })];
          assert.deepEqual(paths, JSON.parse(s_VERIFY_PATH_LIST));
       });
 
@@ -1855,7 +1862,7 @@ describe('ObjectUtil:', () =>
       it('yields numeric indexes for a root array', () =>
       {
          const data = ['a', 'b', 'c'];
-         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[0], [1], [2]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: true })], [[0], [1], [2]]);
       });
 
       it('does not yield root array indexes when arrayIndex is false', () =>
@@ -1882,7 +1889,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = ['a', 'b'];
 
-         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[key, 0], [key, 1]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: true })], [[key, 0], [key, 1]]);
       });
 
       it('does not yield a symbol array property when arrayIndex is false', () =>
@@ -1922,7 +1929,7 @@ describe('ObjectUtil:', () =>
          // @ts-expect-error
          data.extra = 42;
 
-         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[0]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: true })], [[0]]);
       });
 
       it('ignores non-enumerable symbol properties', () =>
@@ -1977,7 +1984,7 @@ describe('ObjectUtil:', () =>
          data[objectKey] = { value: true };
          data[functionKey] = (): void => {};
 
-         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: true })], [
             [0],
             [1],
             [primitiveKey],
@@ -2005,6 +2012,170 @@ describe('ObjectUtil:', () =>
          assert.doesNotThrow(() => [...ObjectUtil.pathKeyIterator(source)]);
       });
 
+      it('applies prefix, stop, and maximum-depth bounds with absolute paths', () =>
+      {
+         const data = {
+            actor: {
+               system: {
+                  hp: { value: 10 },
+                  ac: 15
+               },
+               name: 'Actor'
+            },
+            token: { x: 1 }
+         };
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            prefixPath: 'actor',
+            stopPath: 'actor.system.hp',
+            maxDepth: 2
+         })], [
+            ['actor', 'name'],
+            ['actor', 'system', 'hp'],
+            ['actor', 'system', 'ac']
+         ]);
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            prefixPath: 'actor.system',
+            maxDepth: 0
+         })], [['actor', 'system']]);
+      });
+
+      it('stops before processing queued object branches after reaching the result limit', () =>
+      {
+         const data = {
+            first: { value: 1 },
+            second: { value: 2 }
+         };
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, { maxResults: 1 })], [
+            ['second', 'value']
+         ]);
+      });
+
+      it('does not yield function values reached at a maximum-depth boundary', () =>
+      {
+         const data = {
+            callback(): void {}
+         };
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, { maxDepth: 1 })], []);
+      });
+
+      it('applies result and prefix bounds to numeric root-array indexes', () =>
+      {
+         const data = ['first', 'second'];
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            arrayIndex: true,
+            maxResults: 1
+         })], [[0]]);
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            arrayIndex: true,
+            prefixPath: [0]
+         })], [[0]]);
+      });
+
+      it('applies prefix, stop, depth, and result bounds to array symbol properties', () =>
+      {
+         const unrelated = Symbol('unrelated');
+         const branch = Symbol('branch');
+         const child = Symbol('child');
+         const callback = Symbol('callback');
+         const limited = Symbol('limited');
+         const data: any[] = [];
+
+         data[unrelated] = 1;
+         data[branch] = [];
+         data[branch][child] = 2;
+         data[callback] = (): void => {};
+         data[limited] = 3;
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            prefixPath: [branch, child],
+            stopPath: [branch, child]
+         })], [[branch, child]]);
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            maxDepth: 1
+         })], [[unrelated], [branch], [limited]]);
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, {
+            prefixPath: [limited],
+            maxResults: 1
+         })], [[limited]]);
+      });
+
+      it('stops array-symbol traversal at the result limit before another frame iteration', () =>
+      {
+         const key = Symbol('value');
+         const data: any[] = [];
+         data[key] = 1;
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, { maxResults: 1 })], [[key]]);
+      });
+
+      it('limits yielded results without inspecting later properties', () =>
+      {
+         let reads = 0;
+         const data = {
+            first: 1,
+            second: 2,
+            get third()
+            {
+               reads++;
+               return 3;
+            }
+         };
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, { maxResults: 2 })], [['first'], ['second']]);
+         assert.equal(reads, 0);
+      });
+
+      it('enforces a shared visit budget before reading another property', () =>
+      {
+         let reads = 0;
+         const data = {
+            first: 1,
+            get second()
+            {
+               reads++;
+               return 2;
+            }
+         };
+
+         assert.throws(() => [...ObjectUtil.pathKeyIterator(data, { maxVisits: 1 })], RangeError,
+          `pathKeyIterator error: Traversal exceeded 'options.maxVisits'.`);
+         assert.equal(reads, 0);
+      });
+
+      it('bounds sparse array traversal by visits', () =>
+      {
+         const data = new Array(1_000_000);
+
+         assert.throws(() => [...ObjectUtil.pathKeyIterator(data, {
+            arrayIndex: true,
+            maxVisits: 3
+         })], RangeError, `pathKeyIterator error: Traversal exceeded 'options.maxVisits'.`);
+      });
+
+      it('returns immediately when maxResults is zero', () =>
+      {
+         let reads = 0;
+         const data = Object.defineProperty({}, 'value', {
+            enumerable: true,
+            get()
+            {
+               reads++;
+               return 1;
+            }
+         });
+
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data, { maxResults: 0 })], []);
+         assert.equal(reads, 0);
+      });
+
       describe('Errors', () =>
       {
          it('throws - data not object', () =>
@@ -2012,6 +2183,15 @@ describe('ObjectUtil:', () =>
             // @ts-expect-error
             expect(() => [...ObjectUtil.pathKeyIterator(false)]).throws(TypeError,
              `pathKeyIterator error: 'data' is not an object.`);
+         });
+
+         it('throws - options is not an object', () =>
+         {
+            expect(() => [...ObjectUtil.pathKeyIterator({}, null)]).throws(TypeError,
+             `pathKeyIterator error: 'options' is not an object.`);
+            // @ts-expect-error
+            expect(() => [...ObjectUtil.pathKeyIterator({}, [])]).throws(TypeError,
+             `pathKeyIterator error: 'options' is not an object.`);
          });
 
          it('throws - options.arrayIndex is not a boolean', () =>
@@ -2024,6 +2204,23 @@ describe('ObjectUtil:', () =>
          {
             expect(() => [...ObjectUtil.pathKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
              `pathKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
+         });
+
+         it('throws - invalid traversal limits and path bounds', () =>
+         {
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, { maxDepth: -1 })], TypeError,
+             `pathKeyIterator error: 'options.maxDepth' is not a non-negative safe integer.`);
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, { maxResults: 1.5 })], TypeError,
+             `pathKeyIterator error: 'options.maxResults' is not a non-negative safe integer.`);
+            // @ts-expect-error
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, { maxVisits: 'bad' })], TypeError,
+             `pathKeyIterator error: 'options.maxVisits' is not a non-negative safe integer.`);
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, { prefixPath: [] })], TypeError);
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, { stopPath: [] })], TypeError);
+            assert.throws(() => [...ObjectUtil.pathKeyIterator({}, {
+               prefixPath: 'actor.system',
+               stopPath: 'actor'
+            })], RangeError);
          });
 
          it('throws - circular source object', () =>
@@ -2040,7 +2237,7 @@ describe('ObjectUtil:', () =>
 
    describe('safeSet:', () =>
    {
-      const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM)];
+      const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM, { arrayIndex: true })];
 
       const pathsAsStrings = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM, { arrayIndex: false })].map(
        (path) => path.join('.'));
