@@ -19,7 +19,7 @@ The package also re-exports the cloning API from `klona/full`.
 
 - Runtime assertions and TypeScript type guards for objects, records, plain objects, and iterables.
 - Typed property-path access with inferred return values.
-- Exact string, number, and symbol path segments through `SafeAccessor`.
+- Exact string, number, and symbol path segments through `PropertyPath`.
 - Numeric-only array indexing with ECMAScript array-index validation.
 - Symbol-aware property existence checks and traversal.
 - Protected object mutation that blocks prototype-pollution paths and ECMAScript well-known symbols.
@@ -56,10 +56,10 @@ import { klona } from '#runtime/util/object';
 
 ## Property paths
 
-Several functions accept a `SafeAccessor`:
+Several functions accept a `PropertyPath`:
 
 ```ts
-type SafeAccessor = string | readonly PropertyKey[];
+type PropertyPath = string | readonly PropertyKey[];
 ```
 
 ### Dotted string accessors
@@ -180,7 +180,7 @@ hasProperty(data, 'missing');
 | `hasGetter` | Checks the object and its prototype chain for a getter descriptor. |
 | `hasSetter` | Checks the object and its prototype chain for a setter descriptor. |
 | `hasPrototype` | Determines whether a constructor is, or inherits from, another constructor. |
-| `hasProperty` | Returns whether a complete `SafeAccessor` path exists, aborting as soon as resolution fails. |
+| `hasProperty` | Returns whether a complete `PropertyPath` path exists, aborting as soon as resolution fails. |
 
 ### Property-path utilities
 
@@ -188,7 +188,7 @@ hasProperty(data, 'missing');
 | --- | --- |
 | `safeAccess` | Resolves a dotted string or exact property-key path and returns a typed value or supplied default. |
 | `safeSet` | Sets or updates a value at a property path with optional missing-object creation and mutation hardening. |
-| `safeKeyIterator` | Iteratively yields enumerable leaf paths as readonly `PropertyKey` arrays. |
+| `pathKeyIterator` | Iteratively yields enumerable leaf paths as readonly `PropertyKey` arrays. |
 | `safeEqual` | Verifies that every traversed leaf in a source object resolves to the same value in a target object. |
 
 ### Object graph utilities
@@ -351,7 +351,7 @@ Validation occurs during traversal. When `createMissing` is enabled, earlier mis
 
 ## Property-path iteration
 
-`safeKeyIterator` performs an iterative depth-first traversal and yields readonly arrays suitable for `safeAccess`, `hasProperty`, and `safeSet`:
+`pathKeyIterator` performs an iterative depth-first traversal and yields readonly arrays suitable for `safeAccess`, `hasProperty`, and `safeSet`:
 
 ```ts
 const marker = Symbol('marker');
@@ -364,7 +364,7 @@ const data = {
    [marker]: true
 };
 
-[...safeKeyIterator(data)];
+[...pathKeyIterator(data)];
 // Example:
 // [
 //    [marker],
@@ -598,15 +598,15 @@ hasPrototype(Derived, Base);
 
 ## TypeScript notes
 
-- Exact tuple accessors provide the strongest `safeAccess` inference.
-- Runtime-sized `PropertyKey[]` accessors resolve to `unknown` at the type level because their path cannot be determined statically.
+- Exact tuple string property paths provide the strongest `safeAccess` inference.
+- Runtime-sized `PropertyKey[]` paths resolve to `unknown` at the type level because their path cannot be determined statically.
 - Dotted string inference is supported for object properties but intentionally rejects traversal into arrays.
 
 ## Scope and limitations
 
 These utilities focus on ordinary JavaScript objects and arrays:
 
-- `Map` and `Set` entries are not traversed by `safeKeyIterator` or compared by `safeEqual`.
+- `Map` and `Set` entries are not traversed by `pathKeyIterator` or compared by `safeEqual`.
 - Property access may invoke getters and proxy traps.
 - `safeEqual` is asymmetric and source-driven.
 - Array element objects are compared by reference.
