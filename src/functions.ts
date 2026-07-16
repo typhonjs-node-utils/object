@@ -1,16 +1,3 @@
-/**
- * Provides JavaScript and TypeScript utilities for validating, inspecting, traversing, comparing, and modifying
- * objects.
- *
- * The package includes runtime assertions and type guards, strongly typed property-path access using dotted strings
- * or exact {@link PropertyKey} arrays, hardened mutation and deep-merge operations, symbol-aware traversal, iterative
- * freeze / seal helpers, prototype and descriptor inspection, and iterable utilities.
- *
- * The cloning API from `klona/full` is re-exported.
- *
- * @packageDocumentation
- */
-
 export * from 'klona/full';
 
 /**
@@ -1092,74 +1079,6 @@ export function objectSize(object: any): number
 }
 
 /**
- * Provides a way to safely access an object's data / entries using either a dotted property path string or an array of
- * exact property keys.
- *
- * Array indexes may only be accessed by number through the array property-key form.
- *
- * @param data - An object to access entry data.
- *
- * @param path - A dotted string property path or an array of exact string, number, or symbol property keys.
- *
- * @param [defaultValue] - (Optional) A default value to return if an entry for property path is not found.
- *
- * @returns The value referenced by the path.
- *
- * @typeParam T - Type of data.
- * @typeParam P - Property path type.
- * @typeParam R - Return value / Inferred deep access type or any provided default value type.
- */
-export function safeAccess<T extends object, const P extends PropertyPath, R = DeepAccess<T, P>>(data: T,
- path: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
-  DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
-{
-   const result: unknown = getProperty(data, path);
-
-   // Preserve legacy safeAccess behavior: present nullish values collapse to the supplied default.
-   return result === void 0 || result === null ? defaultValue as any : result as any;
-}
-
-/**
- * Compares a source object and values of entries against a target object. If the entries in the source object match
- * the target object then `true` is returned otherwise `false`. If either object is undefined or null then false
- * is returned.
- *
- * Note: The source and target should be ordinary objects or arrays; {@link Map} and {@link Set} entries are not
- * compared. Present properties whose values are `undefined` or `null` remain distinct from missing properties.
- *
- * @param source - Source object.
- *
- * @param target - Target object.
- *
- * @param [options] - Options.
- *
- * @param [options.arrayIndex] - Set to `false` to exclude equality testing for numeric array indexes; default: `true`.
- *
- * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
- *
- * @returns True if equal.
- */
-export function safeEqual<T extends object>(source: T, target: object,
- options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }): target is T
-{
-   if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
-
-   for (const path of pathKeyIterator(source, options))
-   {
-      const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, path);
-      const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, path);
-
-      if (sourceResolution === void 0 || targetResolution === void 0 ||
-       sourceResolution.value !== targetResolution.value)
-      {
-         return false;
-      }
-   }
-
-   return true;
-}
-
-/**
  * Returns an iterator of property-key path arrays useful with {@link safeAccess} and {@link safeSet} by traversing
  * the given object. Enumerable string and symbol keys are included, and array indexes are emitted as numbers.
  *
@@ -1231,6 +1150,74 @@ export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
          }
       }
    }
+}
+
+/**
+ * Provides a way to safely access an object's data / entries using either a dotted property path string or an array of
+ * exact property keys.
+ *
+ * Array indexes may only be accessed by number through the array property-key form.
+ *
+ * @param data - An object to access entry data.
+ *
+ * @param path - A dotted string property path or an array of exact string, number, or symbol property keys.
+ *
+ * @param [defaultValue] - (Optional) A default value to return if an entry for property path is not found.
+ *
+ * @returns The value referenced by the path.
+ *
+ * @typeParam T - Type of data.
+ * @typeParam P - Property path type.
+ * @typeParam R - Return value / Inferred deep access type or any provided default value type.
+ */
+export function safeAccess<T extends object, const P extends PropertyPath, R = DeepAccess<T, P>>(data: T,
+ path: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
+  DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
+{
+   const result: unknown = getProperty(data, path);
+
+   // Preserve legacy safeAccess behavior: present nullish values collapse to the supplied default.
+   return result === void 0 || result === null ? defaultValue as any : result as any;
+}
+
+/**
+ * Compares a source object and values of entries against a target object. If the entries in the source object match
+ * the target object then `true` is returned otherwise `false`. If either object is undefined or null then false
+ * is returned.
+ *
+ * Note: The source and target should be ordinary objects or arrays; {@link Map} and {@link Set} entries are not
+ * compared. Present properties whose values are `undefined` or `null` remain distinct from missing properties.
+ *
+ * @param source - Source object.
+ *
+ * @param target - Target object.
+ *
+ * @param [options] - Options.
+ *
+ * @param [options.arrayIndex] - Set to `false` to exclude equality testing for numeric array indexes; default: `true`.
+ *
+ * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
+ *
+ * @returns True if equal.
+ */
+export function safeEqual<T extends object>(source: T, target: object,
+ options?: { arrayIndex?: boolean, hasOwnOnly?: boolean }): target is T
+{
+   if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
+
+   for (const path of pathKeyIterator(source, options))
+   {
+      const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, path);
+      const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, path);
+
+      if (sourceResolution === void 0 || targetResolution === void 0 ||
+       sourceResolution.value !== targetResolution.value)
+      {
+         return false;
+      }
+   }
+
+   return true;
 }
 
 /**
