@@ -1,9 +1,9 @@
 import {
    isArrayIndex,
    isPropertyPathPrefix,
-   normalizePropertyPath }    from './functions';
+   normalizePropertyPath }    from '../functions';
 
-import type { PropertyPath }  from './functions';
+import type { PropertyPath }  from '../types';
 
 /**
  * Stores values by structural {@link PropertyPath} paths using a property-key trie.
@@ -57,6 +57,8 @@ import type { PropertyPath }  from './functions';
  * `Map` insertion-order behavior.
  *
  * Mutation of the map while an iterator is active is intentionally unspecified.
+ *
+ * @category Property Path Collections
  *
  * @typeParam V - Stored value type.
  */
@@ -812,8 +814,16 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 }
 
+/**
+ * Defines configuration options for {@link PropertyPathMap}.
+ *
+ * @category Property Path Collections
+ */
 declare namespace PropertyPathMap
 {
+   /**
+    * Defines configuration options for {@link PropertyPathMap}.
+    */
    export namespace Options
    {
       /**

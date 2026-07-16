@@ -1,7 +1,7 @@
-import { normalizePropertyPath } from './functions';
+import { normalizePropertyPath } from '../functions';
 import { PropertyPathMap }       from './PropertyPathMap';
 
-import type { PropertyPath }     from './functions';
+import type { PropertyPath }     from '../types';
 
 /**
  * Associates structural {@link PropertyPath} paths with values beneath weakly held root objects.
@@ -43,6 +43,8 @@ import type { PropertyPath }     from './functions';
  * Matching entry and value iterators may optionally include the property value resolved from the candidate object.
  * Prefix-bounded matching and candidate-independent subtree iteration retain the corresponding behavior of
  * {@link PropertyPathMap}.
+ *
+ * @category Property Path Collections
  *
  * @typeParam R - Weak root object type.
  * @typeParam V - Stored value type.

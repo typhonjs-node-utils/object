@@ -1,4 +1,4 @@
-export * from 'klona/full';
+import type { PropertyPath } from './types';
 
 /**
  * Asserts that a value is an object, not null, and not an array.
@@ -21,11 +21,13 @@ export * from 'klona/full';
  *   opts.value;                                      // Fully typed access remains available.
  * }
  *
- * @throws {TypeError} if the value is null, non-object, or an array.
+ * @category Object Validation
  *
  * @param value - The value to validate.
  *
  * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is null, non-object, or an array.
  */
 export function assertObject<T>(value: T, errorMsg: string = 'Expected an object.'): asserts value is T & object
 {
@@ -53,11 +55,13 @@ export function assertObject<T>(value: T, errorMsg: string = 'Expected an object
  *   opts.value;                                               // Fully typed access remains available.
  * }
  *
- * @throws {TypeError} if the value is null, non-object, or an array.
+ * @category Object Validation
  *
  * @param value - The value to validate.
  *
  * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is null, non-object, or an array.
  */
 export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a plain object.'):
  asserts value is T & object
@@ -86,11 +90,13 @@ export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a pl
  *   opts.value;                                                  // Fully typed access remains available.
  * }
  *
- * @throws {TypeError} if the value is null, non-object, or an array.
+ * @category Object Validation
  *
  * @param value - The value to validate.
  *
  * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is null, non-object, or an array.
  */
 export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record object.'):
  asserts value is T & Record<string, unknown>
@@ -111,6 +117,7 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
  * concatPropertyPath('actor.system', ['attributes', 'hp'], 'value');
  * // ['actor', 'system', 'attributes', 'hp', 'value']
  * ```
+ * @category Property Keys and Paths
  *
  * @param path - First path to concatenate.
  *
@@ -135,61 +142,9 @@ export function concatPropertyPath(path: PropertyPath, ...paths: PropertyPath[])
 }
 
 /**
- * Deletes the property resolved by a property path.
- *
- * By default, every path segment must be an own property. Set `hasOwnOnly` to `false` to permit inherited traversal;
- * when the final property is inherited, the property is deleted from the prototype object that owns it. This explicit
- * opt-in prevents accidental prototype mutation during ordinary use.
- *
- * Prototype-pollution keys (`__proto__`, `prototype`, and `constructor`) and ECMAScript well-known symbols are rejected
- * at every path segment, matching the mutation hardening applied by {@link safeSet}. Non-configurable properties are
- * not deleted.
- *
- * @param data - Object containing the property path.
- *
- * @param path - Dotted or exact property-key path.
- *
- * @param options - Deletion options.
- *
- * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `true`.
- *
- * @returns Whether an existing configurable property was deleted.
- *
- * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
- */
-export function deleteProperty(data: object, path: PropertyPath, { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}):
- boolean
-{
-   if (typeof data !== 'object' || data === null || !isPropertyPath(path)) { return false; }
-
-   if (typeof hasOwnOnly !== 'boolean')
-   {
-      throw new TypeError(`deleteProperty error: 'options.hasOwnOnly' is not a boolean.`);
-   }
-
-   const normPath: readonly PropertyKey[] = normalizePropertyPath(path);
-
-   for (const key of normPath)
-   {
-      if ((typeof key === 'string' && isBlockedPrototypeKey(key)) ||
-       (typeof key === 'symbol' && wellKnownSymbols.has(key)))
-      {
-         return false;
-      }
-   }
-
-   const resolution: PropertyPathResolution | undefined = resolvePropertyPath(data, normPath, {
-      hasOwnOnly,
-      readValue: false
-   });
-
-   if (resolution === void 0 || resolution.descriptor.configurable === false) { return false; }
-
-   return Reflect.deleteProperty(resolution.owner, resolution.key);
-}
-
-/**
  * Freezes all entries traversed that are objects including entries in arrays.
+ *
+ * @category Deep Object Operations
  *
  * @param data - An object or array.
  *
@@ -247,6 +202,8 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
  * as the target a shallow copy is produced. If the target and source property are object literals they are merged.
  *
  * Note: The output type is inferred, but you may provide explicit generic types as well.
+ *
+ * @category Deep Object Operations
  *
  * @param target - Target object.
  *
@@ -367,6 +324,8 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 /**
  * Seals all entries traversed that are objects including entries in arrays.
  *
+ * @category Deep Object Operations
+ *
  * @param data - An object or array.
  *
  * @param [options] - Options
@@ -419,6 +378,62 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 }
 
 /**
+ * Deletes the property resolved by a property path.
+ *
+ * By default, every path segment must be an own property. Set `hasOwnOnly` to `false` to permit inherited traversal;
+ * when the final property is inherited, the property is deleted from the prototype object that owns it. This explicit
+ * opt-in prevents accidental prototype mutation during ordinary use.
+ *
+ * Prototype-pollution keys (`__proto__`, `prototype`, and `constructor`) and ECMAScript well-known symbols are rejected
+ * at every path segment, matching the mutation hardening applied by {@link safeSet}. Non-configurable properties are
+ * not deleted.
+ *
+ * @category Property Mutation
+ *
+ * @param data - Object containing the property path.
+ *
+ * @param path - Dotted or exact property-key path.
+ *
+ * @param options - Deletion options.
+ *
+ * @param options.hasOwnOnly - Whether every path segment must be an own property; default: `true`.
+ *
+ * @returns Whether an existing configurable property was deleted.
+ *
+ * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
+ */
+export function deleteProperty(data: object, path: PropertyPath, { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}):
+ boolean
+{
+   if (typeof data !== 'object' || data === null || !isPropertyPath(path)) { return false; }
+
+   if (typeof hasOwnOnly !== 'boolean')
+   {
+      throw new TypeError(`deleteProperty error: 'options.hasOwnOnly' is not a boolean.`);
+   }
+
+   const normPath: readonly PropertyKey[] = normalizePropertyPath(path);
+
+   for (const key of normPath)
+   {
+      if ((typeof key === 'string' && isBlockedPrototypeKey(key)) ||
+       (typeof key === 'symbol' && wellKnownSymbols.has(key)))
+      {
+         return false;
+      }
+   }
+
+   const resolution: PropertyPathResolution | undefined = resolvePropertyPath(data, normPath, {
+      hasOwnOnly,
+      readValue: false
+   });
+
+   if (resolution === void 0 || resolution.descriptor.configurable === false) { return false; }
+
+   return Reflect.deleteProperty(resolution.owner, resolution.key);
+}
+
+/**
  * Ensures that a value is a *non-empty async iterable*.
  * ```
  * - If the value is not async iterable, `undefined` is returned.
@@ -428,6 +443,8 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
  * ```
  *
  * Supports both AsyncIterable<T> and (optionally) synchronous Iterable<T>.
+ *
+ * @category Iterable Utilities
  *
  * @param value - The value to test as an async iterable.
  *
@@ -494,11 +511,6 @@ export async function ensureNonEmptyAsyncIterable<T>(value: AsyncIterable<T> | I
  * This function is ideal when you need a safe, non-empty iterable for iteration but cannot consume or trust the
  * original iterable’s internal iterator state.
  *
- * @param value - The value to inspect.
- *
- * @returns A restartable iterable containing all values, or `undefined` if the input was not iterable or contained no
- *          items.
- *
  * @example
  * const iter = ensureNonEmptyIterable(['a', 'b']);
  * // `iter` is an iterable yielding 'a', 'b'.
@@ -508,6 +520,13 @@ export async function ensureNonEmptyAsyncIterable<T>(value: AsyncIterable<T> | I
  *
  * const gen = ensureNonEmptyIterable((function*(){ yield 1; yield 2; })());
  * // Safe: returns an iterable yielding 1, 2 without consuming the generator.
+ *
+ * @category Iterable Utilities
+ *
+ * @param value - The value to inspect.
+ *
+ * @returns A restartable iterable containing all values, or `undefined` if the input was not iterable or contained no
+ *          items.
  */
 export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined): Iterable<T> | undefined
 {
@@ -538,6 +557,8 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
  * Unlike {@link safeAccess}, this function returns a present nullish property unchanged. A missing or invalid path
  * returns `undefined`; use {@link hasProperty} when that result must be distinguished from a present `undefined`
  * property. Array indexes require numeric keys through an exact array property-key path.
+ *
+ * @category Property Access and Inspection
  *
  * @param data - Object to inspect.
  *
@@ -575,6 +596,8 @@ export function getProperty<T extends object, const P extends PropertyPath>(data
  * accessors at the terminal segment are therefore not invoked. When inherited lookup is enabled, the descriptor is
  * returned from the prototype object that owns the final property.
  *
+ * @category Property Access and Inspection
+ *
  * @param data - Object to inspect.
  *
  * @param path - Dotted or exact property-key path.
@@ -607,6 +630,8 @@ export function getPropertyDescriptor(data: object, path: PropertyPath,
  * read to continue traversal, but the final property value is not read. Set `hasOwnOnly` to `true` to require every
  * segment, including the terminal property, to be owned directly by the value reached at that depth.
  *
+ * @category Property Access and Inspection
+ *
  * @param data - Object to inspect.
  *
  * @param path - Dotted or exact property-key path.
@@ -635,6 +660,8 @@ export function getPropertyOwner(data: object, path: PropertyPath,
 /**
  * Determine if the given object has a getter & setter accessor.
  *
+ * @category Accessors and Prototypes
+ *
  * @param object - An object.
  *
  * @param accessor - Accessor to test.
@@ -655,6 +682,8 @@ export function hasAccessor<T extends object, K extends keyof T>(object: T, acce
 
 /**
  * Determine if the given object has a getter accessor.
+ *
+ * @category Accessors and Prototypes
  *
  * @param object - An object.
  *
@@ -680,6 +709,8 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
  * property value is not read, so a getter at the final segment is not invoked merely to test existence.
  *
  * Array indexes may only be accessed by number through the array property-key form.
+ *
+ * @category Property Access and Inspection
  *
  * @param data - An object to inspect.
  *
@@ -709,6 +740,8 @@ export function hasProperty(data: object, path: PropertyPath, { hasOwnOnly = fal
 /**
  * Returns whether the target is or has the given prototype walking up the prototype chain.
  *
+ * @category Accessors and Prototypes
+ *
  * @param target - Any target class / constructor function to test.
  *
  * @param Prototype - Class / constructor function to find.
@@ -736,6 +769,8 @@ export function hasPrototype<T extends new (...args: any[]) => any>(target: new 
 /**
  * Determine if the given object has a setter accessor.
  *
+ * @category Accessors and Prototypes
+ *
  * @param object - An object.
  *
  * @param accessor - Accessor to test.
@@ -757,6 +792,8 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
  *
  * The maximum array index is `2^32 - 2`; `2^32 - 1` is reserved and does not update an array's `length`.
  *
+ * @category Property Keys and Paths
+ *
  * @param value - Candidate numeric property key.
  *
  * @returns Whether `value` is an integer in the ECMAScript array-index range.
@@ -768,6 +805,8 @@ export function isArrayIndex(value: unknown): value is number
 
 /**
  * Tests for whether an _object_ is async iterable.
+ *
+ * @category Iterable Utilities
  *
  * @param value - Any value.
  *
@@ -782,6 +821,8 @@ export function isAsyncIterable<T>(value: unknown): value is AsyncIterable<T>
  * Tests for whether an _object_ is iterable.
  *
  * Note: Excludes `strings` in iterable test even though they are technically iterable.
+ *
+ * @category Iterable Utilities
  *
  * @param value - Any value.
  *
@@ -822,6 +863,8 @@ export function isObject<T extends object>(value: T): value is T;
  * a specific object type. If you instead need to **retain** the declared type regardless of narrowing, use
  * {@link assertObject}. If you need indexable key / value access use a dedicated record check such as
  * {@link isRecord} or {@link isPlainObject}.
+ *
+ * @category Object Validation
  *
  * @param value - Any value to check.
  *
@@ -865,6 +908,8 @@ export function isPlainObject<T extends object>(value: T): value is T;
  *   data.foo;         // ok — key is `unknown`, but structure is guaranteed.
  * }
  *
+ * @category Object Validation
+ *
  * @param value - Any value to evaluate.
  *
  * @returns True if the value is a plain object with no special prototype.
@@ -880,6 +925,8 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
  *
  * Property keys are strings, numbers, or symbols. Numbers are accepted because exact property-key arrays preserve
  * numeric array indexes and ordinary JavaScript property access coerces numeric object keys as usual.
+ *
+ * @category Property Keys and Paths
  *
  * @param value - Candidate property key.
  *
@@ -911,6 +958,8 @@ export function isPropertyKey(value: unknown): value is PropertyKey
  * - {@link isPlainObject} → narrows to plain JSON objects only (no prototypes, no class instances).
  * - `isRecord()` → always narrows to a dictionary-style record for keyed lookup.
  *
+ * @category Object Validation
+ *
  * @param value - Any value to test.
  *
  * @returns True if the value is an object that is neither null nor an array.
@@ -930,6 +979,8 @@ export function isRecord(value: unknown): value is Record<string, unknown>
  *
  * This function validates the property path representation only. Numeric array-index constraints are evaluated during
  * traversal because whether a numeric key is required depends on the value reached at runtime.
+ *
+ * @category Property Keys and Paths
  *
  * @param value - Value to validate.
  *
@@ -957,6 +1008,8 @@ export function isPropertyPath(value: unknown): value is PropertyPath
  * equal. Numeric and string segments remain distinct.
  *
  * Invalid path values return `false` rather than throwing, matching predicate conventions.
+ *
+ * @category Property Keys and Paths
  *
  * @param prefix - Candidate prefix path.
  *
@@ -996,6 +1049,8 @@ export function isPropertyPathPrefix(prefix: PropertyPath, path: PropertyPath): 
  * so `['level1', '', 'value']` becomes `'level1..value'`. The exact single empty-string key `['']` is rejected because
  * an empty dotted string is not a valid {@link PropertyPath}.
  *
+ * @category Property Keys and Paths
+ *
  * @param path - Property path to convert.
  *
  * @returns An equivalent dotted string property path.
@@ -1030,6 +1085,8 @@ export function joinPropertyPath(path: PropertyPath): string
  * Dotted strings are split on `.` while property-key arrays are returned unchanged. Exact array property-keys should be
  * used for symbols, numeric array indexes, empty-string keys, and property names containing literal periods.
  *
+ * @category Property Keys and Paths
+ *
  * @param path - Property path to normalize.
  *
  * @returns The path as a readonly property-key array.
@@ -1049,6 +1106,8 @@ export function normalizePropertyPath(path: PropertyPath): readonly PropertyKey[
 /**
  * Safely returns keys on an object or an empty array if not an object.
  *
+ * @category General Object Utilities
+ *
  * @param object - An object.
  *
  * @returns Object keys or empty array.
@@ -1060,6 +1119,8 @@ export function objectKeys<T extends object>(object: T): (keyof T)[]
 
 /**
  * Safely returns an objects size. Note for String objects Unicode is not taken into consideration.
+ *
+ * @category General Object Utilities
  *
  * @param object - Any value, but size returned for object / Map / Set / arrays / strings.
  *
@@ -1083,6 +1144,8 @@ export function objectSize(object: any): number
  * the given object. Enumerable string and symbol keys are included, and array indexes are emitted as numbers.
  *
  * Note: Keys are only generated for ordinary objects and arrays; {@link Map} and {@link Set} are not indexed.
+ *
+ * @category Object Traversal and Comparison
  *
  * @param data - An object to traverse for property path keys.
  *
@@ -1158,6 +1221,8 @@ export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
  *
  * Array indexes may only be accessed by number through the array property-key form.
  *
+ * @category Property Access and Inspection
+ *
  * @param data - An object to access entry data.
  *
  * @param path - A dotted string property path or an array of exact string, number, or symbol property keys.
@@ -1187,6 +1252,8 @@ export function safeAccess<T extends object, const P extends PropertyPath, R = D
  *
  * Note: The source and target should be ordinary objects or arrays; {@link Map} and {@link Set} entries are not
  * compared. Present properties whose values are `undefined` or `null` remain distinct from missing properties.
+ *
+ * @category Object Traversal and Comparison
  *
  * @param source - Source object.
  *
@@ -1223,6 +1290,8 @@ export function safeEqual<T extends object>(source: T, target: object,
 /**
  * Provides a way to safely set an object's data / entries using either a dotted path string or an array of exact
  * property keys. Array indexes may only be accessed by number through the array property-key form.
+ *
+ * @category Property Mutation
  *
  * @param data - An object to access entry data.
  *
@@ -1762,15 +1831,6 @@ function resolvePropertyPath(data: object, path: readonly PropertyKey[],
    return void 0;
 }
 /* v8 ignore stop */
-
-// External Types ----------------------------------------------------------------------------------------------------
-
-/**
- * Defines a property path accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String paths use
- * `.` delimiters while array paths preserve each {@link PropertyKey} as an exact property key. Array indexes require
- * numeric keys.
- */
-export type PropertyPath = string | readonly PropertyKey[];
 
 // Internal Types ----------------------------------------------------------------------------------------------------
 
