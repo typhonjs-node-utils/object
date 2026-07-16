@@ -161,13 +161,13 @@ describe('ObjectUtil:', () =>
    });
 
 
-   describe('concatSafeAccessor:', () =>
+   describe('concatPropertyPath:', () =>
    {
       it('concatenates dotted and exact accessors into a new property-key array', () =>
       {
          const symbol = Symbol('value');
          const exact: PropertyKey[] = ['attributes', 0, symbol];
-         const result = ObjectUtil.concatSafeAccessor('actor.system', exact, ['value']);
+         const result = ObjectUtil.concatPropertyPath('actor.system', exact, ['value']);
 
          assert.deepEqual(result, ['actor', 'system', 'attributes', 0, symbol, 'value']);
          assert.notEqual(result, exact);
@@ -179,7 +179,7 @@ describe('ObjectUtil:', () =>
       it('returns a copy for one exact accessor', () =>
       {
          const accessor = ['actor', 'name'] as const;
-         const result = ObjectUtil.concatSafeAccessor(accessor);
+         const result = ObjectUtil.concatPropertyPath(accessor);
 
          assert.deepEqual(result, accessor);
          assert.notEqual(result, accessor);
@@ -189,14 +189,14 @@ describe('ObjectUtil:', () =>
       {
          it('throws - when no accessor is supplied', () =>
          {
-            assert.throws(() => (ObjectUtil.concatSafeAccessor as (...accessors: any[]) => readonly PropertyKey[])(),
-             TypeError, `concatSafeAccessor error: At least one safe accessor is required.`);
+            assert.throws(() => (ObjectUtil.concatPropertyPath as (...accessors: any[]) => readonly PropertyKey[])(),
+             TypeError, `concatPropertyPath error: At least one property path is required.`);
          });
 
          it('throws - when any accessor is invalid', () =>
          {
-            assert.throws(() => ObjectUtil.concatSafeAccessor('actor', []), TypeError,
-             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+            assert.throws(() => ObjectUtil.concatPropertyPath('actor', []), TypeError,
+             `normalizePropertyPath error: 'accessor' is not a valid property path.`);
          });
       });
    });
@@ -1512,60 +1512,60 @@ describe('ObjectUtil:', () =>
       if (ObjectUtil.isRecord(val)) { expectTypeOf(val).toEqualTypeOf<Record<string, unknown>>(); }
    });
 
-   describe('isSafeAccessor:', () =>
+   describe('isPropertyPath:', () =>
    {
       it('returns true for a non-empty dotted string accessor', () =>
       {
-         assert.isTrue(ObjectUtil.isSafeAccessor('level1.value'));
+         assert.isTrue(ObjectUtil.isPropertyPath('level1.value'));
       });
 
       it('returns false for an empty string accessor', () =>
       {
-         assert.isFalse(ObjectUtil.isSafeAccessor(''));
+         assert.isFalse(ObjectUtil.isPropertyPath(''));
       });
 
       it('returns true for a non-empty property-key array', () =>
       {
          const symbol = Symbol('value');
 
-         assert.isTrue(ObjectUtil.isSafeAccessor(['level1', 0, symbol]));
+         assert.isTrue(ObjectUtil.isPropertyPath(['level1', 0, symbol]));
       });
 
       it('returns true for an exact empty-string property key', () =>
       {
-         assert.isTrue(ObjectUtil.isSafeAccessor(['']));
+         assert.isTrue(ObjectUtil.isPropertyPath(['']));
       });
 
       it('returns false for an empty accessor array', () =>
       {
-         assert.isFalse(ObjectUtil.isSafeAccessor([]));
+         assert.isFalse(ObjectUtil.isPropertyPath([]));
       });
 
       it('returns false when an accessor array contains an invalid key', () =>
       {
-         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', true]));
+         assert.isFalse(ObjectUtil.isPropertyPath(['level1', true]));
 
-         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', null]));
+         assert.isFalse(ObjectUtil.isPropertyPath(['level1', null]));
 
-         assert.isFalse(ObjectUtil.isSafeAccessor(['level1', {}]));
+         assert.isFalse(ObjectUtil.isPropertyPath(['level1', {}]));
       });
 
       it('returns false for non-accessor values', () =>
       {
-         assert.isFalse(ObjectUtil.isSafeAccessor(null));
-         assert.isFalse(ObjectUtil.isSafeAccessor(void 0));
-         assert.isFalse(ObjectUtil.isSafeAccessor(42));
-         assert.isFalse(ObjectUtil.isSafeAccessor({}));
+         assert.isFalse(ObjectUtil.isPropertyPath(null));
+         assert.isFalse(ObjectUtil.isPropertyPath(void 0));
+         assert.isFalse(ObjectUtil.isPropertyPath(42));
+         assert.isFalse(ObjectUtil.isPropertyPath({}));
       });
    });
 
-   describe('isSafeAccessorPrefix:', () =>
+   describe('isPropertyPathPrefix:', () =>
    {
       it('matches equal and descendant structural paths', () =>
       {
-         assert.isTrue(ObjectUtil.isSafeAccessorPrefix('actor.system', ['actor', 'system']));
-         assert.isTrue(ObjectUtil.isSafeAccessorPrefix('actor', 'actor.system.hp'));
-         assert.isTrue(ObjectUtil.isSafeAccessorPrefix(['actor', 'system'], ['actor', 'system', 'hp']));
+         assert.isTrue(ObjectUtil.isPropertyPathPrefix('actor.system', ['actor', 'system']));
+         assert.isTrue(ObjectUtil.isPropertyPathPrefix('actor', 'actor.system.hp'));
+         assert.isTrue(ObjectUtil.isPropertyPathPrefix(['actor', 'system'], ['actor', 'system', 'hp']));
       });
 
       it('uses SameValueZero and symbol identity semantics', () =>
@@ -1573,61 +1573,61 @@ describe('ObjectUtil:', () =>
          const symbol = Symbol('branch');
          const otherSymbol = Symbol('branch');
 
-         assert.isTrue(ObjectUtil.isSafeAccessorPrefix([symbol, NaN], [symbol, NaN, 'value']));
-         assert.isTrue(ObjectUtil.isSafeAccessorPrefix([0], [-0, 'value']));
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([symbol], [otherSymbol, 'value']));
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([0], ['0', 'value']));
+         assert.isTrue(ObjectUtil.isPropertyPathPrefix([symbol, NaN], [symbol, NaN, 'value']));
+         assert.isTrue(ObjectUtil.isPropertyPathPrefix([0], [-0, 'value']));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix([symbol], [otherSymbol, 'value']));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix([0], ['0', 'value']));
       });
 
       it('rejects longer, mismatched, and invalid prefixes', () =>
       {
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor.system.hp', 'actor.system'));
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor.token', 'actor.system.hp'));
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix([] as unknown as any, 'actor'));
-         assert.isFalse(ObjectUtil.isSafeAccessorPrefix('actor', [] as unknown as any));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix('actor.system.hp', 'actor.system'));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix('actor.token', 'actor.system.hp'));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix([] as unknown as any, 'actor'));
+         assert.isFalse(ObjectUtil.isPropertyPathPrefix('actor', [] as unknown as any));
       });
    });
 
-   describe('joinSafeAccessor:', () =>
+   describe('joinPropertyPath:', () =>
    {
       it('returns existing dotted strings and losslessly joins exact string paths', () =>
       {
-         assert.equal(ObjectUtil.joinSafeAccessor('actor.system.hp'), 'actor.system.hp');
-         assert.equal(ObjectUtil.joinSafeAccessor(['actor', 'system', 'hp']), 'actor.system.hp');
-         assert.equal(ObjectUtil.joinSafeAccessor(['actor', '', 'hp']), 'actor..hp');
-         assert.equal(ObjectUtil.joinSafeAccessor(['', 'actor']), '.actor');
-         assert.equal(ObjectUtil.joinSafeAccessor(['actor', '']), 'actor.');
+         assert.equal(ObjectUtil.joinPropertyPath('actor.system.hp'), 'actor.system.hp');
+         assert.equal(ObjectUtil.joinPropertyPath(['actor', 'system', 'hp']), 'actor.system.hp');
+         assert.equal(ObjectUtil.joinPropertyPath(['actor', '', 'hp']), 'actor..hp');
+         assert.equal(ObjectUtil.joinPropertyPath(['', 'actor']), '.actor');
+         assert.equal(ObjectUtil.joinPropertyPath(['actor', '']), 'actor.');
       });
 
       describe('Errors', () =>
       {
          it('throws - for invalid accessors', () =>
          {
-            assert.throws(() => ObjectUtil.joinSafeAccessor([]), TypeError,
-             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+            assert.throws(() => ObjectUtil.joinPropertyPath([]), TypeError,
+             `normalizePropertyPath error: 'accessor' is not a valid property path.`);
          });
 
          it('throws - for exact paths that cannot be represented losslessly', () =>
          {
-            assert.throws(() => ObjectUtil.joinSafeAccessor([0]), TypeError,
-             `joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
-            assert.throws(() => ObjectUtil.joinSafeAccessor([Symbol('value')]), TypeError);
-            assert.throws(() => ObjectUtil.joinSafeAccessor(['literal.period']), TypeError);
-            assert.throws(() => ObjectUtil.joinSafeAccessor(['']), TypeError);
+            assert.throws(() => ObjectUtil.joinPropertyPath([0]), TypeError,
+             `joinPropertyPath error: 'accessor' cannot be represented as a dotted string accessor.`);
+            assert.throws(() => ObjectUtil.joinPropertyPath([Symbol('value')]), TypeError);
+            assert.throws(() => ObjectUtil.joinPropertyPath(['literal.period']), TypeError);
+            assert.throws(() => ObjectUtil.joinPropertyPath(['']), TypeError);
          });
       });
    });
 
-   describe('normalizeSafeAccessor:', () =>
+   describe('normalizePropertyPath:', () =>
    {
       it('splits a dotted string accessor into property keys', () =>
       {
-         assert.deepEqual(ObjectUtil.normalizeSafeAccessor('level1.level2.value'), ['level1', 'level2', 'value']);
+         assert.deepEqual(ObjectUtil.normalizePropertyPath('level1.level2.value'), ['level1', 'level2', 'value']);
       });
 
       it('preserves empty path segments in dotted strings', () =>
       {
-         assert.deepEqual(ObjectUtil.normalizeSafeAccessor('level1..value'), ['level1', '', 'value']);
+         assert.deepEqual(ObjectUtil.normalizePropertyPath('level1..value'), ['level1', '', 'value']);
       });
 
       it('returns a property-key array unchanged', () =>
@@ -1635,7 +1635,7 @@ describe('ObjectUtil:', () =>
          const symbol = Symbol('value');
          const accessor = ['level1', 0, symbol] as const;
 
-         const result = ObjectUtil.normalizeSafeAccessor(accessor);
+         const result = ObjectUtil.normalizePropertyPath(accessor);
 
          assert.equal(result, accessor);
       });
@@ -1644,7 +1644,7 @@ describe('ObjectUtil:', () =>
       {
          const accessor = [''] as const;
 
-         const result = ObjectUtil.normalizeSafeAccessor(accessor);
+         const result = ObjectUtil.normalizePropertyPath(accessor);
 
          assert.equal(result, accessor);
          assert.deepEqual(result, ['']);
@@ -1654,21 +1654,21 @@ describe('ObjectUtil:', () =>
       {
          it('throws - for an empty string accessor', () =>
          {
-            assert.throws(() => ObjectUtil.normalizeSafeAccessor(''), TypeError,
-             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+            assert.throws(() => ObjectUtil.normalizePropertyPath(''), TypeError,
+             `normalizePropertyPath error: 'accessor' is not a valid property path.`);
          });
 
          it('throws - for an empty accessor array', () =>
          {
-            assert.throws(() => ObjectUtil.normalizeSafeAccessor([]), TypeError,
-             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+            assert.throws(() => ObjectUtil.normalizePropertyPath([]), TypeError,
+             `normalizePropertyPath error: 'accessor' is not a valid property path.`);
          });
 
          it('throws - when an accessor array contains an invalid key', () =>
          {
             // @ts-expect-error
-            assert.throws(() => ObjectUtil.normalizeSafeAccessor(['level1', true]), TypeError,
-             `normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+            assert.throws(() => ObjectUtil.normalizePropertyPath(['level1', true]), TypeError,
+             `normalizePropertyPath error: 'accessor' is not a valid property path.`);
          });
       });
    });
@@ -1705,7 +1705,7 @@ describe('ObjectUtil:', () =>
       it('all mixed accessors (as accessor arrays)', () =>
       {
          const output = [];
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
+         const accessors = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED)];
 
          for (const accessor of accessors) { output.push(ObjectUtil.safeAccess(s_OBJECT_MIXED, accessor)); }
 
@@ -1824,17 +1824,17 @@ describe('ObjectUtil:', () =>
       });
    });
 
-   describe('safeKeyIterator:', () =>
+   describe('pathKeyIterator:', () =>
    {
       it('all accessors', () =>
       {
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED)];
+         const accessors = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED)];
          assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST));
       });
 
       it('options.arrayIndex (false)', () =>
       {
-         const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_MIXED, { arrayIndex: false })];
+         const accessors = [...ObjectUtil.pathKeyIterator(s_OBJECT_MIXED, { arrayIndex: false })];
          assert.deepEqual(accessors, JSON.parse(s_VERIFY_ACCESSOR_LIST_NO_ARRAY));
       });
 
@@ -1846,21 +1846,21 @@ describe('ObjectUtil:', () =>
             enumerable: true
          });
 
-         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: true })], []);
-         assert.deepEqual([...ObjectUtil.safeKeyIterator(new Test(), { hasOwnOnly: false })], [['a']]);
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(new Test(), { hasOwnOnly: true })], []);
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(new Test(), { hasOwnOnly: false })], [['a']]);
       });
 
       it('yields numeric indexes for a root array', () =>
       {
          const data = ['a', 'b', 'c'];
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[0], [1], [2]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[0], [1], [2]]);
       });
 
       it('does not yield root array indexes when arrayIndex is false', () =>
       {
          const data = ['a', 'b', 'c'];
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { arrayIndex: false })], []);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: false })], []);
       });
 
       it('yields an enumerable symbol property containing a primitive', () =>
@@ -1870,7 +1870,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = 42;
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[key]]);
       });
 
       it('yields numeric indexes for an enumerable symbol property containing an array', () =>
@@ -1880,7 +1880,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = ['a', 'b'];
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key, 0], [key, 1]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[key, 0], [key, 1]]);
       });
 
       it('does not yield a symbol array property when arrayIndex is false', () =>
@@ -1890,7 +1890,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = ['a', 'b'];
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { arrayIndex: false })], []);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { arrayIndex: false })], []);
       });
 
       it('traverses an object stored under an enumerable symbol property', () =>
@@ -1900,7 +1900,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = { first: 1, second: 2 };
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[key, 'first'], [key, 'second']]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[key, 'first'], [key, 'second']]);
       });
 
       it('does not yield a function stored under an enumerable symbol property', () =>
@@ -1910,7 +1910,7 @@ describe('ObjectUtil:', () =>
 
          data[key] = (): void => {};
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], []);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], []);
       });
 
       it('ignores enumerable string properties attached to arrays', () =>
@@ -1920,7 +1920,7 @@ describe('ObjectUtil:', () =>
          // @ts-expect-error
          data.extra = 42;
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [[0]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [[0]]);
       });
 
       it('ignores non-enumerable symbol properties', () =>
@@ -1930,7 +1930,7 @@ describe('ObjectUtil:', () =>
 
          Object.defineProperty(data, key, { enumerable: false, value: 42 });
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], []);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], []);
       });
 
       it('includes inherited enumerable symbol properties when hasOwnOnly is false', () =>
@@ -1943,7 +1943,7 @@ describe('ObjectUtil:', () =>
          const data: any[] = [];
          Object.setPrototypeOf(data, prototype);
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { hasOwnOnly: false })], [[key]]);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { hasOwnOnly: false })], [[key]]);
       });
 
       it('excludes inherited enumerable symbol properties when hasOwnOnly is true', () =>
@@ -1956,7 +1956,7 @@ describe('ObjectUtil:', () =>
          const data: any[] = [];
          Object.setPrototypeOf(data, prototype);
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data, { hasOwnOnly: true })], []);
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data, { hasOwnOnly: true })], []);
       });
 
       it('handles all supported root-array entries in order', () =>
@@ -1975,7 +1975,7 @@ describe('ObjectUtil:', () =>
          data[objectKey] = { value: true };
          data[functionKey] = (): void => {};
 
-         assert.deepStrictEqual([...ObjectUtil.safeKeyIterator(data)], [
+         assert.deepStrictEqual([...ObjectUtil.pathKeyIterator(data)], [
             [0],
             [1],
             [primitiveKey],
@@ -1992,7 +1992,7 @@ describe('ObjectUtil:', () =>
             callback(): void {}
          };
 
-         assert.deepEqual([...ObjectUtil.safeKeyIterator(data)], [['value']]);
+         assert.deepEqual([...ObjectUtil.pathKeyIterator(data)], [['value']]);
       });
 
       it('allows shared references that do not form a circular path', () =>
@@ -2000,7 +2000,7 @@ describe('ObjectUtil:', () =>
          const shared = { value: 42 };
          const source = { first: shared, second: shared };
 
-         assert.doesNotThrow(() => [...ObjectUtil.safeKeyIterator(source)]);
+         assert.doesNotThrow(() => [...ObjectUtil.pathKeyIterator(source)]);
       });
 
       describe('Errors', () =>
@@ -2008,20 +2008,20 @@ describe('ObjectUtil:', () =>
          it('throws - data not object', () =>
          {
             // @ts-expect-error
-            expect(() => [...ObjectUtil.safeKeyIterator(false)]).throws(TypeError,
-             `safeKeyIterator error: 'data' is not an object.`);
+            expect(() => [...ObjectUtil.pathKeyIterator(false)]).throws(TypeError,
+             `pathKeyIterator error: 'data' is not an object.`);
          });
 
          it('throws - options.arrayIndex is not a boolean', () =>
          {
-            expect(() => [...ObjectUtil.safeKeyIterator({}, { arrayIndex: null })]).throws(TypeError,
-             `safeKeyIterator error: 'options.arrayIndex' is not a boolean.`);
+            expect(() => [...ObjectUtil.pathKeyIterator({}, { arrayIndex: null })]).throws(TypeError,
+             `pathKeyIterator error: 'options.arrayIndex' is not a boolean.`);
          });
 
          it('throws - options.hasOwnOnly is not a boolean', () =>
          {
-            expect(() => [...ObjectUtil.safeKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
-             `safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
+            expect(() => [...ObjectUtil.pathKeyIterator({}, { hasOwnOnly: null })]).throws(TypeError,
+             `pathKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
          });
 
          it('throws - circular source object', () =>
@@ -2030,17 +2030,17 @@ describe('ObjectUtil:', () =>
 
             source.self = source;
 
-            assert.throws(() => [...ObjectUtil.safeKeyIterator(source)], TypeError,
-             `safeKeyIterator error: Circular object path detected.`);
+            assert.throws(() => [...ObjectUtil.pathKeyIterator(source)], TypeError,
+             `pathKeyIterator error: Circular object path detected.`);
          });
       });
    });
 
    describe('safeSet:', () =>
    {
-      const accessors = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM)];
+      const accessors = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM)];
 
-      const accessorsAsStrings = [...ObjectUtil.safeKeyIterator(s_OBJECT_NUM, { arrayIndex: false })].map(
+      const accessorsAsStrings = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM, { arrayIndex: false })].map(
        (accessor) => accessor.join('.'));
 
       let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);

@@ -1,7 +1,7 @@
 import {
    isArrayIndex,
-   isSafeAccessorPrefix,
-   normalizeSafeAccessor }    from './functions';
+   isPropertyPathPrefix,
+   normalizePropertyPath }    from './functions';
 
 import type { PropertyPath }  from './functions';
 
@@ -135,7 +135,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    delete(accessor: PropertyPath): boolean
    {
-      const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+      const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
       const frames: PropertyPathMapDeleteFrame<V>[] = [];
       let node: PropertyPathMapNode<V> = this.#root;
 
@@ -224,7 +224,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    get(accessor: PropertyPath): V | undefined
    {
-      return this.#findNode(normalizeSafeAccessor(accessor))?.entry?.value;
+      return this.#findNode(normalizePropertyPath(accessor))?.entry?.value;
    }
 
    /**
@@ -240,7 +240,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    has(accessor: PropertyPath): boolean
    {
-      return this.#findNode(normalizeSafeAccessor(accessor))?.entry !== void 0;
+      return this.#findNode(normalizePropertyPath(accessor))?.entry !== void 0;
    }
 
    /**
@@ -454,7 +454,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    set(accessor: PropertyPath, value: V): this
    {
-      const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+      const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
       let node: PropertyPathMapNode<V> = this.#root;
 
       // Allocate only the missing suffix; existing prefixes are shared by every related path.
@@ -731,11 +731,11 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     PropertyPathMapTraversalScope<V>
    {
       const prefixPath: readonly PropertyKey[] | undefined = pathPrefix === void 0 ?
-       void 0 : normalizeSafeAccessor(pathPrefix);
+       void 0 : normalizePropertyPath(pathPrefix);
       const stopPath: readonly PropertyKey[] | undefined = stopAt === void 0 ?
-       void 0 : normalizeSafeAccessor(stopAt);
+       void 0 : normalizePropertyPath(stopAt);
 
-      if (prefixPath !== void 0 && stopPath !== void 0 && !isSafeAccessorPrefix(prefixPath, stopPath))
+      if (prefixPath !== void 0 && stopPath !== void 0 && !isPropertyPathPrefix(prefixPath, stopPath))
       {
          throw new RangeError(`PropertyPathMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
       }

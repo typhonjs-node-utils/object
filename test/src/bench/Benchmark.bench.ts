@@ -8,7 +8,7 @@ import * as ObjectUtil  from '../../../src/functions';
 const deepFreeze = false;
 const deepMerge = false;
 const deepSeal = false;
-const safeKeyIterator = false;
+const pathKeyIterator = false;
 
 // Load large objects ------------------------------------------------------------------------------------------------
 
@@ -21,20 +21,20 @@ console.log(`FINISH - Generating Object Data`)
 
 // Tests -------------------------------------------------------------------------------------------------------------
 
-describe.skipIf(!safeKeyIterator)('safeKeyIterator', () =>
+describe.skipIf(!pathKeyIterator)('pathKeyIterator', () =>
 {
    let lengthIter = 0;
 
-   bench('safeKeyIterator', () =>
+   bench('pathKeyIterator', () =>
    {
       lengthIter = 0;
-      for (const entry of ObjectUtil.safeKeyIterator(testObject)) { lengthIter++; }
+      for (const entry of ObjectUtil.pathKeyIterator(testObject)) { lengthIter++; }
    },
    {
       iterations: 0,
       teardown: () =>
       {
-         console.log(`safeKeyIterator length: ${lengthIter}`);
+         console.log(`pathKeyIterator length: ${lengthIter}`);
       }
    });
 });

@@ -112,7 +112,7 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
 }
 
 /**
- * Concatenates one or more safe accessors into a newly allocated exact property-key path.
+ * Concatenates one or more property paths into a newly allocated exact property-key path.
  *
  * Every accessor is normalized before concatenation. Dotted strings therefore contribute one segment per delimiter,
  * while array accessors preserve numbers, symbols, empty-string keys, and literal periods exactly. The returned array
@@ -120,7 +120,7 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
  *
  * @example
  * ```ts
- * concatSafeAccessor('actor.system', ['attributes', 'hp'], 'value');
+ * concatPropertyPath('actor.system', ['attributes', 'hp'], 'value');
  * // ['actor', 'system', 'attributes', 'hp', 'value']
  * ```
  *
@@ -132,22 +132,22 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
  *
  * @throws {TypeError} If any argument is not a valid {@link PropertyPath} or no accessor is supplied at runtime.
  */
-export function concatSafeAccessor(accessor: PropertyPath, ...accessors: PropertyPath[]): readonly PropertyKey[]
+export function concatPropertyPath(accessor: PropertyPath, ...accessors: PropertyPath[]): readonly PropertyKey[]
 {
    if (arguments.length === 0)
    {
-      throw new TypeError(`concatSafeAccessor error: At least one safe accessor is required.`);
+      throw new TypeError(`concatPropertyPath error: At least one property path is required.`);
    }
 
-   const result: PropertyKey[] = Array.from(normalizeSafeAccessor(accessor));
+   const result: PropertyKey[] = Array.from(normalizePropertyPath(accessor));
 
-   for (const entry of accessors) { result.push(...normalizeSafeAccessor(entry)); }
+   for (const entry of accessors) { result.push(...normalizePropertyPath(entry)); }
 
    return result;
 }
 
 /**
- * Deletes the property resolved by a safe accessor.
+ * Deletes the property resolved by a property path.
  *
  * By default, every path segment must be an own property. Set `hasOwnOnly` to `false` to permit inherited traversal;
  * when the final property is inherited, the property is deleted from the prototype object that owns it. This explicit
@@ -172,14 +172,14 @@ export function concatSafeAccessor(accessor: PropertyPath, ...accessors: Propert
 export function deleteProperty(data: object, accessor: PropertyPath,
  { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}): boolean
 {
-   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
+   if (typeof data !== 'object' || data === null || !isPropertyPath(accessor)) { return false; }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
       throw new TypeError(`deleteProperty error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+   const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
 
    for (const key of path)
    {
@@ -545,7 +545,7 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
 }
 
 /**
- * Returns the value resolved by a safe accessor while preserving present `undefined` and `null` values.
+ * Returns the value resolved by a property path while preserving present `undefined` and `null` values.
  *
  * Unlike {@link safeAccess}, this function returns a present nullish property unchanged. A missing or invalid path
  * returns `undefined`; use {@link hasProperty} when that result must be distinguished from a present `undefined`
@@ -569,19 +569,19 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
 export function getProperty<T extends object, const P extends PropertyPath>(data: T, accessor: P,
                                                                             { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): DeepAccess<T, P> | undefined
 {
-   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+   if (typeof data !== 'object' || data === null || !isPropertyPath(accessor)) { return void 0; }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
       throw new TypeError(`getProperty error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly })?.value as
+   return resolvePropertyPath(data, normalizePropertyPath(accessor), { hasOwnOnly })?.value as
     DeepAccess<T, P> | undefined;
 }
 
 /**
- * Returns the own property descriptor that defines the final segment of a safe accessor.
+ * Returns the own property descriptor that defines the final segment of a property path.
  *
  * Intermediate values are read as necessary to continue traversal, but the final property value is not read. Getter
  * accessors at the terminal segment are therefore not invoked. When inherited lookup is enabled, the descriptor is
@@ -602,18 +602,18 @@ export function getProperty<T extends object, const P extends PropertyPath>(data
 export function getPropertyDescriptor(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): PropertyDescriptor | undefined
 {
-   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+   if (typeof data !== 'object' || data === null || !isPropertyPath(accessor)) { return void 0; }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
       throw new TypeError(`getPropertyDescriptor error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false })?.descriptor;
+   return resolvePropertyPath(data, normalizePropertyPath(accessor), { hasOwnOnly, readValue: false })?.descriptor;
 }
 
 /**
- * Returns the object that owns the final property resolved by a safe accessor.
+ * Returns the object that owns the final property resolved by a property path.
  *
  * The owner may be the object reached directly by the parent path or one of its prototypes. Intermediate values are
  * read to continue traversal, but the final property value is not read. Set `hasOwnOnly` to `true` to require every
@@ -634,14 +634,14 @@ export function getPropertyDescriptor(data: object, accessor: PropertyPath,
 export function getPropertyOwner(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): object | undefined
 {
-   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
+   if (typeof data !== 'object' || data === null || !isPropertyPath(accessor)) { return void 0; }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
       throw new TypeError(`getPropertyOwner error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false })?.owner;
+   return resolvePropertyPath(data, normalizePropertyPath(accessor), { hasOwnOnly, readValue: false })?.owner;
 }
 
 /**
@@ -708,14 +708,14 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
 export function hasProperty(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): boolean
 {
-   if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
+   if (typeof data !== 'object' || data === null || !isPropertyPath(accessor)) { return false; }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
       throw new TypeError(`hasProperty error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
-   return resolvePropertyPath(data, normalizeSafeAccessor(accessor), { hasOwnOnly, readValue: false }) !== void 0;
+   return resolvePropertyPath(data, normalizePropertyPath(accessor), { hasOwnOnly, readValue: false }) !== void 0;
 }
 
 /**
@@ -933,7 +933,7 @@ export function isRecord(value: unknown): value is Record<string, unknown>
 }
 
 /**
- * Determines whether a value is a valid safe accessor.
+ * Determines whether a value is a valid property path.
  *
  * A valid accessor is either:
  *
@@ -947,7 +947,7 @@ export function isRecord(value: unknown): value is Record<string, unknown>
  *
  * @returns Whether the value is a valid {@link PropertyPath}.
  */
-export function isSafeAccessor(value: unknown): value is PropertyPath
+export function isPropertyPath(value: unknown): value is PropertyPath
 {
    if (typeof value === 'string') { return value.length > 0; }
 
@@ -962,7 +962,7 @@ export function isSafeAccessor(value: unknown): value is PropertyPath
 }
 
 /**
- * Determines whether one safe accessor is an exact structural prefix of another.
+ * Determines whether one property path is an exact structural prefix of another.
  *
  * Both accessors are compared after normalization. Segment comparison follows native `Map` / SameValueZero
  * semantics: strings compare by value, symbols by identity, `0` equals `-0`, and numeric `NaN` segments compare as
@@ -976,12 +976,12 @@ export function isSafeAccessor(value: unknown): value is PropertyPath
  *
  * @returns Whether `prefix` is an exact structural prefix of `accessor`.
  */
-export function isSafeAccessorPrefix(prefix: PropertyPath, accessor: PropertyPath): boolean
+export function isPropertyPathPrefix(prefix: PropertyPath, accessor: PropertyPath): boolean
 {
-   if (!isSafeAccessor(prefix) || !isSafeAccessor(accessor)) { return false; }
+   if (!isPropertyPath(prefix) || !isPropertyPath(accessor)) { return false; }
 
-   const prefixPath: readonly PropertyKey[] = normalizeSafeAccessor(prefix);
-   const accessorPath: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+   const prefixPath: readonly PropertyKey[] = normalizePropertyPath(prefix);
+   const accessorPath: readonly PropertyKey[] = normalizePropertyPath(accessor);
 
    if (prefixPath.length > accessorPath.length) { return false; }
 
@@ -1001,7 +1001,7 @@ export function isSafeAccessorPrefix(prefix: PropertyPath, accessor: PropertyPat
 }
 
 /**
- * Converts a safe accessor to an equivalent dotted string accessor when that conversion is lossless.
+ * Converts a property path to an equivalent dotted string accessor when that conversion is lossless.
  *
  * Exact accessor arrays containing numbers, symbols, or string segments with literal periods cannot be represented by
  * dotted-string syntax without changing their property-path semantics and are rejected. Empty segments are retained,
@@ -1014,15 +1014,15 @@ export function isSafeAccessorPrefix(prefix: PropertyPath, accessor: PropertyPat
  *
  * @throws {TypeError} If `accessor` is invalid or cannot be represented losslessly as a dotted string accessor.
  */
-export function joinSafeAccessor(accessor: PropertyPath): string
+export function joinPropertyPath(accessor: PropertyPath): string
 {
-   const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+   const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
 
    for (const key of path)
    {
       if (typeof key !== 'string' || key.includes('.'))
       {
-         throw new TypeError(`joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
+         throw new TypeError(`joinPropertyPath error: 'accessor' cannot be represented as a dotted string accessor.`);
       }
    }
 
@@ -1030,14 +1030,14 @@ export function joinSafeAccessor(accessor: PropertyPath): string
 
    if (result.length === 0)
    {
-      throw new TypeError(`joinSafeAccessor error: 'accessor' cannot be represented as a dotted string accessor.`);
+      throw new TypeError(`joinPropertyPath error: 'accessor' cannot be represented as a dotted string accessor.`);
    }
 
    return result;
 }
 
 /**
- * Converts a safe accessor to its canonical readonly property-key array representation.
+ * Converts a property path to its canonical readonly property-key array representation.
  *
  * Dotted strings are split on `.` while property-key arrays are returned unchanged. Exact array accessors should be
  * used for symbols, numeric array indexes, empty-string keys, and property names containing literal periods.
@@ -1048,11 +1048,11 @@ export function joinSafeAccessor(accessor: PropertyPath): string
  *
  * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
  */
-export function normalizeSafeAccessor(accessor: PropertyPath): readonly PropertyKey[]
+export function normalizePropertyPath(accessor: PropertyPath): readonly PropertyKey[]
 {
-   if (!isSafeAccessor(accessor))
+   if (!isPropertyPath(accessor))
    {
-      throw new TypeError(`normalizeSafeAccessor error: 'accessor' is not a valid safe accessor.`);
+      throw new TypeError(`normalizePropertyPath error: 'accessor' is not a valid property path.`);
    }
 
    return typeof accessor === 'string' ? accessor.split('.') : accessor;
@@ -1143,7 +1143,7 @@ export function safeEqual<T extends object>(source: T, target: object,
 {
    if (typeof source !== 'object' || source === null || typeof target !== 'object' || target === null) { return false; }
 
-   for (const accessor of safeKeyIterator(source, options))
+   for (const accessor of pathKeyIterator(source, options))
    {
       const sourceResolution: PropertyPathResolution | undefined = resolvePropertyPath(source, accessor);
       const targetResolution: PropertyPathResolution | undefined = resolvePropertyPath(target, accessor);
@@ -1175,22 +1175,22 @@ export function safeEqual<T extends object>(source: T, target: object,
  *
  * @returns Safe key iterator.
  */
-export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly = true }:
+export function* pathKeyIterator(data: object, { arrayIndex = true, hasOwnOnly = true }:
  { arrayIndex?: boolean, hasOwnOnly?: boolean } = {}): IterableIterator<readonly PropertyKey[]>
 {
    if (typeof data !== 'object' || data === null)
    {
-      throw new TypeError(`safeKeyIterator error: 'data' is not an object.`);
+      throw new TypeError(`pathKeyIterator error: 'data' is not an object.`);
    }
 
    if (typeof arrayIndex !== 'boolean')
    {
-      throw new TypeError(`safeKeyIterator error: 'options.arrayIndex' is not a boolean.`);
+      throw new TypeError(`pathKeyIterator error: 'options.arrayIndex' is not a boolean.`);
    }
 
    if (typeof hasOwnOnly !== 'boolean')
    {
-      throw new TypeError(`safeKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
+      throw new TypeError(`pathKeyIterator error: 'options.hasOwnOnly' is not a boolean.`);
    }
 
    // Ancestors are tracked per active path, not globally. Shared objects may therefore appear at multiple valid
@@ -1204,7 +1204,7 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
 
       if (Array.isArray(obj))
       {
-         yield* iterateArrayAccessors(obj, path, arrayIndex, hasOwnOnly, stack, ancestors);
+         yield* iterateArrayPaths(obj, path, arrayIndex, hasOwnOnly, stack, ancestors);
          continue;
       }
 
@@ -1217,7 +1217,7 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
          {
             // Array index paths are emitted inline to preserve established ordering instead of deferring the array to
             // the primary LIFO object stack.
-            yield* iterateArrayAccessors(value, fullPath, arrayIndex, hasOwnOnly, stack,
+            yield* iterateArrayPaths(value, fullPath, arrayIndex, hasOwnOnly, stack,
              extendPropertyAncestors(ancestors, value));
          }
          else if (typeof value === 'object' && value !== null)
@@ -1435,8 +1435,8 @@ function clonePlainEnumerable(source: Record<PropertyKey, unknown>): Record<Prop
  * `WeakSet`, but it correctly permits shared references that occur on separate non-circular paths.
  *
  * Called by:
- * - {@link safeKeyIterator} when descending through ordinary object and array properties.
- * - {@link iterateArrayAccessors} when descending through symbol properties attached to arrays.
+ * - {@link pathKeyIterator} when descending through ordinary object and array properties.
+ * - {@link iterateArrayPaths} when descending through symbol properties attached to arrays.
  *
  * @param ancestors - Objects already present on the active traversal path.
  * @param child - The object about to be traversed.
@@ -1449,7 +1449,7 @@ function extendPropertyAncestors(ancestors: ReadonlySet<object>, child: object):
 {
    if (ancestors.has(child))
    {
-      throw new TypeError(`safeKeyIterator error: Circular object path detected.`);
+      throw new TypeError(`pathKeyIterator error: Circular object path detected.`);
    }
 
    const result: Set<object> = new Set(ancestors);
@@ -1492,7 +1492,7 @@ function findPropertyDescriptorOwner(value: PropertyPathTraversableValue, key: P
  * Called by:
  * - {@link deepFreeze} and {@link deepSeal} for symbol-aware object-graph traversal.
  * - {@link deepMerge} for safe own-property merging.
- * - {@link safeKeyIterator} and {@link iterateArrayAccessors} for path enumeration.
+ * - {@link pathKeyIterator} and {@link iterateArrayPaths} for path enumeration.
  * - {@link assertNoCircularPlainObject} for merge-cycle validation.
  * - {@link clonePlainEnumerable} for safe target-branch copying.
  *
@@ -1626,18 +1626,18 @@ function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknow
  * array stack avoids recursive generator calls for nested arrays reached through symbols.
  *
  * Called by:
- * - {@link safeKeyIterator} for root arrays and arrays encountered as object-property values.
+ * - {@link pathKeyIterator} for root arrays and arrays encountered as object-property values.
  *
  * @param array - Array to enumerate.
  * @param path - Accessor path leading to `array`.
  * @param arrayIndex - Whether numeric array indexes should be yielded.
  * @param hasOwnOnly - Whether inherited enumerable symbol properties should be excluded.
- * @param objectStack - Primary object traversal stack owned by {@link safeKeyIterator}.
+ * @param objectStack - Primary object traversal stack owned by {@link pathKeyIterator}.
  * @param ancestors - Active path ancestors used for circular-reference detection.
  *
  * @returns An iterator of readonly property-key accessor paths.
  */
-function* iterateArrayAccessors(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
+function* iterateArrayPaths(array: any[], path: readonly PropertyKey[], arrayIndex: boolean,
  hasOwnOnly: boolean, objectStack: PropertyTraversalEntry[], ancestors: ReadonlySet<object>):
   IterableIterator<readonly PropertyKey[]>
 {
@@ -1788,7 +1788,7 @@ export type PropertyPath = string | readonly PropertyKey[];
 // Internal Types ----------------------------------------------------------------------------------------------------
 
 /**
- * Stack frame for array traversal in {@link iterateArrayAccessors}.
+ * Stack frame for array traversal in {@link iterateArrayPaths}.
  */
 interface ArrayTraversalEntry
 {
@@ -1833,7 +1833,7 @@ interface PropertyPathResolution
 type PropertyPathTraversableValue = object | ((...args: any[]) => any);
 
 /**
- * Stack frame for ordinary-object traversal in {@link safeKeyIterator}.
+ * Stack frame for ordinary-object traversal in {@link pathKeyIterator}.
  */
 interface PropertyTraversalEntry
 {

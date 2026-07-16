@@ -1,4 +1,4 @@
-import { normalizeSafeAccessor } from './functions';
+import { normalizePropertyPath } from './functions';
 import { PropertyPathMap }       from './PropertyPathMap';
 
 import type { PropertyPath }     from './functions';
@@ -104,7 +104,7 @@ export class WeakPropertyPathMap<R extends object, V>
       if (map === void 0)
       {
          // Preserve PropertyPathMap validation semantics even when no per-root trie exists.
-         normalizeSafeAccessor(accessor);
+         normalizePropertyPath(accessor);
          return false;
       }
 
@@ -155,7 +155,7 @@ export class WeakPropertyPathMap<R extends object, V>
       if (map === void 0)
       {
          // Validate absent-root queries consistently with a populated PropertyPathMap.
-         normalizeSafeAccessor(accessor);
+         normalizePropertyPath(accessor);
          return void 0;
       }
 
@@ -182,7 +182,7 @@ export class WeakPropertyPathMap<R extends object, V>
 
       if (map === void 0)
       {
-         normalizeSafeAccessor(accessor);
+         normalizePropertyPath(accessor);
          return false;
       }
 
@@ -421,7 +421,7 @@ export class WeakPropertyPathMap<R extends object, V>
       if (map === void 0)
       {
          // Normalize before retaining the root so failed validation cannot create an empty association.
-         const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
+         const path: readonly PropertyKey[] = normalizePropertyPath(accessor);
 
          map = new PropertyPathMap<V>();
          map.set(path, value);
