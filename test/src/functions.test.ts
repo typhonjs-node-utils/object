@@ -2,6 +2,8 @@ import { expectTypeOf } from 'vitest';
 
 import * as ObjectUtil  from '../../src/functions';
 
+import { klona }        from '../../src';
+
 /**
  * For visual no-op type erasure tests.
  */
@@ -54,7 +56,7 @@ const s_OBJECT_MIXED =
    }
 };
 
-const s_OBJECT_MIXED_ORIG = ObjectUtil.klona(s_OBJECT_MIXED);
+const s_OBJECT_MIXED_ORIG = klona(s_OBJECT_MIXED);
 
 // Last entry of array2 differs from s_OBJECT_MIXED
 const s_OBJECT_MIXED_ONE_MOD = { a: 1, b: 2, c: 3, array: ['a', 'b', 'c'], level1: { d: 4, e: 5, f: 6, array1: ['d', 'e', 'f'], level2: { g: 7, h: 8, i: 9, array2: ['g', 'h', 'z'] } } };
@@ -269,7 +271,7 @@ describe('ObjectUtil:', () =>
    {
       it('with skipKeys:', () =>
       {
-         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+         const testObj = klona(s_OBJECT_DEEP);
 
          ObjectUtil.deepFreeze(testObj, { skipKeys: new Set(['skipKey']) });
 
@@ -353,7 +355,7 @@ describe('ObjectUtil:', () =>
       });
 
       it('without skipKeys:', () => {
-         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+         const testObj = klona(s_OBJECT_DEEP);
 
          ObjectUtil.deepFreeze(testObj);
 
@@ -816,7 +818,7 @@ describe('ObjectUtil:', () =>
    {
       it('with skipKeys:', () =>
       {
-         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+         const testObj = klona(s_OBJECT_DEEP);
 
          ObjectUtil.deepSeal(testObj, { skipKeys: new Set(['skipKey']) });
 
@@ -900,7 +902,7 @@ describe('ObjectUtil:', () =>
       });
 
       it('without skipKeys:', () => {
-         const testObj = ObjectUtil.klona(s_OBJECT_DEEP);
+         const testObj = klona(s_OBJECT_DEEP);
 
          ObjectUtil.deepSeal(testObj);
 
@@ -2043,9 +2045,9 @@ describe('ObjectUtil:', () =>
       const pathsAsStrings = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM, { arrayIndex: false })].map(
        (path) => path.join('.'));
 
-      let objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM);
+      let objectNumCopy = klona(s_OBJECT_NUM);
 
-      beforeEach(() => { objectNumCopy = ObjectUtil.klona(s_OBJECT_NUM); });
+      beforeEach(() => { objectNumCopy = klona(s_OBJECT_NUM); });
 
       it('add (path array)', () =>
       {
