@@ -1,3 +1,3 @@
 export * from './functions';
-export * from './SafeAccessorMap';
-export * from './WeakSafeAccessorMap';
+export * from './PropertyPathMap';
+export * from './WeakPropertyPathMap';

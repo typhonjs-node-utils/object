@@ -1,23 +1,23 @@
-import { WeakSafeAccessorMap } from '../../src';
+import { WeakPropertyPathMap } from '../../src';
 
 function collect<T>(iterator: IterableIterator<T>): T[]
 {
    return [...iterator];
 }
 
-describe('WeakSafeAccessorMap', () =>
+describe('WeakPropertyPathMap', () =>
 {
    it('provides the expected object tag', () =>
    {
-      const map = new WeakSafeAccessorMap<object, number>();
-      assert.equal(Object.prototype.toString.call(map), '[object WeakSafeAccessorMap]');
+      const map = new WeakPropertyPathMap<object, number>();
+      assert.equal(Object.prototype.toString.call(map), '[object WeakPropertyPathMap]');
    });
 
    it('stores identical paths independently beneath different roots', () =>
    {
       const rootA = {};
       const rootB = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
 
       map.set(rootA, 'value', 1).set(rootB, 'value', 2);
 
@@ -31,7 +31,7 @@ describe('WeakSafeAccessorMap', () =>
    it('supports function roots', () =>
    {
       function root() {}
-      const map = new WeakSafeAccessorMap<typeof root, string>();
+      const map = new WeakPropertyPathMap<typeof root, string>();
 
       map.set(root, 'value', 'stored');
 
@@ -41,7 +41,7 @@ describe('WeakSafeAccessorMap', () =>
    it('supports undefined as a stored value', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, undefined>();
+      const map = new WeakPropertyPathMap<object, undefined>();
 
       map.set(root, 'value', void 0);
 
@@ -52,7 +52,7 @@ describe('WeakSafeAccessorMap', () =>
    it('updates an existing per-root trie', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
 
       map.set(root, 'first', 1);
       map.set(root, 'second', 2);
@@ -65,7 +65,7 @@ describe('WeakSafeAccessorMap', () =>
    it('validates absent-root accessors for get, has, and delete', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       const invalid = [] as unknown as readonly PropertyKey[];
 
       assert.equal(map.get(root, 'value'), void 0);
@@ -80,7 +80,7 @@ describe('WeakSafeAccessorMap', () =>
    it('returns false when deleting a missing path from an existing root', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       map.set(root, 'value', 1);
 
       assert.equal(map.delete(root, 'missing'), false);
@@ -90,7 +90,7 @@ describe('WeakSafeAccessorMap', () =>
    it('retains a root when deleting one of multiple paths', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       map.set(root, 'first', 1).set(root, 'second', 2);
 
       assert.equal(map.delete(root, 'first'), true);
@@ -101,7 +101,7 @@ describe('WeakSafeAccessorMap', () =>
    it('removes a root after deleting its final path', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       map.set(root, 'value', 1);
 
       assert.equal(map.delete(root, 'value'), true);
@@ -112,7 +112,7 @@ describe('WeakSafeAccessorMap', () =>
    {
       const root = {};
       const missing = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       map.set(root, 'value', 1);
 
       assert.equal(map.deleteRoot(root), true);
@@ -124,7 +124,7 @@ describe('WeakSafeAccessorMap', () =>
    {
       const rootA = {};
       const rootB = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       map.set(rootA, 'value', 1).set(rootB, 'value', 2);
 
       map.clear();
@@ -139,7 +139,7 @@ describe('WeakSafeAccessorMap', () =>
    it('does not retain a root when its first accessor is invalid', () =>
    {
       const root = {};
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
       const invalid = [] as unknown as readonly PropertyKey[];
 
       assert.throws(() => map.set(root, invalid, 1), TypeError);
@@ -148,13 +148,13 @@ describe('WeakSafeAccessorMap', () =>
 
    it('rejects null and primitive roots', () =>
    {
-      const map = new WeakSafeAccessorMap<object, number>();
+      const map = new WeakPropertyPathMap<object, number>();
 
       assert.throws(() => map.hasRoot(null as unknown as object), TypeError,
-       `WeakSafeAccessorMap error: 'root' is not an object or function.`);
+       `WeakPropertyPathMap error: 'root' is not an object or function.`);
 
       assert.throws(() => map.get(42 as unknown as object, 'value'), TypeError,
-       `WeakSafeAccessorMap error: 'root' is not an object or function.`);
+       `WeakPropertyPathMap error: 'root' is not an object or function.`);
    });
 
    describe('matching iterators', () =>
@@ -162,7 +162,7 @@ describe('WeakSafeAccessorMap', () =>
       it('delegates matching entries, keys, and values for an existing root', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'actor.hp', 'hp').set(root, 'actor.ac', 'ac');
 
          const data = { actor: { hp: 10 } };
@@ -175,7 +175,7 @@ describe('WeakSafeAccessorMap', () =>
       it('includes candidate property values for matching entries and values', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'actor.hp', 'hp').set(root, 'actor.name', 'name');
 
          const data = { actor: { hp: 10, name: void 0 } };
@@ -199,7 +199,7 @@ describe('WeakSafeAccessorMap', () =>
       it('preserves the existing tuple shapes when property values are omitted or false', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'value', 'mapped');
 
          assert.deepEqual(collect(map.matchingEntries(root, { value: 1 })), [[['value'], 'mapped']]);
@@ -212,7 +212,7 @@ describe('WeakSafeAccessorMap', () =>
       it('supports runtime boolean property-value options', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'value', 'mapped');
          const includePropertyValue: boolean = true;
 
@@ -225,7 +225,7 @@ describe('WeakSafeAccessorMap', () =>
       it('uses an empty delegated trie for missing roots', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
 
          assert.deepEqual(collect(map.matchingEntries(root, { value: 1 })), []);
          assert.deepEqual(collect(map.matchingEntries(root, { value: 1 }, { includePropertyValue: true })), []);
@@ -237,7 +237,7 @@ describe('WeakSafeAccessorMap', () =>
       it('validates options for missing roots during iterator consumption', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
 
          assert.throws(
           () => collect(map.matchingEntries(root, {}, { hasOwnOnly: 'yes' as unknown as boolean })),
@@ -256,7 +256,7 @@ describe('WeakSafeAccessorMap', () =>
          const root = {};
          const prototype = { inherited: 1 };
          const data = Object.create(prototype);
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'inherited', 'mapped');
 
          assert.deepEqual(collect(map.matchingValues(root, data)), ['mapped']);
@@ -266,7 +266,7 @@ describe('WeakSafeAccessorMap', () =>
       it('passes pathPrefix and stopAt through to the per-root trie', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'actor', 'actor');
          map.set(root, 'actor.hp', 'hp');
          map.set(root, 'actor.hp.value', 'hp-value');
@@ -304,7 +304,7 @@ describe('WeakSafeAccessorMap', () =>
       it('validates path bounds for missing roots during iterator consumption', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          const invalid = [] as unknown as readonly PropertyKey[];
 
          assert.throws(() => collect(map.matchingEntries(root, {}, { pathPrefix: invalid })), TypeError);
@@ -316,7 +316,7 @@ describe('WeakSafeAccessorMap', () =>
 
       it('validates roots before returning matching iterators', () =>
       {
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
 
          assert.throws(() => map.matchingEntries(null as unknown as object, {}), TypeError);
          assert.throws(() => map.matchingKeys(1 as unknown as object, {}), TypeError);
@@ -329,7 +329,7 @@ describe('WeakSafeAccessorMap', () =>
       it('delegates subtree entries, keys, and values for an existing root', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          map.set(root, 'actor', 'actor');
          map.set(root, 'actor.hp', 'hp');
          map.set(root, 'actor.hp.value', 'hp-value');
@@ -360,7 +360,7 @@ describe('WeakSafeAccessorMap', () =>
       it('uses the empty delegated trie for missing roots', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
 
          assert.deepEqual(collect(map.subtreeEntries(root)), []);
          assert.deepEqual(collect(map.subtreeKeys(root, { pathPrefix: 'actor' })), []);
@@ -370,7 +370,7 @@ describe('WeakSafeAccessorMap', () =>
       it('validates subtree options for missing roots during iteration', () =>
       {
          const root = {};
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
          const invalid = [] as unknown as readonly PropertyKey[];
 
          assert.throws(() => collect(map.subtreeEntries(root, { pathPrefix: invalid })), TypeError);
@@ -382,7 +382,7 @@ describe('WeakSafeAccessorMap', () =>
 
       it('validates roots before returning subtree iterators', () =>
       {
-         const map = new WeakSafeAccessorMap<object, string>();
+         const map = new WeakPropertyPathMap<object, string>();
 
          assert.throws(() => map.subtreeEntries(null as unknown as object), TypeError);
          assert.throws(() => map.subtreeKeys(1 as unknown as object), TypeError);

@@ -1,30 +1,30 @@
-import { SafeAccessorMap } from '../../src';
+import { PropertyPathMap } from '../../src';
 
 function collect<T>(iterator: IterableIterator<T>): T[]
 {
    return [...iterator];
 }
 
-describe('SafeAccessorMap', () =>
+describe('PropertyPathMap', () =>
 {
    it('constructs an empty map', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
 
       assert.equal(map.size, 0);
-      assert.equal(Object.prototype.toString.call(map), '[object SafeAccessorMap]');
+      assert.equal(Object.prototype.toString.call(map), '[object PropertyPathMap]');
       assert.deepEqual([...map], []);
    });
 
    it('accepts null constructor entries', () =>
    {
-      const map = new SafeAccessorMap<number>(null);
+      const map = new PropertyPathMap<number>(null);
       assert.equal(map.size, 0);
    });
 
    it('initializes entries and overwrites duplicate structural paths', () =>
    {
-      const map = new SafeAccessorMap<number>([
+      const map = new PropertyPathMap<number>([
          ['a.b', 1],
          [['a', 'b'], 2],
          [['a', 'c'], 3]
@@ -39,7 +39,7 @@ describe('SafeAccessorMap', () =>
 
    it('stores and retrieves structural paths independently of array identity', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
 
       map.set(['actors', 0, 'id'], 42);
 
@@ -53,7 +53,7 @@ describe('SafeAccessorMap', () =>
    {
       const symbolA = Symbol('value');
       const symbolB = Symbol('value');
-      const map = new SafeAccessorMap<string>();
+      const map = new PropertyPathMap<string>();
 
       map.set([0], 'number');
       map.set(['0'], 'string');
@@ -67,7 +67,7 @@ describe('SafeAccessorMap', () =>
 
    it('supports undefined as a stored value', () =>
    {
-      const map = new SafeAccessorMap<undefined>();
+      const map = new PropertyPathMap<undefined>();
 
       map.set('value', void 0);
 
@@ -79,7 +79,7 @@ describe('SafeAccessorMap', () =>
    it('copies and freezes canonical paths', () =>
    {
       const accessor: PropertyKey[] = ['a', 'b'];
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
 
       map.set(accessor, 1);
       accessor[1] = 'changed';
@@ -93,7 +93,7 @@ describe('SafeAccessorMap', () =>
 
    it('preserves insertion order on overwrite', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
 
       map.set('first', 1).set('second', 2).set('first', 3);
 
@@ -104,9 +104,9 @@ describe('SafeAccessorMap', () =>
 
    it('implements entries, keys, values, default iteration, and forEach', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       const thisArg = { total: 0 };
-      const calls: Array<[number, readonly PropertyKey[], SafeAccessorMap<number>]> = [];
+      const calls: Array<[number, readonly PropertyKey[], PropertyPathMap<number>]> = [];
 
       map.set('first', 1).set(['second'], 2);
       map.forEach(function(this: { total: number }, value, key, owner)
@@ -125,7 +125,7 @@ describe('SafeAccessorMap', () =>
 
    it('clears all entries', () =>
    {
-      const map = new SafeAccessorMap<number>([['a', 1], ['b', 2]]);
+      const map = new PropertyPathMap<number>([['a', 1], ['b', 2]]);
 
       map.clear();
 
@@ -139,7 +139,7 @@ describe('SafeAccessorMap', () =>
 
    it('returns false when deleting a missing edge', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('a.b', 1);
 
       assert.equal(map.delete('x.y'), false);
@@ -147,7 +147,7 @@ describe('SafeAccessorMap', () =>
 
    it('returns false when deleting a prefix without an entry', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('a.b', 1);
 
       assert.equal(map.delete('a'), false);
@@ -156,7 +156,7 @@ describe('SafeAccessorMap', () =>
 
    it('deletes a value-bearing prefix while retaining descendants', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('a', 1).set('a.b', 2);
 
       assert.equal(map.delete('a'), true);
@@ -166,7 +166,7 @@ describe('SafeAccessorMap', () =>
 
    it('deletes a leaf while retaining sibling branches', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('a.b', 1).set('a.c', 2);
 
       assert.equal(map.delete('a.b'), true);
@@ -176,7 +176,7 @@ describe('SafeAccessorMap', () =>
 
    it('prunes empty child maps and recreates the path', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set(['root', 'branch', 'leaf'], 1);
 
       assert.equal(map.delete(['root', 'branch', 'leaf']), true);
@@ -188,7 +188,7 @@ describe('SafeAccessorMap', () =>
 
    it('unlinks the only insertion-order entry', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('only', 1);
 
       assert.equal(map.delete('only'), true);
@@ -197,7 +197,7 @@ describe('SafeAccessorMap', () =>
 
    it('unlinks the first insertion-order entry', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('first', 1).set('second', 2).set('third', 3);
 
       assert.equal(map.delete('first'), true);
@@ -206,7 +206,7 @@ describe('SafeAccessorMap', () =>
 
    it('unlinks a middle insertion-order entry', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('first', 1).set('second', 2).set('third', 3);
 
       assert.equal(map.delete('second'), true);
@@ -215,7 +215,7 @@ describe('SafeAccessorMap', () =>
 
    it('unlinks the last insertion-order entry and appends after the new tail', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('first', 1).set('second', 2).set('third', 3);
 
       assert.equal(map.delete('third'), true);
@@ -226,7 +226,7 @@ describe('SafeAccessorMap', () =>
 
    it('moves a deleted and reinserted path to the end', () =>
    {
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
       map.set('first', 1).set('second', 2);
 
       map.delete('first');
@@ -238,7 +238,7 @@ describe('SafeAccessorMap', () =>
    it('rejects invalid accessors through all exact-path operations', () =>
    {
       const invalid = [] as unknown as readonly PropertyKey[];
-      const map = new SafeAccessorMap<number>();
+      const map = new PropertyPathMap<number>();
 
       assert.throws(() => map.set(invalid, 1), TypeError);
       assert.throws(() => map.get(invalid), TypeError);
@@ -250,7 +250,7 @@ describe('SafeAccessorMap', () =>
    {
       it('returns empty results for non-traversable data and an empty map', () =>
       {
-         const map = new SafeAccessorMap<number>();
+         const map = new PropertyPathMap<number>();
 
          assert.deepEqual(collect(map.matchingEntries({})), []);
          assert.deepEqual(collect(map.matchingEntries(null)), []);
@@ -260,7 +260,7 @@ describe('SafeAccessorMap', () =>
 
       it('matches stored paths and prunes missing prefixes', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp', 'hp');
          map.set('actor.system.ac', 'ac');
          map.set('token.x', 'x');
@@ -274,7 +274,7 @@ describe('SafeAccessorMap', () =>
 
       it('uses depth-first trie order instead of global insertion order', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('b.value', 'b');
          map.set('a.first', 'a1');
          map.set('a.second', 'a2');
@@ -288,7 +288,7 @@ describe('SafeAccessorMap', () =>
       {
          const prototype = { inherited: { value: 1 } };
          const data = Object.create(prototype);
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('inherited.value', 'match');
 
          assert.deepEqual(collect(map.matchingValues(data)), ['match']);
@@ -300,7 +300,7 @@ describe('SafeAccessorMap', () =>
          const data = function candidate() {};
          (data as unknown as Record<string, unknown>).metadata = { id: 1 };
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('metadata.id', 'id');
 
          assert.deepEqual(collect(map.matchingKeys(data)), [['metadata', 'id']]);
@@ -312,7 +312,7 @@ describe('SafeAccessorMap', () =>
          const data: any[] = ['zero'];
          (data as any)[symbol] = { value: 2 };
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set([0], 'number-index');
          map.set(['0'], 'string-index');
          map.set([symbol, 'value'], 'symbol-value');
@@ -322,7 +322,7 @@ describe('SafeAccessorMap', () =>
 
       it('matches terminal undefined and null values', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('undefinedValue', 'undefined');
          map.set('nullValue', 'null');
          map.set('undefinedValue.child', 'child');
@@ -337,7 +337,7 @@ describe('SafeAccessorMap', () =>
          const data: Record<string, any> = { value: 1 };
          data.self = data;
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('self.self.value', 'value');
 
          assert.deepEqual(collect(map.matchingKeys(data)), [['self', 'self', 'value']]);
@@ -355,7 +355,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'mapped');
 
          assert.deepEqual(collect(map.matchingEntries(data)), [[['value'], 'mapped']]);
@@ -372,7 +372,7 @@ describe('SafeAccessorMap', () =>
             [symbol]: 'symbol'
          };
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('number', 'number-map');
          map.set('undefinedValue', 'undefined-map');
          map.set('nullValue', 'null-map');
@@ -409,7 +409,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'mapped');
 
          assert.deepEqual(collect(map.matchingValues(data, { includePropertyValue: true })), [['mapped', 42]]);
@@ -428,7 +428,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('prefix', 'prefix-map');
          map.set('prefix.child', 'child-map');
 
@@ -450,7 +450,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('prefix.child', 'child-map');
 
          assert.deepEqual(collect(map.matchingValues(data)), ['child-map']);
@@ -459,7 +459,7 @@ describe('SafeAccessorMap', () =>
 
       it('supports an explicit false property-value option and a runtime boolean option', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'mapped');
          const data = { value: 5 };
 
@@ -478,16 +478,16 @@ describe('SafeAccessorMap', () =>
 
       it('validates matching option types during iteration', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'mapped');
 
          // @ts-expect-error
          assert.throws(() => collect(map.matchingEntries({ value: 1 }, { hasOwnOnly: 'yes' })),
-          TypeError, `SafeAccessorMap matching error: 'options.hasOwnOnly' is not a boolean.`);
+          TypeError, `PropertyPathMap matching error: 'options.hasOwnOnly' is not a boolean.`);
 
          // @ts-expect-error
          assert.throws(() => collect(map.matchingValues({ value: 1 }, { includePropertyValue: 'yes' })),
-          TypeError, `SafeAccessorMap matching error: 'options.includePropertyValue' is not a boolean.`);
+          TypeError, `PropertyPathMap matching error: 'options.includePropertyValue' is not a boolean.`);
       });
 
       it('restricts matching to a stored path prefix and includes the prefix entry', () =>
@@ -507,7 +507,7 @@ describe('SafeAccessorMap', () =>
             }
          };
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system', 'system');
          map.set('actor.system.hp', 'hp');
          map.set('actor.system.ac', 'ac');
@@ -526,7 +526,7 @@ describe('SafeAccessorMap', () =>
 
       it('starts matching at a prefix that does not itself store a value', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp', 'hp');
          map.set('actor.system.ac', 'ac');
 
@@ -551,7 +551,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('present.value', 'value');
 
          assert.deepEqual(collect(map.matchingValues(data, { pathPrefix: 'missing.branch' })), []);
@@ -560,7 +560,7 @@ describe('SafeAccessorMap', () =>
 
       it('rejects missing, non-traversable, and invalid-array candidate prefixes', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp', 'hp');
          map.set([0, 'value'], 'numeric');
          map.set(['0', 'value'], 'string');
@@ -579,7 +579,7 @@ describe('SafeAccessorMap', () =>
       {
          const prototype = { actor: { hp: 10 } };
          const data = Object.create(prototype);
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
 
          assert.deepEqual(collect(map.matchingValues(data, { pathPrefix: 'actor' })), ['hp']);
@@ -600,7 +600,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'mapped');
 
          assert.deepEqual(collect(map.matchingEntries(data, { pathPrefix: 'value' })), [
@@ -617,7 +617,7 @@ describe('SafeAccessorMap', () =>
 
       it('yields a non-traversable prefix entry and rejects its descendants', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('value', 'value');
          map.set('value.child', 'child');
 
@@ -631,7 +631,7 @@ describe('SafeAccessorMap', () =>
 
       it('includes stop entries and prunes only their descendants', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp', 'hp');
          map.set('actor.system.hp.value', 'hp-value');
          map.set('actor.system.ac', 'ac');
@@ -655,7 +655,7 @@ describe('SafeAccessorMap', () =>
 
       it('prunes descendants when stopAt resolves to a non-terminal trie node', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp.value', 'hp-value');
          map.set('actor.system.ac', 'ac');
 
@@ -686,7 +686,7 @@ describe('SafeAccessorMap', () =>
             }
          });
 
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('prefix', 'prefix');
          map.set('prefix.child', 'child');
 
@@ -706,7 +706,7 @@ describe('SafeAccessorMap', () =>
 
       it('ignores a valid stop path that is not stored', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
 
          assert.deepEqual(collect(map.matchingValues({ actor: { hp: 10 } }, {
@@ -725,7 +725,7 @@ describe('SafeAccessorMap', () =>
                }
             }
          };
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set([symbol, NaN], 'nan');
          map.set([symbol, NaN, 'value'], 'value');
 
@@ -737,7 +737,7 @@ describe('SafeAccessorMap', () =>
 
       it('validates matching path bounds during iteration', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
          const invalid = [] as unknown as readonly PropertyKey[];
 
@@ -748,7 +748,7 @@ describe('SafeAccessorMap', () =>
             pathPrefix: 'actor.hp',
             stopAt: 'actor'
          })), RangeError,
-          `SafeAccessorMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
+          `PropertyPathMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
 
          assert.throws(() => collect(map.matchingValues({}, {
             pathPrefix: 'actor',
@@ -761,7 +761,7 @@ describe('SafeAccessorMap', () =>
    {
       it('iterates the complete trie in depth-first order', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('b.value', 'b');
          map.set('a', 'a');
          map.set('a.first', 'a1');
@@ -784,7 +784,7 @@ describe('SafeAccessorMap', () =>
 
       it('starts at a value-bearing path prefix and retains absolute paths', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor', 'actor');
          map.set('actor.hp', 'hp');
          map.set('actor.ac', 'ac');
@@ -799,7 +799,7 @@ describe('SafeAccessorMap', () =>
 
       it('starts at a prefix without its own entry', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.system.hp', 'hp');
          map.set('actor.system.ac', 'ac');
 
@@ -808,7 +808,7 @@ describe('SafeAccessorMap', () =>
 
       it('returns empty results for a missing prefix and an empty map', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
 
          assert.deepEqual(collect(map.subtreeEntries({ pathPrefix: 'missing' })), []);
@@ -820,7 +820,7 @@ describe('SafeAccessorMap', () =>
 
       it('includes a stop entry and prunes its descendants while retaining siblings', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
          map.set('actor.hp.value', 'hp-value');
          map.set('actor.ac', 'ac');
@@ -833,7 +833,7 @@ describe('SafeAccessorMap', () =>
 
       it('prunes a non-terminal stop node', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp.value', 'hp-value');
          map.set('actor.ac', 'ac');
 
@@ -847,7 +847,7 @@ describe('SafeAccessorMap', () =>
 
       it('can stop at the selected prefix', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor', 'actor');
          map.set('actor.hp', 'hp');
 
@@ -859,7 +859,7 @@ describe('SafeAccessorMap', () =>
 
       it('ignores a valid missing stop path', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
 
          assert.deepEqual(collect(map.subtreeValues({
@@ -871,7 +871,7 @@ describe('SafeAccessorMap', () =>
       it('supports symbol and SameValueZero numeric bounds', () =>
       {
          const symbol = Symbol('branch');
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set([symbol, NaN], 'nan');
          map.set([symbol, NaN, 'child'], 'child');
 
@@ -886,7 +886,7 @@ describe('SafeAccessorMap', () =>
 
       it('validates subtree bounds during iteration', () =>
       {
-         const map = new SafeAccessorMap<string>();
+         const map = new PropertyPathMap<string>();
          map.set('actor.hp', 'hp');
          const invalid = [] as unknown as readonly PropertyKey[];
 

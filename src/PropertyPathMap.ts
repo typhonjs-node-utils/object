@@ -3,17 +3,17 @@ import {
    isSafeAccessorPrefix,
    normalizeSafeAccessor }    from './functions';
 
-import type { SafeAccessor }  from './functions';
+import type { PropertyPath }  from './functions';
 
 /**
- * Stores values by structural {@link SafeAccessor} paths using a property-key trie.
+ * Stores values by structural {@link PropertyPath} paths using a property-key trie.
  *
  * Unlike `Map<readonly PropertyKey[], V>`, lookup does not depend on accessor-array identity. Equivalent paths resolve
  * to the same entry even when a new accessor array is supplied:
  *
  * @example
  * ```ts
- * const map = new SafeAccessorMap<number>();
+ * const map = new PropertyPathMap<number>();
  *
  * map.set(['actors', 0, 'id'], 42);
  * map.get(['actors', 0, 'id']); // 42
@@ -60,16 +60,16 @@ import type { SafeAccessor }  from './functions';
  *
  * @typeParam V - Stored value type.
  */
-class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
+class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
 {
    /** Root trie node. Empty accessors are invalid, so the root never stores an entry. */
-   #root: SafeAccessorMapNode<V> = {};
+   #root: PropertyPathMapNode<V> = {};
 
    /** First terminal entry in insertion order. */
-   #firstEntry: SafeAccessorMapEntry<V> | undefined;
+   #firstEntry: PropertyPathMapEntry<V> | undefined;
 
    /** Last terminal entry in insertion order. */
-   #lastEntry: SafeAccessorMapEntry<V> | undefined;
+   #lastEntry: PropertyPathMapEntry<V> | undefined;
 
    /** Number of exact paths currently storing values. */
    #size = 0;
@@ -81,7 +81,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @param entries - Optional initial accessor / value entries.
     */
-   constructor(entries?: Iterable<readonly [SafeAccessor, V]> | null)
+   constructor(entries?: Iterable<readonly [PropertyPath, V]> | null)
    {
       if (entries === void 0 || entries === null) { return; }
 
@@ -101,7 +101,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    get [Symbol.toStringTag](): string
    {
-      return 'SafeAccessorMap';
+      return 'PropertyPathMap';
    }
 
    /**
@@ -131,18 +131,18 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns `true` when an entry existed and was removed; otherwise `false`.
     *
-    * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
     */
-   delete(accessor: SafeAccessor): boolean
+   delete(accessor: PropertyPath): boolean
    {
       const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
-      const frames: SafeAccessorMapDeleteFrame<V>[] = [];
-      let node: SafeAccessorMapNode<V> = this.#root;
+      const frames: PropertyPathMapDeleteFrame<V>[] = [];
+      let node: PropertyPathMapNode<V> = this.#root;
 
       // Record every parent / child edge so empty nodes can be removed after deleting the terminal entry.
       for (const key of path)
       {
-         const child: SafeAccessorMapNode<V> | undefined = node.children?.get(key);
+         const child: PropertyPathMapNode<V> | undefined = node.children?.get(key);
 
          if (child === void 0) { return false; }
 
@@ -150,7 +150,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          node = child;
       }
 
-      const entry: SafeAccessorMapEntry<V> | undefined = node.entry;
+      const entry: PropertyPathMapEntry<V> | undefined = node.entry;
 
       // The path may exist only as a prefix for longer stored paths.
       if (entry === void 0) { return false; }
@@ -185,7 +185,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    *entries(): IterableIterator<[readonly PropertyKey[], V]>
    {
-      for (let entry: SafeAccessorMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
+      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
       {
          yield [entry.path, entry.value];
       }
@@ -201,10 +201,10 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @param thisArg - Optional callback `this` value.
     */
-   forEach(callback: (value: V, key: readonly PropertyKey[], map: SafeAccessorMap<V>) => void,
+   forEach(callback: (value: V, key: readonly PropertyKey[], map: PropertyPathMap<V>) => void,
     thisArg?: unknown): void
    {
-      for (let entry: SafeAccessorMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
+      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
       {
          callback.call(thisArg, entry.value, entry.path, this);
       }
@@ -220,9 +220,9 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Stored value or `undefined` when the exact path is absent.
     *
-    * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
     */
-   get(accessor: SafeAccessor): V | undefined
+   get(accessor: PropertyPath): V | undefined
    {
       return this.#findNode(normalizeSafeAccessor(accessor))?.entry?.value;
    }
@@ -236,9 +236,9 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Whether the exact path stores a value.
     *
-    * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
     */
-   has(accessor: SafeAccessor): boolean
+   has(accessor: PropertyPath): boolean
    {
       return this.#findNode(normalizeSafeAccessor(accessor))?.entry !== void 0;
    }
@@ -258,7 +258,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    *keys(): IterableIterator<readonly PropertyKey[]>
    {
-      for (let entry: SafeAccessorMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
+      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
       {
          yield entry.path;
       }
@@ -299,16 +299,16 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   matchingEntries(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
+   matchingEntries(data: unknown, options: PropertyPathMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[readonly PropertyKey[], V, unknown]>;
 
-   matchingEntries(data: unknown, options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }):
+   matchingEntries(data: unknown, options?: PropertyPathMap.Options.Match & { includePropertyValue?: false }):
     IterableIterator<[readonly PropertyKey[], V]>;
 
-   matchingEntries(data: unknown, options?: SafeAccessorMap.Options.Match):
+   matchingEntries(data: unknown, options?: PropertyPathMap.Options.Match):
     IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>;
 
-   *matchingEntries(data: unknown, options: SafeAccessorMap.Options.Match = {}):
+   *matchingEntries(data: unknown, options: PropertyPathMap.Options.Match = {}):
     IterableIterator<[readonly PropertyKey[], V] | [readonly PropertyKey[], V, unknown]>
    {
       const includePropertyValue: boolean = options.includePropertyValue ?? false;
@@ -337,7 +337,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *matchingKeys(data: unknown, options?: SafeAccessorMap.Options.MatchKeys):
+   *matchingKeys(data: unknown, options?: PropertyPathMap.Options.MatchKeys):
     IterableIterator<readonly PropertyKey[]>
    {
       for (const match of this.#matchingEntryIterator(data, options)) { yield match.entry.path; }
@@ -359,16 +359,16 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   matchingValues(data: unknown, options: SafeAccessorMap.Options.Match & { includePropertyValue: true }):
+   matchingValues(data: unknown, options: PropertyPathMap.Options.Match & { includePropertyValue: true }):
     IterableIterator<[V, unknown]>;
 
-   matchingValues(data: unknown, options?: SafeAccessorMap.Options.Match & { includePropertyValue?: false }):
+   matchingValues(data: unknown, options?: PropertyPathMap.Options.Match & { includePropertyValue?: false }):
     IterableIterator<V>;
 
-   matchingValues(data: unknown, options?: SafeAccessorMap.Options.Match):
+   matchingValues(data: unknown, options?: PropertyPathMap.Options.Match):
     IterableIterator<V | [V, unknown]>;
 
-   *matchingValues(data: unknown, options: SafeAccessorMap.Options.Match = {}):
+   *matchingValues(data: unknown, options: PropertyPathMap.Options.Match = {}):
     IterableIterator<V | [V, unknown]>
    {
       const includePropertyValue: boolean = options.includePropertyValue ?? false;
@@ -396,7 +396,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *subtreeEntries(options: SafeAccessorMap.Options.Subtree = {}):
+   *subtreeEntries(options: PropertyPathMap.Options.Subtree = {}):
     IterableIterator<[readonly PropertyKey[], V]>
    {
       for (const entry of this.#subtreeEntryIterator(options)) { yield [entry.path, entry.value]; }
@@ -415,7 +415,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *subtreeKeys(options: SafeAccessorMap.Options.Subtree = {}): IterableIterator<readonly PropertyKey[]>
+   *subtreeKeys(options: PropertyPathMap.Options.Subtree = {}): IterableIterator<readonly PropertyKey[]>
    {
       for (const entry of this.#subtreeEntryIterator(options)) { yield entry.path; }
    }
@@ -433,7 +433,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *subtreeValues(options: SafeAccessorMap.Options.Subtree = {}): IterableIterator<V>
+   *subtreeValues(options: PropertyPathMap.Options.Subtree = {}): IterableIterator<V>
    {
       for (const entry of this.#subtreeEntryIterator(options)) { yield entry.value; }
    }
@@ -450,18 +450,18 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns This map.
     *
-    * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
     */
-   set(accessor: SafeAccessor, value: V): this
+   set(accessor: PropertyPath, value: V): this
    {
       const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
-      let node: SafeAccessorMapNode<V> = this.#root;
+      let node: PropertyPathMapNode<V> = this.#root;
 
       // Allocate only the missing suffix; existing prefixes are shared by every related path.
       for (const key of path)
       {
-         const children: Map<PropertyKey, SafeAccessorMapNode<V>> = node.children ??= new Map();
-         let child: SafeAccessorMapNode<V> | undefined = children.get(key);
+         const children: Map<PropertyKey, PropertyPathMapNode<V>> = node.children ??= new Map();
+         let child: PropertyPathMapNode<V> | undefined = children.get(key);
 
          if (child === void 0)
          {
@@ -481,7 +481,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       // Array accessors are returned unchanged by normalizeSafeAccessor, so copy before retaining the path.
       const canonicalPath: readonly PropertyKey[] = Object.freeze(Array.from(path));
-      const entry: SafeAccessorMapEntry<V> = { path: canonicalPath, value };
+      const entry: PropertyPathMapEntry<V> = { path: canonicalPath, value };
 
       node.entry = entry;
       this.#appendEntry(entry);
@@ -497,7 +497,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    *values(): IterableIterator<V>
    {
-      for (let entry: SafeAccessorMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
+      for (let entry: PropertyPathMapEntry<V> | undefined = this.#firstEntry; entry !== void 0; entry = entry.next)
       {
          yield entry.value;
       }
@@ -510,7 +510,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * Called by {@link set} only when a path did not previously store a value.
     */
-   #appendEntry(entry: SafeAccessorMapEntry<V>): void
+   #appendEntry(entry: PropertyPathMapEntry<V>): void
    {
       if (this.#lastEntry === void 0)
       {
@@ -534,13 +534,13 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Reached node or `undefined` when any segment is absent.
     */
-   #findNode(path: readonly PropertyKey[]): SafeAccessorMapNode<V> | undefined
+   #findNode(path: readonly PropertyKey[]): PropertyPathMapNode<V> | undefined
    {
-      let node: SafeAccessorMapNode<V> = this.#root;
+      let node: PropertyPathMapNode<V> = this.#root;
 
       for (const key of path)
       {
-         const child: SafeAccessorMapNode<V> | undefined = node.children?.get(key);
+         const child: PropertyPathMapNode<V> | undefined = node.children?.get(key);
 
          if (child === void 0) { return void 0; }
 
@@ -560,7 +560,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @returns Whether `value` is a non-null object or function.
     */
-   static #isSafeAccessorMapTraversableValue(value: unknown): value is SafeAccessorMapTraversableValue
+   static #isPropertyPathMapTraversableValue(value: unknown): value is PropertyPathMapTraversableValue
    {
       return value !== null && (typeof value === 'object' || typeof value === 'function');
    }
@@ -591,8 +591,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If a boolean option has an invalid type or either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *#matchingEntryIterator(data: unknown, options: SafeAccessorMap.Options.MatchKeys |
-    SafeAccessorMap.Options.Match = {}): IterableIterator<SafeAccessorMapMatch<V>>
+   *#matchingEntryIterator(data: unknown, options: PropertyPathMap.Options.MatchKeys |
+    PropertyPathMap.Options.Match = {}): IterableIterator<PropertyPathMapMatch<V>>
    {
       const hasOwnOnly: boolean = options.hasOwnOnly ?? false;
       const includePropertyValue: boolean = 'includePropertyValue' in options ?
@@ -600,24 +600,24 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       if (typeof hasOwnOnly !== 'boolean')
       {
-         throw new TypeError(`SafeAccessorMap matching error: 'options.hasOwnOnly' is not a boolean.`);
+         throw new TypeError(`PropertyPathMap matching error: 'options.hasOwnOnly' is not a boolean.`);
       }
 
       if (typeof includePropertyValue !== 'boolean')
       {
-         throw new TypeError(`SafeAccessorMap matching error: 'options.includePropertyValue' is not a boolean.`);
+         throw new TypeError(`PropertyPathMap matching error: 'options.includePropertyValue' is not a boolean.`);
       }
 
       const { pathPrefix, startNode, stopNode } = this.#resolveTraversalScope(options);
 
       // Resolve trie bounds before touching candidate data so a missing stored prefix rejects the operation cheaply.
-      if (startNode === void 0 || !SafeAccessorMap.#isSafeAccessorMapTraversableValue(data)) { return; }
+      if (startNode === void 0 || !PropertyPathMap.#isPropertyPathMapTraversableValue(data)) { return; }
 
-      let stack: SafeAccessorMapMatchFrame<V>[];
+      let stack: PropertyPathMapMatchFrame<V>[];
 
       if (pathPrefix !== void 0)
       {
-         let candidate: SafeAccessorMapTraversableValue = data;
+         let candidate: PropertyPathMapTraversableValue = data;
          let propertyValue: unknown;
 
          // Resolve the selected absolute prefix against the candidate once before entering general subtree traversal.
@@ -645,7 +645,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
             if (!isFinal)
             {
-               if (!SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue)) { return; }
+               if (!PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue)) { return; }
                candidate = propertyValue;
             }
          }
@@ -653,7 +653,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          if (startNode.entry !== void 0) { yield { entry: startNode.entry, propertyValue }; }
 
          if (startNode === stopNode || startNode.children === void 0 ||
-          !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue))
+          !PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue))
          {
             return;
          }
@@ -662,7 +662,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
       }
       else
       {
-         const rootChildren: Map<PropertyKey, SafeAccessorMapNode<V>> | undefined = startNode.children;
+         const rootChildren: Map<PropertyKey, PropertyPathMapNode<V>> | undefined = startNode.children;
 
          if (rootChildren === void 0) { return; }
 
@@ -671,8 +671,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       while (stack.length > 0)
       {
-         const frame: SafeAccessorMapMatchFrame<V> = stack[stack.length - 1];
-         const result: IteratorResult<[PropertyKey, SafeAccessorMapNode<V>]> = frame.iterator.next();
+         const frame: PropertyPathMapMatchFrame<V> = stack[stack.length - 1];
+         const result: IteratorResult<[PropertyKey, PropertyPathMapNode<V>]> = frame.iterator.next();
 
          if (result.done)
          {
@@ -682,7 +682,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
          const [key, child] = result.value;
 
-         // Arrays deliberately reject string indexes and non-index string properties to match SafeAccessor traversal.
+         // Arrays deliberately reject string indexes and non-index string properties to match PropertyPath traversal.
          if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndex(key)) { continue; }
 
          const exists: boolean = hasOwnOnly ? Object.hasOwn(frame.value, key) : key in frame.value;
@@ -703,7 +703,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
          if (child.entry !== void 0) { yield { entry: child.entry, propertyValue }; }
 
          if (isStopNode || !hasChildren ||
-          !SafeAccessorMap.#isSafeAccessorMapTraversableValue(propertyValue))
+          !PropertyPathMap.#isPropertyPathMapTraversableValue(propertyValue))
          {
             continue;
          }
@@ -727,8 +727,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If either accessor option is invalid.
     * @throws {RangeError} If `stopAt` is outside `pathPrefix`.
     */
-   #resolveTraversalScope({ pathPrefix, stopAt }: SafeAccessorMap.Options.Common = {}):
-    SafeAccessorMapTraversalScope<V>
+   #resolveTraversalScope({ pathPrefix, stopAt }: PropertyPathMap.Options.Common = {}):
+    PropertyPathMapTraversalScope<V>
    {
       const prefixPath: readonly PropertyKey[] | undefined = pathPrefix === void 0 ?
        void 0 : normalizeSafeAccessor(pathPrefix);
@@ -737,7 +737,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       if (prefixPath !== void 0 && stopPath !== void 0 && !isSafeAccessorPrefix(prefixPath, stopPath))
       {
-         throw new RangeError(`SafeAccessorMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
+         throw new RangeError(`PropertyPathMap traversal error: 'options.stopAt' is outside 'options.pathPrefix'.`);
       }
 
       return {
@@ -763,8 +763,8 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     * @throws {TypeError} If either accessor option is invalid.
     * @throws {RangeError} If `options.stopAt` is outside `options.pathPrefix`.
     */
-   *#subtreeEntryIterator(options: SafeAccessorMap.Options.Subtree = {}):
-    IterableIterator<SafeAccessorMapEntry<V>>
+   *#subtreeEntryIterator(options: PropertyPathMap.Options.Subtree = {}):
+    IterableIterator<PropertyPathMapEntry<V>>
    {
       const { startNode, stopNode } = this.#resolveTraversalScope(options);
 
@@ -774,12 +774,12 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
       if (startNode === stopNode || startNode.children === void 0) { return; }
 
-      const stack: SafeAccessorMapSubtreeFrame<V>[] = [{ iterator: startNode.children.entries() }];
+      const stack: PropertyPathMapSubtreeFrame<V>[] = [{ iterator: startNode.children.entries() }];
 
       while (stack.length > 0)
       {
-         const frame: SafeAccessorMapSubtreeFrame<V> = stack[stack.length - 1];
-         const result: IteratorResult<[PropertyKey, SafeAccessorMapNode<V>]> = frame.iterator.next();
+         const frame: PropertyPathMapSubtreeFrame<V> = stack[stack.length - 1];
+         const result: IteratorResult<[PropertyKey, PropertyPathMapNode<V>]> = frame.iterator.next();
 
          if (result.done)
          {
@@ -787,7 +787,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
             continue;
          }
 
-         const child: SafeAccessorMapNode<V> = result.value[1];
+         const child: PropertyPathMapNode<V> = result.value[1];
 
          if (child.entry !== void 0) { yield child.entry; }
 
@@ -802,7 +802,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * Called by {@link delete}. Neighbor links and list endpoints are updated in constant time.
     */
-   #unlinkEntry(entry: SafeAccessorMapEntry<V>): void
+   #unlinkEntry(entry: PropertyPathMapEntry<V>): void
    {
       if (entry.previous !== void 0) { entry.previous.next = entry.next; }
       else { this.#firstEntry = entry.next; }
@@ -812,7 +812,7 @@ class SafeAccessorMap<V> implements Iterable<[readonly PropertyKey[], V]>
    }
 }
 
-declare namespace SafeAccessorMap
+declare namespace PropertyPathMap
 {
    export namespace Options
    {
@@ -821,8 +821,8 @@ declare namespace SafeAccessorMap
        */
       export interface Common
       {
-         pathPrefix?: SafeAccessor;
-         stopAt?: SafeAccessor;
+         pathPrefix?: PropertyPath;
+         stopAt?: PropertyPath;
       }
 
       /**
@@ -863,36 +863,36 @@ declare namespace SafeAccessorMap
    }
 }
 
-export { SafeAccessorMap };
+export { PropertyPathMap };
 
 // Internal Types ----------------------------------------------------------------------------------------------------
 
 /**
  * A parent / child relationship recorded while locating a trie node for deletion.
  *
- * The path is retained only for the duration of {@link SafeAccessorMap.delete} so unused trie nodes can be pruned
+ * The path is retained only for the duration of {@link PropertyPathMap.delete} so unused trie nodes can be pruned
  * from the terminal node back toward the root.
  */
-interface SafeAccessorMapDeleteFrame<V>
+interface PropertyPathMapDeleteFrame<V>
 {
    /** Parent node containing the child mapping. */
-   parent: SafeAccessorMapNode<V>;
+   parent: PropertyPathMapNode<V>;
 
    /** Property key mapping the parent to the child. */
    key: PropertyKey;
 
-   /** Child node reached through {@link SafeAccessorMapDeleteFrame.key}. */
-   child: SafeAccessorMapNode<V>;
+   /** Child node reached through {@link PropertyPathMapDeleteFrame.key}. */
+   child: PropertyPathMapNode<V>;
 }
 
 /**
  * A terminal value stored at a trie node.
  *
  * The canonical path is copied and frozen when first inserted. This prevents later mutation of a caller-provided
- * accessor array from changing the path exposed by {@link SafeAccessorMap.keys} or {@link SafeAccessorMap.entries}.
+ * accessor array from changing the path exposed by {@link PropertyPathMap.keys} or {@link PropertyPathMap.entries}.
  * The previous / next links maintain insertion-order iteration without traversing the complete trie.
  */
-interface SafeAccessorMapEntry<V>
+interface PropertyPathMapEntry<V>
 {
    /** Canonical property-key path associated with this entry. */
    readonly path: readonly PropertyKey[];
@@ -901,25 +901,25 @@ interface SafeAccessorMapEntry<V>
    value: V;
 
    /** Previous terminal entry in insertion order. */
-   previous?: SafeAccessorMapEntry<V>;
+   previous?: PropertyPathMapEntry<V>;
 
    /** Next terminal entry in insertion order. */
-   next?: SafeAccessorMapEntry<V>;
+   next?: PropertyPathMapEntry<V>;
 }
 
 /**
- * Active depth-first trie frame used by {@link SafeAccessorMap.matchingEntries}.
+ * Active depth-first trie frame used by {@link PropertyPathMap.matchingEntries}.
  *
  * The native child-map iterator preserves each trie node's child insertion order without allocating arrays of child
  * entries. The candidate value is the object or function corresponding to the same trie prefix.
  */
-interface SafeAccessorMapMatchFrame<V>
+interface PropertyPathMapMatchFrame<V>
 {
    /** Candidate value reached at this trie prefix. */
-   value: SafeAccessorMapTraversableValue;
+   value: PropertyPathMapTraversableValue;
 
    /** Iterator over the trie node's children. */
-   iterator: IterableIterator<[PropertyKey, SafeAccessorMapNode<V>]>;
+   iterator: IterableIterator<[PropertyKey, PropertyPathMapNode<V>]>;
 }
 
 /**
@@ -928,10 +928,10 @@ interface SafeAccessorMapMatchFrame<V>
  * `propertyValue` is the value resolved from the candidate object when requested by the caller or required for
  * descendant traversal. It remains `undefined` when a terminal-only property was intentionally not read.
  */
-interface SafeAccessorMapMatch<V>
+interface PropertyPathMapMatch<V>
 {
    /** Stored terminal entry reached by the trie walk. */
-   entry: SafeAccessorMapEntry<V>;
+   entry: PropertyPathMapEntry<V>;
 
    /** Candidate property value resolved at the matching terminal path. */
    propertyValue: unknown;
@@ -943,40 +943,40 @@ interface SafeAccessorMapMatch<V>
  * Each child map represents one path segment. A node may simultaneously contain a value and child nodes, allowing
  * both `['settings']` and `['settings', 'theme']` to be stored without conflict.
  */
-interface SafeAccessorMapNode<V>
+interface PropertyPathMapNode<V>
 {
    /** Child trie nodes keyed with native `Map` / SameValueZero semantics. */
-   children?: Map<PropertyKey, SafeAccessorMapNode<V>>;
+   children?: Map<PropertyKey, PropertyPathMapNode<V>>;
 
    /** Terminal entry when a value is stored at this exact path. */
-   entry?: SafeAccessorMapEntry<V>;
+   entry?: PropertyPathMapEntry<V>;
 }
 
 /**
  * Active depth-first frame used by candidate-independent subtree traversal.
  */
-interface SafeAccessorMapSubtreeFrame<V>
+interface PropertyPathMapSubtreeFrame<V>
 {
    /** Iterator over one trie node's children. */
-   iterator: IterableIterator<[PropertyKey, SafeAccessorMapNode<V>]>;
+   iterator: IterableIterator<[PropertyKey, PropertyPathMapNode<V>]>;
 }
 
 /**
  * Resolved common traversal bounds shared by matching and subtree iterators.
  */
-interface SafeAccessorMapTraversalScope<V>
+interface PropertyPathMapTraversalScope<V>
 {
    /** Normalized absolute prefix, or `undefined` when traversal begins at the trie root. */
    pathPrefix?: readonly PropertyKey[];
 
    /** Trie node where traversal begins; missing stored prefixes resolve to `undefined`. */
-   startNode?: SafeAccessorMapNode<V>;
+   startNode?: PropertyPathMapNode<V>;
 
    /** Trie node whose descendants must be pruned, when the stop path exists. */
-   stopNode?: SafeAccessorMapNode<V>;
+   stopNode?: PropertyPathMapNode<V>;
 }
 
 /**
  * Object or function value that can supply another property-path segment.
  */
-type SafeAccessorMapTraversableValue = object | ((...args: any[]) => any);
+type PropertyPathMapTraversableValue = object | ((...args: any[]) => any);

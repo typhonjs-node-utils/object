@@ -130,9 +130,9 @@ export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record 
  *
  * @returns A newly allocated exact property-key accessor.
  *
- * @throws {TypeError} If any argument is not a valid {@link SafeAccessor} or no accessor is supplied at runtime.
+ * @throws {TypeError} If any argument is not a valid {@link PropertyPath} or no accessor is supplied at runtime.
  */
-export function concatSafeAccessor(accessor: SafeAccessor, ...accessors: SafeAccessor[]): readonly PropertyKey[]
+export function concatSafeAccessor(accessor: PropertyPath, ...accessors: PropertyPath[]): readonly PropertyKey[]
 {
    if (arguments.length === 0)
    {
@@ -169,7 +169,7 @@ export function concatSafeAccessor(accessor: SafeAccessor, ...accessors: SafeAcc
  *
  * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
-export function deleteProperty(data: object, accessor: SafeAccessor,
+export function deleteProperty(data: object, accessor: PropertyPath,
  { hasOwnOnly = true }: { hasOwnOnly?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
@@ -566,8 +566,8 @@ export function ensureNonEmptyIterable<T>(value: Iterable<T> | null | undefined)
  * @typeParam T - Root object type.
  * @typeParam P - Accessor type.
  */
-export function getProperty<T extends object, const P extends SafeAccessor>(data: T, accessor: P,
- { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): DeepAccess<T, P> | undefined
+export function getProperty<T extends object, const P extends PropertyPath>(data: T, accessor: P,
+                                                                            { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): DeepAccess<T, P> | undefined
 {
    if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
 
@@ -599,7 +599,7 @@ export function getProperty<T extends object, const P extends SafeAccessor>(data
  *
  * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
-export function getPropertyDescriptor(data: object, accessor: SafeAccessor,
+export function getPropertyDescriptor(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): PropertyDescriptor | undefined
 {
    if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
@@ -631,7 +631,7 @@ export function getPropertyDescriptor(data: object, accessor: SafeAccessor,
  *
  * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
-export function getPropertyOwner(data: object, accessor: SafeAccessor,
+export function getPropertyOwner(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): object | undefined
 {
    if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return void 0; }
@@ -705,7 +705,7 @@ export function hasGetter<T extends object, K extends keyof T>(object: T, access
  *
  * @throws {TypeError} If `options.hasOwnOnly` is not a boolean.
  */
-export function hasProperty(data: object, accessor: SafeAccessor,
+export function hasProperty(data: object, accessor: PropertyPath,
  { hasOwnOnly = false }: { hasOwnOnly?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null || !isSafeAccessor(accessor)) { return false; }
@@ -945,9 +945,9 @@ export function isRecord(value: unknown): value is Record<string, unknown>
  *
  * @param value - Value to validate.
  *
- * @returns Whether the value is a valid {@link SafeAccessor}.
+ * @returns Whether the value is a valid {@link PropertyPath}.
  */
-export function isSafeAccessor(value: unknown): value is SafeAccessor
+export function isSafeAccessor(value: unknown): value is PropertyPath
 {
    if (typeof value === 'string') { return value.length > 0; }
 
@@ -976,7 +976,7 @@ export function isSafeAccessor(value: unknown): value is SafeAccessor
  *
  * @returns Whether `prefix` is an exact structural prefix of `accessor`.
  */
-export function isSafeAccessorPrefix(prefix: SafeAccessor, accessor: SafeAccessor): boolean
+export function isSafeAccessorPrefix(prefix: PropertyPath, accessor: PropertyPath): boolean
 {
    if (!isSafeAccessor(prefix) || !isSafeAccessor(accessor)) { return false; }
 
@@ -1006,7 +1006,7 @@ export function isSafeAccessorPrefix(prefix: SafeAccessor, accessor: SafeAccesso
  * Exact accessor arrays containing numbers, symbols, or string segments with literal periods cannot be represented by
  * dotted-string syntax without changing their property-path semantics and are rejected. Empty segments are retained,
  * so `['level1', '', 'value']` becomes `'level1..value'`. The exact single empty-string key `['']` is rejected because
- * an empty dotted string is not a valid {@link SafeAccessor}.
+ * an empty dotted string is not a valid {@link PropertyPath}.
  *
  * @param accessor - Accessor to convert.
  *
@@ -1014,7 +1014,7 @@ export function isSafeAccessorPrefix(prefix: SafeAccessor, accessor: SafeAccesso
  *
  * @throws {TypeError} If `accessor` is invalid or cannot be represented losslessly as a dotted string accessor.
  */
-export function joinSafeAccessor(accessor: SafeAccessor): string
+export function joinSafeAccessor(accessor: PropertyPath): string
 {
    const path: readonly PropertyKey[] = normalizeSafeAccessor(accessor);
 
@@ -1046,9 +1046,9 @@ export function joinSafeAccessor(accessor: SafeAccessor): string
  *
  * @returns The accessor as a readonly property-key array.
  *
- * @throws {TypeError} If `accessor` is not a valid {@link SafeAccessor}.
+ * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
  */
-export function normalizeSafeAccessor(accessor: SafeAccessor): readonly PropertyKey[]
+export function normalizeSafeAccessor(accessor: PropertyPath): readonly PropertyKey[]
 {
    if (!isSafeAccessor(accessor))
    {
@@ -1108,8 +1108,8 @@ export function objectSize(object: any): number
  * @typeParam P - Accessor type.
  * @typeParam R - Return value / Inferred deep access type or any provided default value type.
  */
-export function safeAccess<T extends object, const P extends SafeAccessor, R = DeepAccess<T, P>>(data: T,
- accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
+export function safeAccess<T extends object, const P extends PropertyPath, R = DeepAccess<T, P>>(data: T,
+                                                                                                 accessor: P, defaultValue?: DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>):
   DeepAccess<T, P> extends undefined ? R : DeepAccess<T, P>
 {
    const result: unknown = getProperty(data, accessor);
@@ -1257,8 +1257,8 @@ export function* safeKeyIterator(data: object, { arrayIndex = true, hasOwnOnly =
  *
  * @returns True if successful.
  */
-export function safeSet(data: object, accessor: SafeAccessor, value: any,
- { operation = 'set', createMissing = false }:
+export function safeSet(data: object, accessor: PropertyPath, value: any,
+                        { operation = 'set', createMissing = false }:
   { operation?: 'add' | 'div' | 'mult' | 'set' | 'set-undefined' | 'sub', createMissing?: boolean } = {}): boolean
 {
    if (typeof data !== 'object' || data === null) { throw new TypeError(`safeSet error: 'data' is not an object.`); }
@@ -1779,12 +1779,11 @@ function resolvePropertyPath(data: object, accessor: readonly PropertyKey[],
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
- * Accessor accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String accessors use `.`
- * delimiters while array accessors preserve each {@link PropertyKey} as an exact property key. Array indexes require
+ * Defines a property path accepted by {@link hasProperty}, {@link safeAccess}, and {@link safeSet}. String paths use
+ * `.` delimiters while array paths preserve each {@link PropertyKey} as an exact property key. Array indexes require
  * numeric keys.
  */
-export type SafeAccessor = string | readonly PropertyKey[];
-
+export type PropertyPath = string | readonly PropertyKey[];
 
 // Internal Types ----------------------------------------------------------------------------------------------------
 
@@ -1848,7 +1847,7 @@ interface PropertyTraversalEntry
 /**
  * Utility type for `safeAccess`. Infers compound string accessors and readonly tuple accessors in object T.
  */
-type DeepAccess<T, P extends SafeAccessor> =
+type DeepAccess<T, P extends PropertyPath> =
  P extends string
   ? P extends ''
    ? undefined
