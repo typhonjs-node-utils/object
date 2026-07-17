@@ -9,609 +9,368 @@
 [![Discord](https://img.shields.io/discord/737953117999726592?label=TyphonJS%20Discord)](https://typhonjs.io/discord/)
 [![Twitch](https://img.shields.io/twitch/status/typhonrt?style=social)](https://www.twitch.tv/typhonrt)
 
-A focused collection of JavaScript and TypeScript utilities for validating, inspecting, traversing, comparing, and modifying objects.
+A focused JavaScript and TypeScript library for working safely and precisely with object structures.
 
-The package combines conventional object helpers with strongly typed property-path operations. Property paths may be expressed as dotted strings for ordinary object properties or as exact `PropertyKey` arrays when symbols, numeric array indexes, or property names containing periods must be preserved.
+`@typhonjs-utils/object` combines conventional object utilities with a structural property-path system that understands the complete JavaScript `PropertyKey` space: strings, numeric array indexes, and symbols. It provides typed access and inspection, hardened mutation, bounded traversal, structural comparison, deep object operations, iterable helpers, and trie-backed property-path collections.
 
-The package also re-exports the cloning API from `klona/full`.
+The API is designed around predictable runtime semantics and strong TypeScript inference. Known object shapes are preserved by guards and assertions, literal property paths infer exact result types, deep merges infer the accumulated output shape, and collection overloads refine iterator results from literal options.
 
 ## Highlights
 
-- Runtime assertions and TypeScript type guards for objects, records, plain objects, and iterables.
-- Typed property-path access with inferred return values.
-- Exact string, number, and symbol path segments through `PropertyPath`.
-- Numeric-only array indexing with ECMAScript array-index validation.
-- Symbol-aware property existence checks and traversal.
-- Protected object mutation that blocks prototype-pollution paths and ECMAScript well-known symbols.
-- Iterative deep freeze, seal, and merge operations.
-- Source-driven shallow structural comparison across nested property paths.
-- Utilities for getters, setters, prototypes, keys, sizes, and non-empty iterables.
+- Strongly inferred dotted and exact tuple property paths.
+- Exact string, number, and symbol path segments without delimiter ambiguity.
+- Object guards and assertions that preserve existing interface, class, and union types.
+- Getter-safe property existence, descriptor, and owner inspection.
+- Prototype-pollution-resistant assignment and deletion.
+- Iterative, bounded object traversal with depth, result, and visit controls.
+- Trie-backed structural path maps with subtree and candidate-object matching.
+- Weak-root structural path associations without retaining root objects.
+- Deep merge, freeze, seal, and cloning operations.
+- Synchronous and asynchronous iterable validation and non-empty replay.
 
-## Importing
+## Installation and importing
 
-When using the package directly, the utilities are available from:
+```shell
+npm install @typhonjs-utils/object
+```
+
+Direct package import:
 
 ```ts
 import {
-   hasProperty,
-   isPlainObject,
+   PropertyPathMap,
+   safeAccess,
+   safeSet
 } from '@typhonjs-utils/object';
 ```
 
+## TypeScript inference
 
-Within TRL, the utilities are available from:
+Type inference is a primary design constraint rather than an afterthought.
 
-```ts
-import {
-   hasProperty,
-   isPlainObject,
-} from '#runtime/util/object';
-```
+### Exact property-path results
 
-The package re-exports `klona/full`, so its cloning function is available from the same module:
+Dotted paths infer nested object properties:
 
 ```ts
-import { klona } from '#runtime/util/object';
-```
-
-## Property paths
-
-Several functions accept a `PropertyPath`:
-
-```ts
-type PropertyPath = string | readonly PropertyKey[];
-```
-
-### Dotted string accessors
-
-Dotted strings are convenient for ordinary nested object properties:
-
-```ts
-const data = {
-   user: {
-      profile: {
-         name: 'Ada'
-      }
+const state = {
+   settings: {
+      enabled: true,
+      label: 'Primary'
    }
 };
 
-safeAccess(data, 'user.profile.name');
-// 'Ada'
+const enabled = safeAccess(state, 'settings.enabled');
+// boolean
 ```
 
-A dotted string is split at every period. It therefore cannot represent a literal property name containing `.` and cannot index arrays.
-
-```ts
-safeAccess({ 'user.name': 'Ada' }, 'user.name');
-// Attempts to resolve data.user.name, not data['user.name'].
-
-safeAccess({ items: ['a'] }, 'items.0');
-// Returns the default value because array indexes require numeric keys.
-```
-
-### Exact property-key accessors
-
-Array accessors preserve every key exactly and support strings, numbers, and symbols:
+Readonly tuple paths preserve exact numeric and symbol segments through a `const` type parameter:
 
 ```ts
 const metadata = Symbol('metadata');
 
-const data = {
-   'user.name': 'Ada',
-   items: ['a', 'b'],
+const state = {
+   entries: [
+      { id: 1 },
+      { id: 2 }
+   ],
    [metadata]: {
       active: true
    }
 };
 
-safeAccess(data, ['user.name']);
-// 'Ada'
-
-safeAccess(data, ['items', 1]);
-// 'b'
-
-safeAccess(data, [metadata, 'active']);
-// true
-```
-
-Array indexes must be numbers in the range `0` through `0xFFFF_FFFE`. String indexes, negative numbers, fractional numbers, and values outside the ECMAScript array-index range are rejected.
-
-Inline accessor arrays retain tuple inference through a TypeScript `const` type parameter:
-
-```ts
-const result = safeAccess(data, ['items', 0]);
-// Inferred from the exact path.
-```
-
-## Property-path behavior
-
-A few distinctions are intentional:
-
-- `safeAccess` returns its default value when the resolved value is `undefined` or `null`.
-- `hasProperty` checks whether the complete path exists, so present `undefined` and `null` values return `true`.
-- Property lookup includes inherited properties.
-- Functions may be traversed as intermediate values by the internal property resolver.
-- Empty string and empty array accessors are considered invalid paths.
-
-```ts
-const data = {
-   undefinedValue: undefined,
-   nullValue: null
-};
-
-safeAccess(data, 'undefinedValue', 'fallback');
-// 'fallback'
-
-hasProperty(data, 'undefinedValue');
-// true
-
-hasProperty(data, 'nullValue');
-// true
-
-hasProperty(data, 'missing');
-// false
-```
-
-## API overview
-
-### Assertions
-
-| Function | Description |
-| --- | --- |
-| `assertObject` | Asserts that a value is a non-null, non-array object while preserving its existing static type. |
-| `assertPlainObject` | Asserts that a value has either `Object.prototype` or `null` as its prototype while preserving its existing static type. |
-| `assertRecord` | Asserts that a value is a non-null, non-array object and narrows it to a string-keyed record without discarding its known shape. |
-
-### Type guards
-
-| Function | Description |
-| --- | --- |
-| `isObject` | Returns whether a value is a non-null, non-array object, preserving a known object type when possible. |
-| `isPlainObject` | Returns whether a value is a plain object created with `Object.prototype` or a `null` prototype. |
-| `isRecord` | Returns whether a value is a non-null, non-array object and narrows it to `Record<string, unknown>`. |
-| `isIterable` | Returns whether a non-null object provides `Symbol.iterator`; primitive strings are intentionally excluded. |
-| `isAsyncIterable` | Returns whether a non-null object provides `Symbol.asyncIterator`. |
-
-### Property descriptors and prototypes
-
-| Function | Description |
-| --- | --- |
-| `hasAccessor` | Checks the object and its prototype chain for a property descriptor containing both a getter and setter. |
-| `hasGetter` | Checks the object and its prototype chain for a getter descriptor. |
-| `hasSetter` | Checks the object and its prototype chain for a setter descriptor. |
-| `hasPrototype` | Determines whether a constructor is, or inherits from, another constructor. |
-| `hasProperty` | Returns whether a complete `PropertyPath` path exists, aborting as soon as resolution fails. |
-
-### Property-path utilities
-
-| Function | Description |
-| --- | --- |
-| `safeAccess` | Resolves a dotted string or exact property-key path and returns a typed value or supplied default. |
-| `safeSet` | Sets or updates a value at a property path with optional missing-object creation and mutation hardening. |
-| `pathKeyIterator` | Iteratively yields enumerable leaf paths as readonly `PropertyKey` arrays. |
-| `safeEqual` | Verifies that every traversed leaf in a source object resolves to the same value in a target object. |
-
-### Object graph utilities
-
-| Function | Description |
-| --- | --- |
-| `deepMerge` | Recursively merges one or more plain source objects into a plain target object in place. |
-| `deepFreeze` | Iteratively freezes an object graph, including values stored in arrays. |
-| `deepSeal` | Iteratively seals an object graph, including values stored in arrays. |
-| `klona` | Deep-clones values through the API re-exported from `klona/full`. |
-
-### Iterable utilities
-
-| Function | Description |
-| --- | --- |
-| `ensureNonEmptyIterable` | Returns `undefined` for a missing, invalid, or empty iterable; otherwise returns an iterable containing the peeked first value and remaining values. |
-| `ensureNonEmptyAsyncIterable` | Performs the equivalent operation for async iterables and may lift a synchronous iterable into an async iterable. |
-
-### General helpers
-
-| Function | Description |
-| --- | --- |
-| `objectKeys` | Returns typed enumerable own string keys for an object, or an empty array for an invalid runtime input. |
-| `objectSize` | Returns the size of maps, sets, boxed strings, arrays, and enumerable string-keyed objects according to their supported representation. |
-
-## Safe access
-
-`safeAccess` provides compile-time inference for known string paths and readonly tuple paths:
-
-```ts
-const state = {
-   settings: {
-      enabled: true
-   },
-   entries: [
-      { id: 1 },
-      { id: 2 }
-   ]
-};
-
-const enabled = safeAccess(state, 'settings.enabled');
-// boolean
-
 const id = safeAccess(state, ['entries', 1, 'id']);
 // number
 
-const missing = safeAccess(state, 'settings.label', 'Unnamed');
+const active = safeAccess(state, [metadata, 'active']);
+// boolean
+```
+
+A supplied default participates in the result type only when the property path may resolve to `undefined`:
+
+```ts
+declare const options: {
+   label?: string;
+};
+
+const label = safeAccess(options, 'label', 'Untitled');
 // string
 ```
 
-The supplied default is returned when:
+### Shape-preserving guards and assertions
 
-- `data` is not a valid object.
-- The accessor is invalid or empty.
-- An intermediate property is missing.
-- An intermediate value cannot be traversed.
-- An array segment is not a valid numeric array index.
-- The final value is `undefined` or `null`.
-
-Use `hasProperty` when the distinction between a missing property and a present `undefined` or `null` property matters.
-
-## Property existence
-
-`hasProperty` resolves a path with early termination:
-
-```ts
-const data = {
-   user: {
-      name: undefined
-   },
-   entries: ['first']
-};
-
-hasProperty(data, 'user.name');
-// true
-
-hasProperty(data, 'user.email');
-// false
-
-hasProperty(data, ['entries', 0]);
-// true
-
-hasProperty(data, ['entries', '0']);
-// false
-```
-
-Inherited properties are considered available because path resolution uses JavaScript property lookup semantics.
-
-## Safe mutation
-
-`safeSet` supports direct assignment and basic arithmetic operations:
-
-```ts
-const data = {
-   count: 2,
-   settings: {
-      enabled: false
-   }
-};
-
-safeSet(data, 'settings.enabled', true);
-safeSet(data, 'count', 3, { operation: 'add' });
-
-data.count;
-// 5
-```
-
-### Operations
-
-| Operation | Effect |
-| --- | --- |
-| `set` | Assigns the supplied value. |
-| `set-undefined` | Assigns only when the current value is `undefined`. |
-| `add` | Applies `+=`. |
-| `sub` | Applies `-=`. |
-| `mult` | Applies `*=`. |
-| `div` | Applies `/=`. |
-
-The default operation is `set`.
-
-### Creating missing objects
-
-By default, every intermediate path segment must already resolve to an object:
-
-```ts
-const data = {};
-
-safeSet(data, 'settings.enabled', true);
-// false
-```
-
-Set `createMissing` to create missing intermediate object entries:
-
-```ts
-safeSet(data, 'settings.enabled', true, {
-   createMissing: true
-});
-// true
-```
-
-Missing entries are created as ordinary objects. The function does not infer that a missing segment should be an array.
-
-### Mutation safety
-
-`safeSet` rejects the following string path segments:
-
-- `__proto__`
-- `prototype`
-- `constructor`
-
-It also rejects ECMAScript well-known symbols, including protocol hooks such as:
-
-- `Symbol.iterator`
-- `Symbol.toPrimitive`
-- `Symbol.toStringTag`
-
-This prevents prototype-pollution paths and modification of built-in language protocols through the generic mutation API. User-created symbols and symbols produced by `Symbol.for` remain valid.
-
-Validation occurs during traversal. When `createMissing` is enabled, earlier missing segments may already have been created before a later blocked or invalid segment causes the operation to return `false`.
-
-## Property-path iteration
-
-`pathKeyIterator` performs an iterative depth-first traversal and yields readonly arrays suitable for `safeAccess`, `hasProperty`, and `safeSet`:
-
-```ts
-const marker = Symbol('marker');
-
-const data = {
-   user: {
-      name: 'Ada'
-   },
-   entries: ['a', 'b'],
-   [marker]: true
-};
-
-[...pathKeyIterator(data)];
-// Example:
-// [
-//    [marker],
-//    ['entries', 0],
-//    ['entries', 1],
-//    ['user', 'name']
-// ]
-```
-
-The exact order follows the iterator's depth-first traversal rules. Array indexes are emitted immediately when an array property is encountered, preserving the established array ordering.
-
-Behavioral details:
-
-- Enumerable own string and symbol properties are included by default.
-- Set `hasOwnOnly: false` to include enumerable inherited properties.
-- Set `arrayIndex: false` to omit numeric array indexes.
-- Enumerable symbol properties attached to arrays remain included when `arrayIndex` is false.
-- Functions are excluded as leaf values.
-- Objects are traversed recursively.
-- Array elements are yielded as indexed leaf paths rather than recursively traversed.
-- `Map` and `Set` entries are not traversed.
-- Literal string keys containing periods remain unambiguous because paths are arrays.
-
-## Source-driven equality
-
-`safeEqual` is a source-driven structural comparison rather than a symmetric general-purpose deep-equality function:
-
-```ts
-safeEqual(
-   { settings: { enabled: true } },
-   { settings: { enabled: true }, extra: 42 }
-);
-// true
-```
-
-Every leaf path produced from `source` must exist in `target` and resolve to the same value. Extra target properties are ignored.
-
-Values are compared with strict equality:
-
-- Primitive leaves compare by value and type.
-- Object and function leaves compare by reference.
-- `NaN` does not equal `NaN`.
-- `0` and `-0` compare as equal.
-- Present `undefined` and `null` properties remain distinct from missing properties.
-
-Arrays are compared by their numeric element paths. Object values stored in arrays are therefore compared by reference rather than recursively by their internal properties.
-
-```ts
-const shared = { id: 1 };
-
-safeEqual({ entries: [shared] }, { entries: [shared] });
-// true
-
-safeEqual({ entries: [{ id: 1 }] }, { entries: [{ id: 1 }] });
-// false
-```
-
-Options:
-
-```ts
-safeEqual(source, target, {
-   arrayIndex: false,
-   hasOwnOnly: false
-});
-```
-
-- `arrayIndex: false` ignores numeric array elements.
-- `hasOwnOnly: false` includes enumerable inherited properties.
-
-## Deep merge
-
-`deepMerge` mutates and returns the target:
-
-```ts
-const target = {
-   settings: {
-      enabled: false,
-      mode: 'basic'
-   }
-};
-
-deepMerge(target, {
-   settings: {
-      enabled: true
-   }
-});
-
-// {
-//    settings: {
-//       enabled: true,
-//       mode: 'basic'
-//    }
-// }
-```
-
-Only plain object inputs are accepted. Nested values are recursively merged when both the source and target values are object literals. Other values, including arrays, replace the target value.
-
-Later source objects take precedence over earlier sources:
-
-```ts
-deepMerge({}, defaults, userOptions, runtimeOverrides);
-```
-
-## Deep freeze and seal
-
-`deepFreeze` and `deepSeal` use iterative traversal, avoiding recursive call-stack growth for deeply nested object graphs.
-
-```ts
-const frozen = deepFreeze({
-   settings: {
-      enabled: true
-   }
-});
-
-Object.isFrozen(frozen);
-Object.isFrozen(frozen.settings);
-// true
-```
-
-Both functions accept an optional `skipKeys` set:
-
-```ts
-deepFreeze(data, {
-   skipKeys: new Set(['cache'])
-});
-```
-
-`skipKeys` applies to traversed object string keys. The containing object is still frozen or sealed; the referenced child is simply omitted from further traversal through that key.
-
-## Non-empty iterables
-
-`ensureNonEmptyIterable` safely peeks at an iterable:
-
-```ts
-const values = ensureNonEmptyIterable([1, 2, 3]);
-
-if (values)
-{
-   for (const value of values)
-   {
-      // 1, 2, 3
-   }
-}
-```
-
-It returns `undefined` when the input is missing, non-iterable, or empty. For one-shot iterators, the returned iterable preserves the already-consumed first item before continuing with the original iterator.
-
-`ensureNonEmptyAsyncIterable` provides the same behavior for async iteration:
-
-```ts
-const values = await ensureNonEmptyAsyncIterable(source);
-
-if (values)
-{
-   for await (const value of values)
-   {
-      // ...
-   }
-}
-```
-
-Synchronous iterables may also be lifted into an async iterable.
-
-## Object checks
-
-The object predicates intentionally provide different narrowing behavior:
+Known object types remain known:
 
 ```ts
 interface Options
 {
    enabled?: boolean;
+   timeout?: number;
 }
 
-declare const input: Options | undefined;
+declare const value: Options | undefined;
 
-if (input && isObject(input))
+if (isObject(value))
 {
-   input.enabled;
-   // Existing Options shape is retained.
+   value.timeout;
+   // value: Options
 }
 ```
 
-Use:
-
-- `isObject` when a known object type should be preserved.
-- `isRecord` when generic string-keyed access is required.
-- `isPlainObject` when class instances, arrays, and custom prototypes must be excluded.
-- The corresponding assertion functions when invalid input should throw instead of returning `false`.
-
-## Getter, setter, and prototype checks
-
-Descriptor utilities inspect both the instance and its prototype chain:
+Assertions remove invalid union members without widening the surviving type:
 
 ```ts
-class Example
-{
-   #value = 0;
-
-   get value(): number
-   {
-      return this.#value;
-   }
-
-   set value(value: number)
-   {
-      this.#value = value;
-   }
-}
-
-const example = new Example();
-
-hasAccessor(example, 'value');
-// true
-
-hasGetter(example, 'value');
-// true
-
-hasSetter(example, 'value');
-// true
+assertPlainObject(value);
+// value: Options
 ```
 
-`hasPrototype` operates on constructors:
+Use `isRecord` when generic string-key indexing is desired, or `assertRecord` when the existing shape should be preserved while adding `PropertyKey` indexing.
+
+### Inferred deep merge results
+
+`deepMerge` accumulates source shapes in order and reflects later-key precedence:
 
 ```ts
-class Base {}
-class Derived extends Base {}
+const result = deepMerge(
+   { enabled: false },
+   { theme: 'dark' as const },
+   { enabled: true, retries: 3 }
+);
 
-hasPrototype(Derived, Base);
-// true
+// {
+//    theme: 'dark';
+//    enabled: boolean;
+//    retries: number;
+// }
 ```
 
-## TypeScript notes
+## Structural property paths
 
-- Exact tuple string property paths provide the strongest `safeAccess` inference.
-- Runtime-sized `PropertyKey[]` paths resolve to `unknown` at the type level because their path cannot be determined statically.
-- Dotted string inference is supported for object properties but intentionally rejects traversal into arrays.
+Path-aware APIs accept:
 
-## Scope and limitations
+```ts
+type PropertyPath = string | readonly PropertyKey[];
+```
 
-These utilities focus on ordinary JavaScript objects and arrays:
+Dotted strings are concise for ordinary nested string keys:
 
-- `Map` and `Set` entries are not traversed by `pathKeyIterator` or compared by `safeEqual`.
-- Property access may invoke getters and proxy traps.
+```ts
+safeAccess(data, 'user.profile.name');
+```
+
+Exact arrays preserve keys that dotted syntax cannot represent:
+
+```ts
+safeAccess(data, ['user.name']);        // Literal period.
+safeAccess(data, ['entries', 0]);       // Numeric array index.
+safeAccess(data, [metadata, 'active']); // Symbol key.
+safeAccess(data, ['', 'value']);        // Empty-string key.
+```
+
+Numeric array indexes must be numbers in the ECMAScript array-index range. String indexes such as `'0'` are intentionally rejected when traversing arrays.
+
+Property paths can also be validated, normalized, concatenated, compared by structural prefix, and converted back to dotted form when the conversion is lossless.
+
+## Property access, inspection, and mutation
+
+The access API separates value lookup from structural inspection:
+
+```ts
+const value = getProperty(data, path);
+// Preserves present undefined and null.
+
+const valueOrDefault = safeAccess(data, path, fallback);
+// Uses fallback for missing or nullish values.
+
+const exists = hasProperty(data, path);
+// Does not read the terminal property value.
+
+const descriptor = getPropertyDescriptor(data, path);
+// Does not invoke a terminal getter.
+
+const owner = getPropertyOwner(data, path);
+// Returns the object or prototype defining the terminal property.
+```
+
+`safeSet` and `deleteProperty` reject prototype-pollution segments and ECMAScript well-known symbols. `safeSet` supports direct assignment, conditional assignment, arithmetic updates, and optional creation of missing object segments. `deleteProperty` supports explicit inherited-property handling and only removes configurable properties.
+
+Property access may invoke getters or proxy traps when intermediate values must be read. Exceptions from user-defined accessors and proxies are intentionally propagated.
+
+## Traversal and comparison
+
+`pathKeyIterator` performs iterative, symbol-aware traversal and yields exact readonly property-key arrays:
+
+```ts
+for (const path of pathKeyIterator(data, {
+   arrayIndex: true,
+   maxDepth: 8,
+   maxResults: 1_000,
+   maxVisits: 10_000
+}))
+{
+   // path: readonly PropertyKey[]
+}
+```
+
+Traversal can be constrained to a `prefixPath`, pruned at a `stopPath`, restricted to own properties, and bounded by depth, result, and visit budgets.
+
+`safeEqual` is a source-driven structural comparison. Every enumerable source path must exist in the target and resolve to the same value; additional target properties are ignored. It is intentionally not a symmetric general-purpose deep-equality algorithm.
+
+## Property-path collections
+
+### `PropertyPathMap<V>`
+
+`PropertyPathMap` is a map keyed by structural property paths rather than accessor-array identity:
+
+```ts
+const fields = new PropertyPathMap<string>();
+
+fields.set('actor.system.hp', 'hp');
+fields.set(['actor', 'items', 0, 'name'], 'first-item');
+fields.set([metadata, 'enabled'], 'metadata-enabled');
+
+fields.get(['actor', 'system', 'hp']);
+// 'hp'
+```
+
+Equivalent dotted and string-array paths resolve to the same entry. Numeric and string segments remain distinct, and symbols compare by identity.
+
+The collection provides:
+
+- `Map`-style `set`, `get`, `has`, `delete`, `clear`, iteration, and `forEach`.
+- Canonical frozen path arrays and insertion-order base iteration.
+- `matchingEntries`, `matchingKeys`, and `matchingValues` for testing stored paths against a candidate object with shared-prefix pruning.
+- `subtreeEntries`, `subtreeKeys`, and `subtreeValues` for candidate-independent trie traversal.
+- Absolute `pathPrefix` and `stopAt` bounds.
+- Optional inclusion of the candidate property value in matching results.
+- Configurable path-depth, entry, trie-node, result, and visit limits.
+- Atomic insertion preflight so failed limit checks do not leave partial trie state.
+- Incremental `nodeCount` inspection.
+
+Exact lookup is proportional to path length. Trie-aware matching avoids independently resolving every stored path and rejects unavailable branches at their shared prefix.
+
+### `WeakPropertyPathMap<R, V>`
+
+`WeakPropertyPathMap` associates a `PropertyPathMap` with each weakly held root object or function:
+
+```ts
+const bindings = new WeakPropertyPathMap<object, string>();
+const document = {};
+
+bindings.set(document, 'system.hp.value', 'hp-binding');
+bindings.get(document, ['system', 'hp', 'value']);
+// 'hp-binding'
+```
+
+Each root receives an independent trie and independent resource limits. Roots are not globally enumerable, matching normal `WeakMap` semantics. Deleting the final path beneath a root removes its per-root trie immediately, while an otherwise unreachable root and all associated paths remain eligible for garbage collection.
+
+The weak collection exposes exact path operations, root membership and deletion, candidate matching, subtree iteration, and constant-time `clear`.
+
+## API by functional group
+
+### Object validation
+
+| Function | Purpose |
+| --- | --- |
+| `isObject` | Tests for a non-null, non-array object while preserving known object types. |
+| `assertObject` | Asserts the same runtime category while preserving the existing static type. |
+| `isObjectOrFunction` | Tests for any non-null object or function, including arrays and constructors. |
+| `assertObjectOrFunction` | Asserts an object-or-function reference while filtering primitive union members. |
+| `isOrdinaryObject` | Tests for the library's tag-based ordinary-object category, including class instances but excluding specialized built-ins. |
+| `assertOrdinaryObject` | Asserts an ordinary object while preserving the existing static type. |
+| `isPlainObject` | Tests for an object whose prototype is `Object.prototype` or `null`. |
+| `assertPlainObject` | Asserts a plain object while preserving the existing static type. |
+| `isRecord` | Narrows a non-null, non-array object to `Record<string, unknown>`. |
+| `assertRecord` | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing. |
+
+### Property keys and paths
+
+| Function | Purpose |
+| --- | --- |
+| `isPropertyKey` | Tests for a string, number, or symbol property key. |
+| `isArrayIndex` | Tests for a numeric ECMAScript array index. |
+| `isPropertyPath` | Validates a non-empty dotted string or exact property-key array. |
+| `normalizePropertyPath` | Converts a path to its canonical readonly property-key array form. |
+| `concatPropertyPath` | Normalizes and concatenates one or more paths. |
+| `joinPropertyPath` | Converts an exact path to dotted form when lossless. |
+| `isPropertyPathPrefix` | Tests whether one normalized path equals or structurally prefixes another. |
+
+### Property access and inspection
+
+| Function | Purpose |
+| --- | --- |
+| `safeAccess` | Resolves a strongly inferred path and applies an optional nullish fallback. |
+| `getProperty` | Resolves a strongly inferred path while preserving present `undefined` and `null`. |
+| `hasProperty` | Tests complete path existence without reading the terminal value. |
+| `getPropertyDescriptor` | Returns the terminal property descriptor without invoking a terminal getter. |
+| `getPropertyOwner` | Returns the object or prototype that owns the terminal property. |
+
+### Property mutation
+
+| Function | Purpose |
+| --- | --- |
+| `safeSet` | Performs hardened path assignment, conditional assignment, or arithmetic update. |
+| `deleteProperty` | Deletes a configurable path with hardened keys and explicit prototype handling. |
+
+### Object traversal and comparison
+
+| Function | Purpose |
+| --- | --- |
+| `pathKeyIterator` | Yields bounded, exact enumerable property paths with symbol and optional array-index support. |
+| `safeEqual` | Performs source-driven structural path and value comparison. |
+
+### Deep object operations
+
+| Function | Purpose |
+| --- | --- |
+| `deepMerge` | Merges source objects into a target with inferred accumulated output typing. |
+| `deepFreeze` | Iteratively freezes a traversed object graph. |
+| `deepSeal` | Iteratively seals a traversed object graph. |
+| `klona` | Deep-clones a value through the re-exported `klona/full` implementation. |
+
+### Accessors and prototypes
+
+| Function | Purpose |
+| --- | --- |
+| `hasAccessor` | Tests for both getter and setter descriptors through the prototype chain. |
+| `hasGetter` | Tests for a getter descriptor through the prototype chain. |
+| `hasSetter` | Tests for a setter descriptor through the prototype chain. |
+| `hasPrototype` | Tests whether a constructor matches or inherits from another constructor. |
+
+### Iterable utilities
+
+| Function | Purpose |
+| --- | --- |
+| `isIterable` | Tests for synchronous iteration while intentionally excluding primitive strings. |
+| `isAsyncIterable` | Tests for asynchronous iteration. |
+| `ensureNonEmptyIterable` | Peeks and returns a replaying iterable only when at least one value exists. |
+| `ensureNonEmptyAsyncIterable` | Provides the equivalent behavior for async or synchronous iterable input. |
+
+### General object utilities
+
+| Function | Purpose |
+| --- | --- |
+| `objectKeys` | Returns typed enumerable own string keys with safe fallback behavior. |
+| `objectSize` | Determines the supported size of objects, arrays, maps, sets, and strings. |
+
+### Collections and public types
+
+| Export | Purpose |
+| --- | --- |
+| `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
+| `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
+| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
+| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
+| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
+
+## Scope and semantics
+
+- Dotted strings cannot represent literal periods, symbols, numeric array indexes, or a single empty-string key; use exact arrays for those cases.
+- `Map` and `Set` entries are not traversed by `pathKeyIterator` or compared structurally by `safeEqual`.
+- Array elements are terminal traversal paths even when they contain objects.
 - `safeEqual` is asymmetric and source-driven.
-- Array element objects are compared by reference.
 - `safeSet` creates missing intermediate segments as objects, not arrays.
-- Dotted string paths cannot represent literal periods, symbols, or array indexes.
-- The package does not attempt to serialize symbols into string paths.
+- Property access and matching may invoke getters and proxy traps when intermediate or requested terminal values must be read.
+- Traversal and collection limits are configurable so trusted workloads can raise them explicitly.
 
-Use exact property-key arrays whenever correctness across the complete JavaScript property-key space is required.
+For exhaustive signatures, option semantics, complexity notes, and edge cases, please see the [API documentation](https://typhonjs-node-utils.github.io/object/).
