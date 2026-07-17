@@ -9,31 +9,6 @@ import { klona }        from '../../src';
  */
 interface NoOpObj { a?: number }
 
-const s_OBJECT_DEEP =
-{
-   skipKey: { s1: ['a'] },
-   a: { a1: [{ e1: 1 }] },
-   b: { b1: 2 },
-   c: [{ c1: 3 }],
-   array: [[{ ae1: 'a' }], [{ ae2: 'b' }], [{ ae3: 'c' }]],
-   level1:
-   {
-      skipKey: { s2: ['b'] },
-      d: { d1: [{ e1: 4 }] },
-      e: { e1: 5 },
-      f: [{ f1: 6 }],
-      array1: [[{ ae1: 'd' }], [{ ae2: 'e' }], [{ ae3: 'f' }]],
-      level2:
-      {
-         skipKey: { s3: ['c'] },
-         g: { g1: [{ e1: 7 }] },
-         h: { h1: 8 },
-         i: [{ i1: 9 }],
-         array2: [[{ ae1: 'g' }], [{ ae2: 'h' }], [{ ae3: 'i' }]]
-      }
-   }
-};
-
 const s_OBJECT_MIXED =
 {
    a: 1,
@@ -516,126 +491,311 @@ describe('ObjectUtil:', () =>
 
    describe('deepFreeze:', () =>
    {
-      it('with skipKeys:', () =>
+      it('freezes nested objects, arrays, and symbol-keyed values', () =>
       {
-         const testObj = klona(s_OBJECT_DEEP);
+         const symbol = Symbol('child');
 
-         ObjectUtil.deepFreeze(testObj, { skipKeys: new Set(['skipKey']) });
+         const data = {
+            object: {
+               nested: {}
+            },
+            array: [
+               {
+                  nested: {}
+               }
+            ],
+            [symbol]: {
+               nested: {}
+            }
+         };
 
-         // Verify not frozen
-         assert.isFalse(Object.isFrozen(testObj.skipKey));
-         assert.isFalse(Object.isFrozen(testObj.skipKey.s1));
-         assert.isFalse(Object.isFrozen(testObj.level1.skipKey));
-         assert.isFalse(Object.isFrozen(testObj.level1.skipKey.s2));
-         assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey));
-         assert.isFalse(Object.isFrozen(testObj.level1.level2.skipKey.s3));
+         const result = ObjectUtil.deepFreeze(data);
 
-         // Verify frozen
-         assert.isTrue(Object.isFrozen(testObj));
+         assert.strictEqual(result, data);
 
-         assert.isTrue(Object.isFrozen(testObj.a));
-         assert.isTrue(Object.isFrozen(testObj.a.a1));
-         assert.isTrue(Object.isFrozen(testObj.a.a1[0]));
-         assert.isTrue(Object.isFrozen(testObj.b));
-         assert.isTrue(Object.isFrozen(testObj.c));
-         assert.isTrue(Object.isFrozen(testObj.c[0]));
-         assert.isTrue(Object.isFrozen(testObj.array));
-         assert.isTrue(Object.isFrozen(testObj.array[0]));
-         assert.isTrue(Object.isFrozen(testObj.array[0][0]));
-         assert.isTrue(Object.isFrozen(testObj.array[1]));
-         assert.isTrue(Object.isFrozen(testObj.array[1][0]));
-         assert.isTrue(Object.isFrozen(testObj.array[2]));
-         assert.isTrue(Object.isFrozen(testObj.array[2][0]));
-
-         assert.isTrue(Object.isFrozen(testObj.level1));
-         assert.isTrue(Object.isFrozen(testObj.level1.d));
-         assert.isTrue(Object.isFrozen(testObj.level1.d.d1));
-         assert.isTrue(Object.isFrozen(testObj.level1.d.d1[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.e));
-         assert.isTrue(Object.isFrozen(testObj.level1.f));
-         assert.isTrue(Object.isFrozen(testObj.level1.f[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[0][0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[1]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[1][0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[2]));
-         assert.isTrue(Object.isFrozen(testObj.level1.array1[2][0]));
-
-         assert.isTrue(Object.isFrozen(testObj.level1.level2));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.g));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.g.g1[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.h));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.i));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.i[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[0][0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[1][0]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2]));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.array2[2][0]));
-
-         // Make sure pushing to arrays fails.
-                                                                                 // @ts-expect-error
-         assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
-         assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
-         assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
-         assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.array[2].push(1); });
-                                                                                 // @ts-expect-error
-         assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
-         assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
-
-         assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
+         assert.isTrue(Object.isFrozen(data));
+         assert.isTrue(Object.isFrozen(data.object));
+         assert.isTrue(Object.isFrozen(data.object.nested));
+         assert.isTrue(Object.isFrozen(data.array));
+         assert.isTrue(Object.isFrozen(data.array[0]));
+         assert.isTrue(Object.isFrozen(data.array[0].nested));
+         assert.isTrue(Object.isFrozen(data[symbol]));
+         assert.isTrue(Object.isFrozen(data[symbol].nested));
       });
 
-      it('without skipKeys:', () => {
-         const testObj = klona(s_OBJECT_DEEP);
+      it('preserves the input type', () =>
+      {
+         interface Data
+         {
+            child: {
+               value: number;
+            };
+         }
 
-         ObjectUtil.deepFreeze(testObj);
+         const data: Data = {
+            child: {
+               value: 42
+            }
+         };
 
-         // Verify frozen
-         assert.isTrue(Object.isFrozen(testObj.skipKey));
-         assert.isTrue(Object.isFrozen(testObj.skipKey.s1));
-         assert.isTrue(Object.isFrozen(testObj.level1.skipKey));
-         assert.isTrue(Object.isFrozen(testObj.level1.skipKey.s2));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey));
-         assert.isTrue(Object.isFrozen(testObj.level1.level2.skipKey.s3));
+         const result = ObjectUtil.deepFreeze(data);
+
+         expectTypeOf(result).toEqualTypeOf<Data>();
       });
 
-      it('skips already frozen keys:', () => {
-         const result = ObjectUtil.deepFreeze({ a: Object.freeze({ b: true }) });
+      it('skips matching string keys globally', () =>
+      {
+         const data = {
+            skip: {
+               nested: {}
+            },
+            branch: {
+               skip: {
+                  nested: {}
+               },
+               keep: {
+                  nested: {}
+               }
+            }
+         };
 
-         // Verify frozen
-         assert.isTrue(Object.isFrozen(result));
-         assert.isTrue(Object.isFrozen(result.a));
+         const skipKeys: ReadonlySet<PropertyKey> = new Set(['skip']);
+
+         ObjectUtil.deepFreeze(data, { skipKeys });
+
+         assert.isTrue(Object.isFrozen(data));
+         assert.isTrue(Object.isFrozen(data.branch));
+         assert.isTrue(Object.isFrozen(data.branch.keep));
+         assert.isTrue(Object.isFrozen(data.branch.keep.nested));
+
+         assert.isFalse(Object.isFrozen(data.skip));
+         assert.isFalse(Object.isFrozen(data.skip.nested));
+         assert.isFalse(Object.isFrozen(data.branch.skip));
+         assert.isFalse(Object.isFrozen(data.branch.skip.nested));
+      });
+
+      it('skips symbol keys', () =>
+      {
+         const skip = Symbol('skip');
+         const keep = Symbol('keep');
+
+         const data = {
+            [skip]: {
+               nested: {}
+            },
+            [keep]: {
+               nested: {}
+            }
+         };
+
+         ObjectUtil.deepFreeze(data, {
+            skipKeys: new Set<PropertyKey>([skip])
+         });
+
+         assert.isTrue(Object.isFrozen(data));
+
+         assert.isFalse(Object.isFrozen(data[skip]));
+         assert.isFalse(Object.isFrozen(data[skip].nested));
+
+         assert.isTrue(Object.isFrozen(data[keep]));
+         assert.isTrue(Object.isFrozen(data[keep].nested));
+      });
+
+      it('normalizes numeric skip keys for arrays', () =>
+      {
+         const data = [
+            {
+               nested: {}
+            },
+            {
+               nested: {}
+            }
+         ];
+
+         ObjectUtil.deepFreeze(data, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         assert.isTrue(Object.isFrozen(data));
+
+         assert.isFalse(Object.isFrozen(data[0]));
+         assert.isFalse(Object.isFrozen(data[0].nested));
+
+         assert.isTrue(Object.isFrozen(data[1]));
+         assert.isTrue(Object.isFrozen(data[1].nested));
+      });
+
+      it('normalizes numeric skip keys for ordinary object properties', () =>
+      {
+         const data = {
+            0: {
+               nested: {}
+            },
+            1: {
+               nested: {}
+            }
+         };
+
+         ObjectUtil.deepFreeze(data, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         assert.isTrue(Object.isFrozen(data));
+
+         assert.isFalse(Object.isFrozen(data[0]));
+         assert.isTrue(Object.isFrozen(data[1]));
+      });
+
+      it('treats numeric and equivalent string skip keys identically', () =>
+      {
+         const numericChild = {};
+         const stringChild = {};
+
+         const numericData = [numericChild];
+         const stringData = [stringChild];
+
+         ObjectUtil.deepFreeze(numericData, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         ObjectUtil.deepFreeze(stringData, {
+            skipKeys: new Set<PropertyKey>(['0'])
+         });
+
+         assert.isFalse(Object.isFrozen(numericChild));
+         assert.isFalse(Object.isFrozen(stringChild));
+      });
+
+      it('does not read a skipped getter', () =>
+      {
+         let getterCalls = 0;
+         const child = {};
+
+         const data = Object.defineProperty({}, 'skip', {
+            enumerable: true,
+            get()
+            {
+               getterCalls++;
+               return child;
+            }
+         });
+
+         ObjectUtil.deepFreeze(data, {
+            skipKeys: new Set<PropertyKey>(['skip'])
+         });
+
+         assert.equal(getterCalls, 0);
+         assert.isTrue(Object.isFrozen(data));
+         assert.isFalse(Object.isFrozen(child));
+      });
+
+      it('reads a non-skipped getter once', () =>
+      {
+         let getterCalls = 0;
+         const child = {};
+
+         const data = Object.defineProperty({}, 'child', {
+            enumerable: true,
+            get()
+            {
+               getterCalls++;
+               return child;
+            }
+         });
+
+         ObjectUtil.deepFreeze(data);
+
+         assert.equal(getterCalls, 1);
+         assert.isTrue(Object.isFrozen(data));
+         assert.isTrue(Object.isFrozen(child));
+      });
+
+      it('does not traverse non-enumerable properties', () =>
+      {
+         const hidden = {};
+
+         const data = Object.defineProperty({}, 'hidden', {
+            enumerable: false,
+            value: hidden
+         });
+
+         ObjectUtil.deepFreeze(data);
+
+         assert.isTrue(Object.isFrozen(data));
+         assert.isFalse(Object.isFrozen(hidden));
+      });
+
+      it('handles circular object graphs', () =>
+      {
+         interface Circular
+         {
+            child: object;
+            self?: Circular;
+         }
+
+         const data: Circular = {
+            child: {}
+         };
+
+         data.self = data;
+
+         ObjectUtil.deepFreeze(data);
+
+         assert.isTrue(Object.isFrozen(data));
+         assert.isTrue(Object.isFrozen(data.child));
+      });
+
+      it('allows a skipped value to be frozen through another non-skipped alias', () =>
+      {
+         const shared = {
+            nested: {}
+         };
+
+         const data = {
+            skip: shared,
+            keep: shared
+         };
+
+         ObjectUtil.deepFreeze(data, {
+            skipKeys: new Set<PropertyKey>(['skip'])
+         });
+
+         assert.isTrue(Object.isFrozen(shared));
+         assert.isTrue(Object.isFrozen(shared.nested));
+      });
+
+      it('is safe to apply repeatedly', () =>
+      {
+         const data = {
+            child: {}
+         };
+
+         ObjectUtil.deepFreeze(data);
+
+         assert.doesNotThrow(() => ObjectUtil.deepFreeze(data));
+         assert.isTrue(Object.isFrozen(data));
+         assert.isTrue(Object.isFrozen(data.child));
       });
 
       describe('Errors', () =>
       {
-         it('throws - data not object', () =>
+         it('throws when data is not a non-null object', () =>
          {
+            assert.throws(() => ObjectUtil.deepFreeze(null), TypeError,
+             `deepFreeze error: 'data' is not an object or array.`);
+
             // @ts-expect-error
             assert.throws(() => ObjectUtil.deepFreeze('bad'), TypeError,
              `deepFreeze error: 'data' is not an object or array.`);
+
+            assert.throws(() => ObjectUtil.deepFreeze(() => void 0), TypeError,
+             `deepFreeze error: 'data' is not an object or array.`);
          });
 
-         it('throws - options.skipKeys is not a Set', () =>
+         it('throws when options.skipKeys is not a Set', () =>
          {
             // @ts-expect-error
-            assert.throws(() => ObjectUtil.deepFreeze({}, { skipKeys: 'bad' }), TypeError,
+            assert.throws(() => ObjectUtil.deepFreeze({}, { skipKeys: ['skip'] }), TypeError,
              `deepFreeze error: 'options.skipKeys' is not a Set.`);
          });
       });
@@ -1063,126 +1223,315 @@ describe('ObjectUtil:', () =>
 
    describe('deepSeal:', () =>
    {
-      it('with skipKeys:', () =>
+      it('seals nested objects, arrays, and symbol-keyed values', () =>
       {
-         const testObj = klona(s_OBJECT_DEEP);
+         const symbol = Symbol('child');
 
-         ObjectUtil.deepSeal(testObj, { skipKeys: new Set(['skipKey']) });
+         const data = {
+            object: {
+               nested: {}
+            },
+            array: [
+               {
+                  nested: {}
+               }
+            ],
+            [symbol]: {
+               nested: {}
+            }
+         };
 
-         // Verify not sealed
-         assert.isFalse(Object.isSealed(testObj.skipKey));
-         assert.isFalse(Object.isSealed(testObj.skipKey.s1));
-         assert.isFalse(Object.isSealed(testObj.level1.skipKey));
-         assert.isFalse(Object.isSealed(testObj.level1.skipKey.s2));
-         assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey));
-         assert.isFalse(Object.isSealed(testObj.level1.level2.skipKey.s3));
+         const result = ObjectUtil.deepSeal(data);
 
-         // Verify sealed
-         assert.isTrue(Object.isSealed(testObj));
+         assert.strictEqual(result, data);
 
-         assert.isTrue(Object.isSealed(testObj.a));
-         assert.isTrue(Object.isSealed(testObj.a.a1));
-         assert.isTrue(Object.isSealed(testObj.a.a1[0]));
-         assert.isTrue(Object.isSealed(testObj.b));
-         assert.isTrue(Object.isSealed(testObj.c));
-         assert.isTrue(Object.isSealed(testObj.c[0]));
-         assert.isTrue(Object.isSealed(testObj.array));
-         assert.isTrue(Object.isSealed(testObj.array[0]));
-         assert.isTrue(Object.isSealed(testObj.array[0][0]));
-         assert.isTrue(Object.isSealed(testObj.array[1]));
-         assert.isTrue(Object.isSealed(testObj.array[1][0]));
-         assert.isTrue(Object.isSealed(testObj.array[2]));
-         assert.isTrue(Object.isSealed(testObj.array[2][0]));
+         assert.isTrue(Object.isSealed(data));
+         assert.isTrue(Object.isSealed(data.object));
+         assert.isTrue(Object.isSealed(data.object.nested));
+         assert.isTrue(Object.isSealed(data.array));
+         assert.isTrue(Object.isSealed(data.array[0]));
+         assert.isTrue(Object.isSealed(data.array[0].nested));
+         assert.isTrue(Object.isSealed(data[symbol]));
+         assert.isTrue(Object.isSealed(data[symbol].nested));
 
-         assert.isTrue(Object.isSealed(testObj.level1));
-         assert.isTrue(Object.isSealed(testObj.level1.d));
-         assert.isTrue(Object.isSealed(testObj.level1.d.d1));
-         assert.isTrue(Object.isSealed(testObj.level1.d.d1[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.e));
-         assert.isTrue(Object.isSealed(testObj.level1.f));
-         assert.isTrue(Object.isSealed(testObj.level1.f[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[0][0]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[1]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[1][0]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[2]));
-         assert.isTrue(Object.isSealed(testObj.level1.array1[2][0]));
-
-         assert.isTrue(Object.isSealed(testObj.level1.level2));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.g));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.g.g1[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.h));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.i));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.i[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[0][0]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[1][0]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2]));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.array2[2][0]));
-
-         // Make sure pushing to arrays fails.
-                                                                                 // @ts-expect-error
-         assert.throws(() => { testObj.a.a1.push(1); });                         // @ts-expect-error
-         assert.throws(() => { testObj.c.push(1); });                            // @ts-expect-error
-         assert.throws(() => { testObj.array.push(1); });                        // @ts-expect-error
-         assert.throws(() => { testObj.array[0].push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.array[1].push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.array[2].push(1); });
-                                                                                 // @ts-expect-error
-         assert.throws(() => { testObj.level1.d.d1.push(1); });                  // @ts-expect-error
-         assert.throws(() => { testObj.level1.f.push(1); });                     // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1.push(1); });                // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[0].push(1); });             // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[1].push(1); });             // @ts-expect-error
-         assert.throws(() => { testObj.level1.array1[2].push(1); });             // @ts-expect-error
-
-         assert.throws(() => { testObj.level1.level2.g.g1.push(1); });           // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.i.push(1); });              // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2.push(1); });         // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[0].push(1); });      // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[1].push(1); });      // @ts-expect-error
-         assert.throws(() => { testObj.level1.level2.array2[2].push(1); });
+         // Sealing does not freeze existing writable values.
+         assert.isFalse(Object.isFrozen(data));
+         assert.isFalse(Object.isFrozen(data.object));
       });
 
-      it('without skipKeys:', () => {
-         const testObj = klona(s_OBJECT_DEEP);
+      it('preserves the input type', () =>
+      {
+         interface Data
+         {
+            child: {
+               value: number;
+            };
+         }
 
-         ObjectUtil.deepSeal(testObj);
+         const data: Data = {
+            child: {
+               value: 42
+            }
+         };
 
-         // Verify frozen
-         assert.isTrue(Object.isSealed(testObj.skipKey));
-         assert.isTrue(Object.isSealed(testObj.skipKey.s1));
-         assert.isTrue(Object.isSealed(testObj.level1.skipKey));
-         assert.isTrue(Object.isSealed(testObj.level1.skipKey.s2));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey));
-         assert.isTrue(Object.isSealed(testObj.level1.level2.skipKey.s3));
+         const result = ObjectUtil.deepSeal(data);
+
+         expectTypeOf(result).toEqualTypeOf<Data>();
       });
 
-      it('skips already sealed keys:', () => {
-         const result = ObjectUtil.deepSeal({ a: Object.seal({ b: true }) });
+      it('skips matching string keys globally', () =>
+      {
+         const data = {
+            skip: {
+               nested: {}
+            },
+            branch: {
+               skip: {
+                  nested: {}
+               },
+               keep: {
+                  nested: {}
+               }
+            }
+         };
 
-         // Verify frozen
-         assert.isTrue(Object.isSealed(result));
-         assert.isTrue(Object.isSealed(result.a));
+         const skipKeys: ReadonlySet<PropertyKey> = new Set(['skip']);
+
+         ObjectUtil.deepSeal(data, { skipKeys });
+
+         assert.isTrue(Object.isSealed(data));
+         assert.isTrue(Object.isSealed(data.branch));
+         assert.isTrue(Object.isSealed(data.branch.keep));
+         assert.isTrue(Object.isSealed(data.branch.keep.nested));
+
+         assert.isFalse(Object.isSealed(data.skip));
+         assert.isFalse(Object.isSealed(data.skip.nested));
+         assert.isFalse(Object.isSealed(data.branch.skip));
+         assert.isFalse(Object.isSealed(data.branch.skip.nested));
+      });
+
+      it('skips symbol keys', () =>
+      {
+         const skip = Symbol('skip');
+         const keep = Symbol('keep');
+
+         const data = {
+            [skip]: {
+               nested: {}
+            },
+            [keep]: {
+               nested: {}
+            }
+         };
+
+         ObjectUtil.deepSeal(data, {
+            skipKeys: new Set<PropertyKey>([skip])
+         });
+
+         assert.isTrue(Object.isSealed(data));
+
+         assert.isFalse(Object.isSealed(data[skip]));
+         assert.isFalse(Object.isSealed(data[skip].nested));
+
+         assert.isTrue(Object.isSealed(data[keep]));
+         assert.isTrue(Object.isSealed(data[keep].nested));
+      });
+
+      it('normalizes numeric skip keys for arrays', () =>
+      {
+         const data = [
+            {
+               nested: {}
+            },
+            {
+               nested: {}
+            }
+         ];
+
+         ObjectUtil.deepSeal(data, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         assert.isTrue(Object.isSealed(data));
+
+         assert.isFalse(Object.isSealed(data[0]));
+         assert.isFalse(Object.isSealed(data[0].nested));
+
+         assert.isTrue(Object.isSealed(data[1]));
+         assert.isTrue(Object.isSealed(data[1].nested));
+      });
+
+      it('normalizes numeric skip keys for ordinary object properties', () =>
+      {
+         const data = {
+            0: {
+               nested: {}
+            },
+            1: {
+               nested: {}
+            }
+         };
+
+         ObjectUtil.deepSeal(data, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         assert.isTrue(Object.isSealed(data));
+
+         assert.isFalse(Object.isSealed(data[0]));
+         assert.isTrue(Object.isSealed(data[1]));
+      });
+
+      it('treats numeric and equivalent string skip keys identically', () =>
+      {
+         const numericChild = {};
+         const stringChild = {};
+
+         const numericData = [numericChild];
+         const stringData = [stringChild];
+
+         ObjectUtil.deepSeal(numericData, {
+            skipKeys: new Set<PropertyKey>([0])
+         });
+
+         ObjectUtil.deepSeal(stringData, {
+            skipKeys: new Set<PropertyKey>(['0'])
+         });
+
+         assert.isFalse(Object.isSealed(numericChild));
+         assert.isFalse(Object.isSealed(stringChild));
+      });
+
+      it('does not read a skipped getter', () =>
+      {
+         let getterCalls = 0;
+         const child = {};
+
+         const data = Object.defineProperty({}, 'skip', {
+            enumerable: true,
+            get()
+            {
+               getterCalls++;
+               return child;
+            }
+         });
+
+         ObjectUtil.deepSeal(data, {
+            skipKeys: new Set<PropertyKey>(['skip'])
+         });
+
+         assert.equal(getterCalls, 0);
+         assert.isTrue(Object.isSealed(data));
+         assert.isFalse(Object.isSealed(child));
+      });
+
+      it('reads a non-skipped getter once', () =>
+      {
+         let getterCalls = 0;
+         const child = {};
+
+         const data = Object.defineProperty({}, 'child', {
+            enumerable: true,
+            get()
+            {
+               getterCalls++;
+               return child;
+            }
+         });
+
+         ObjectUtil.deepSeal(data);
+
+         assert.equal(getterCalls, 1);
+         assert.isTrue(Object.isSealed(data));
+         assert.isTrue(Object.isSealed(child));
+      });
+
+      it('does not traverse non-enumerable properties', () =>
+      {
+         const hidden = {};
+
+         const data = Object.defineProperty({}, 'hidden', {
+            enumerable: false,
+            value: hidden
+         });
+
+         ObjectUtil.deepSeal(data);
+
+         assert.isTrue(Object.isSealed(data));
+         assert.isFalse(Object.isSealed(hidden));
+      });
+
+      it('handles circular object graphs', () =>
+      {
+         interface Circular
+         {
+            child: object;
+            self?: Circular;
+         }
+
+         const data: Circular = {
+            child: {}
+         };
+
+         data.self = data;
+
+         ObjectUtil.deepSeal(data);
+
+         assert.isTrue(Object.isSealed(data));
+         assert.isTrue(Object.isSealed(data.child));
+      });
+
+      it('allows a skipped value to be sealed through another non-skipped alias', () =>
+      {
+         const shared = {
+            nested: {}
+         };
+
+         const data = {
+            skip: shared,
+            keep: shared
+         };
+
+         ObjectUtil.deepSeal(data, {
+            skipKeys: new Set<PropertyKey>(['skip'])
+         });
+
+         assert.isTrue(Object.isSealed(shared));
+         assert.isTrue(Object.isSealed(shared.nested));
+      });
+
+      it('is safe to apply repeatedly', () =>
+      {
+         const data = {
+            child: {}
+         };
+
+         ObjectUtil.deepSeal(data);
+
+         assert.doesNotThrow(() => ObjectUtil.deepSeal(data));
+         assert.isTrue(Object.isSealed(data));
+         assert.isTrue(Object.isSealed(data.child));
       });
 
       describe('Errors', () =>
       {
-         it('throws - data not object', () =>
+         it('throws when data is not a non-null object', () =>
          {
+            assert.throws(() => ObjectUtil.deepSeal(null), TypeError,
+             `deepSeal error: 'data' is not an object or array.`);
+
             // @ts-expect-error
             assert.throws(() => ObjectUtil.deepSeal('bad'), TypeError,
              `deepSeal error: 'data' is not an object or array.`);
+
+            assert.throws(() => ObjectUtil.deepSeal(() => void 0), TypeError,
+             `deepSeal error: 'data' is not an object or array.`);
          });
 
-         it('throws - options.skipKeys is not a Set', () =>
+         it('throws when options.skipKeys is not a Set', () =>
          {
             // @ts-expect-error
-            assert.throws(() => ObjectUtil.deepSeal({}, { skipKeys: 'bad' }), TypeError,
+            assert.throws(() => ObjectUtil.deepSeal({}, { skipKeys: ['skip'] }), TypeError,
              `deepSeal error: 'options.skipKeys' is not a Set.`);
          });
       });

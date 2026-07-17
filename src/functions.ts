@@ -273,30 +273,42 @@ export function concatPropertyPath(path: PropertyPath, ...paths: PropertyPath[])
 }
 
 /**
- * Freezes all entries traversed that are objects including entries in arrays.
+ * Freezes all traversed object and array values.
  *
  * @category Deep Object Operations
  *
  * @param data - An object or array.
  *
- * @param [options] - Options
+ * @param options - Options.
  *
- * @param [options.skipKeys] - A Set of strings indicating keys of objects to not freeze.
+ * @param options.skipKeys - A readonly set of property keys whose values are excluded from traversal. Numeric keys are
+ *        normalized to their JavaScript string-key representation. A matching key is skipped regardless of where it
+ *        appears in the object graph.
  *
  * @returns The frozen object.
  *
  * @typeParam T - Type of data.
  */
-export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
+export function deepFreeze<T extends object>(data: T, { skipKeys }: { skipKeys?: ReadonlySet<PropertyKey> } = {}): T
 {
-   if (typeof data !== 'object' || data === null)
-   {
-      throw new TypeError(`deepFreeze error: 'data' is not an object or array.`);
-   }
+   assertNonNullObject(data, `deepFreeze error: 'data' is not an object or array.`);
 
    if (skipKeys !== void 0 && Object.prototype.toString.call(skipKeys) !== '[object Set]')
    {
       throw new TypeError(`deepFreeze error: 'options.skipKeys' is not a Set.`);
+   }
+
+   // JavaScript coerces numeric property keys to strings. Normalize once so numeric
+   // skip entries match the keys produced by Object.keys / Reflect.ownKeys.
+   let normalizedSkipKeys: ReadonlySet<string | symbol> | undefined;
+
+   if (skipKeys !== void 0)
+   {
+      const normalized: Set<string | symbol> = new Set();
+
+      for (const key of skipKeys) { normalized.add(typeof key === 'number' ? String(key) : key); }
+
+      normalizedSkipKeys = normalized;
    }
 
    const stack: object[] = [data];
@@ -307,13 +319,14 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
 
       if (typeof obj !== 'object' || obj === null || Object.isFrozen(obj)) { continue; }
 
-      // Collect own enumerable string and symbol children before freezing; reading after Object.freeze would still
-      // be legal, but batching first keeps graph discovery separate from mutation and handles self references safely.
+      // Collect own enumerable string and symbol children before freezing. A skipped key prevents the corresponding
+      // property value from being read through this traversal edge.
       const children: unknown[] = [];
 
       for (const key of getEnumerablePropertyKeys(obj, true))
       {
-         if (typeof key === 'string' && skipKeys?.has(key)) { continue; }
+         if (normalizedSkipKeys?.has(key as string | symbol)) { continue; }
+
          children.push(obj[key]);
       }
 
@@ -321,7 +334,7 @@ export function deepFreeze<T extends object | []>(data: T, { skipKeys }: { skipK
 
       for (const child of children)
       {
-         if (typeof child === 'object' && child !== null) { stack.push(child); }
+         if (isNonNullObject(child)) { stack.push(child); }
       }
    }
 
@@ -453,30 +466,42 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
 }
 
 /**
- * Seals all entries traversed that are objects including entries in arrays.
+ * Seals all traversed object and array values.
  *
  * @category Deep Object Operations
  *
  * @param data - An object or array.
  *
- * @param [options] - Options
+ * @param [options] - Options.
  *
- * @param [options.skipKeys] - A Set of strings indicating keys of objects to not seal.
+ * @param [options.skipKeys] - A readonly set of property keys whose values are excluded from traversal. Numeric keys
+ *        are normalized to their JavaScript string-key representation. A matching key is skipped regardless of where it
+ *        appears in the object graph.
  *
  * @returns The sealed object.
  *
  * @typeParam T - Type of data.
  */
-export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: Set<string> } = {}): T
+export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKeys?: ReadonlySet<PropertyKey> } = {}): T
 {
-   if (typeof data !== 'object' || data === null)
-   {
-      throw new TypeError(`deepSeal error: 'data' is not an object or array.`);
-   }
+   assertNonNullObject(data, `deepSeal error: 'data' is not an object or array.`);
 
    if (skipKeys !== void 0 && Object.prototype.toString.call(skipKeys) !== '[object Set]')
    {
       throw new TypeError(`deepSeal error: 'options.skipKeys' is not a Set.`);
+   }
+
+   // JavaScript coerces numeric property keys to strings. Normalize once so numeric
+   // skip entries match the keys produced by Object.keys / Reflect.ownKeys.
+   let normalizedSkipKeys: ReadonlySet<string | symbol> | undefined;
+
+   if (skipKeys !== void 0)
+   {
+      const normalized: Set<string | symbol> = new Set();
+
+      for (const key of skipKeys) { normalized.add(typeof key === 'number' ? String(key) : key); }
+
+      normalizedSkipKeys = normalized;
    }
 
    const stack: object[] = [data];
@@ -493,7 +518,9 @@ export function deepSeal<T extends object | []>(data: T, { skipKeys }: { skipKey
 
       for (const key of getEnumerablePropertyKeys(obj, true))
       {
-         if (typeof key === 'string' && skipKeys?.has(key)) { continue; }
+         // Enumerable object keys returned by the helper are strings or symbols.
+         if (normalizedSkipKeys?.has(key as string | symbol)) { continue; }
+
          children.push(obj[key]);
       }
 
