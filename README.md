@@ -268,35 +268,32 @@ The weak collection exposes exact path operations, root membership and deletion,
 
 ## API by functional group
 
-### Object validation
+### Object Validation
 
-| Function | Purpose                                                                                                                    |
-| --- |----------------------------------------------------------------------------------------------------------------------------|
-| `assertNonNullObject` | Asserts a non-null object, including arrays, while preserving the value's existing static type.                            |
-| `assertObject` | Asserts a non-null object, _excluding_ arrays, while preserving the value's existing static type.                          |
+| Function                 | Purpose                                                                                                                    |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------|
+| `assertNonNullObject`    | Asserts a non-null object, including arrays, while preserving the value's existing static type.                            |
+| `assertObject`           | Asserts a non-null object, _excluding_ arrays, while preserving the value's existing static type.                          |
 | `assertObjectOrFunction` | Asserts an object-or-function reference while filtering primitive union members.                                           |
-| `assertOrdinaryObject` | Asserts an ordinary object while preserving the existing static type.                                                      |
-| `assertPlainObject` | Asserts a plain object while preserving the existing static type.                                                          |
-| `assertRecord` | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing.                                              |
-| `isNonNullObject` | Tests for a non-null object, including arrays, while preserving known object types where possible.                         |
-| `isObject` | Tests for a non-null, non-array object while preserving known object types.                                                |
-| `isObjectOrFunction` | Tests for any non-null object or function, including arrays and constructors.                                              |
-| `isOrdinaryObject` | Tests for the library's tag-based ordinary-object category, including class instances but excluding specialized built-ins. |
-| `isPlainObject` | Tests for an object whose prototype is `Object.prototype` or `null`.                                                       |
-| `isRecord` | Narrows a non-null, non-array object to `Record<string, unknown>`.                                                         |
+| `assertOrdinaryObject`   | Asserts an ordinary object while preserving the existing static type.                                                      |
+| `assertPlainObject`      | Asserts a plain object while preserving the existing static type.                                                          |
+| `assertRecord`           | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing.                                              |
+| `isNonNullObject`        | Tests for a non-null object, including arrays, while preserving known object types where possible.                         |
+| `isObject`               | Tests for a non-null, non-array object while preserving known object types.                                                |
+| `isObjectOrFunction`     | Tests for any non-null object or function, including arrays and constructors.                                              |
+| `isOrdinaryObject`       | Tests for the library's tag-based ordinary-object category, including class instances but excluding specialized built-ins. |
+| `isPlainObject`          | Tests for an object whose prototype is `Object.prototype` or `null`.                                                       |
+| `isRecord`               | Narrows a non-null, non-array object to `Record<string, unknown>`.                                                         |
+| `NonNullObject<T>`       | Extracts the non-null, non-callable object members of a type, including arrays and specialized built-in objects. |
 
-### Collections and public types
+### Property Path Collections
 
 | Export | Purpose |
 | --- | --- |
-| `NonNullObject<T>` | Extracts the non-null, non-callable object members of a type, including arrays and specialized built-in objects. |
-| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
-| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
 | `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
-| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
 | `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
 
-### Property keys and paths
+### Property Keys and Paths
 
 | Function | Purpose |
 | --- | --- |
@@ -307,8 +304,9 @@ The weak collection exposes exact path operations, root membership and deletion,
 | `isPropertyPathPrefix` | Tests whether one normalized path equals or structurally prefixes another. |
 | `joinPropertyPath` | Converts an exact path to dotted form when lossless. |
 | `normalizePropertyPath` | Converts a path to its canonical readonly property-key array form. |
+| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
 
-### Property access and inspection
+### Property Access and Inspection
 
 | Function | Purpose |
 | --- | --- |
@@ -318,18 +316,20 @@ The weak collection exposes exact path operations, root membership and deletion,
 | `hasProperty` | Tests complete path existence without reading the terminal value. |
 | `safeAccess` | Resolves a strongly inferred path and applies an optional nullish fallback. |
 
-### Property mutation
+### Property Mutation
 
 | Function | Purpose |
 | --- | --- |
 | `deleteProperty` | Deletes a configurable path with hardened keys and explicit prototype handling. |
 | `safeSet` | Performs hardened path assignment, conditional assignment, or arithmetic update. |
 
-### Object traversal and comparison
+### Object Traversal and Comparison
 
 | Function | Purpose |
 | --- | --- |
 | `pathKeyIterator` | Yields bounded, exact enumerable property paths with symbol and optional array-index support. |
+| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
+| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
 | `safeEqual` | Performs source-driven structural path and value comparison. |
 
 ### Deep object operations
