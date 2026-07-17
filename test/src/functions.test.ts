@@ -128,6 +128,135 @@ describe('ObjectUtil:', () =>
       expectTypeOf(val).toEqualTypeOf<Test>();
    });
 
+   describe('assertObjectOrFunction:', () =>
+   {
+      it('accepts ordinary objects', () =>
+      {
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction({}));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(Object.create(null)));
+      });
+
+      it('accepts arrays', () =>
+      {
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction([]));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction([1, 2, 3]));
+      });
+
+      it('accepts functions and class constructors', () =>
+      {
+         class Test {}
+
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(() => void 0));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(function test() {}));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(Test));
+      });
+
+      it('accepts specialized built-in objects', () =>
+      {
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(new Date()));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(new Map()));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(new Set()));
+         assert.doesNotThrow(() => ObjectUtil.assertObjectOrFunction(/test/));
+      });
+
+      it('throws for null and undefined', () =>
+      {
+         assert.throws(
+          () => ObjectUtil.assertObjectOrFunction(null),
+          TypeError,
+          'Expected an object or function.'
+         );
+
+         assert.throws(
+          () => ObjectUtil.assertObjectOrFunction(void 0),
+          TypeError,
+          'Expected an object or function.'
+         );
+      });
+
+      it('throws for primitive values', () =>
+      {
+         assert.throws(() => ObjectUtil.assertObjectOrFunction(false), TypeError);
+         assert.throws(() => ObjectUtil.assertObjectOrFunction(42), TypeError);
+         assert.throws(() => ObjectUtil.assertObjectOrFunction(1n), TypeError);
+         assert.throws(() => ObjectUtil.assertObjectOrFunction('test'), TypeError);
+         assert.throws(() => ObjectUtil.assertObjectOrFunction(Symbol('test')), TypeError);
+      });
+
+      it('uses a custom error message', () =>
+      {
+         assert.throws(
+          () => ObjectUtil.assertObjectOrFunction(null, `'value' is not an object or function.`),
+          TypeError,
+          `'value' is not an object or function.`
+         );
+      });
+
+      it('preserves an existing object type', () =>
+      {
+         interface Options
+         {
+            enabled?: boolean;
+         }
+
+         const value: Options = { enabled: true };
+
+         ObjectUtil.assertObjectOrFunction(value);
+
+         expectTypeOf(value).toEqualTypeOf<Options>();
+         assert.isTrue(value.enabled);
+      });
+
+      it('preserves an existing function type', () =>
+      {
+         const value = (input: number): string => `${input}`;
+
+         ObjectUtil.assertObjectOrFunction(value);
+
+         expectTypeOf(value).toEqualTypeOf<(input: number) => string>();
+         assert.equal(value(42), '42');
+      });
+
+      it('removes primitive and nullish union members', () =>
+      {
+         let value = new Date() as Date | (() => void) | string | null | undefined;
+
+         ObjectUtil.assertObjectOrFunction(value);
+
+         expectTypeOf(value).toEqualTypeOf<Date | (() => void)>();
+      });
+
+      it('narrows unknown values to object', () =>
+      {
+         const value: unknown = {};
+
+         ObjectUtil.assertObjectOrFunction(value);
+
+         expectTypeOf(value).toEqualTypeOf<object>();
+      });
+   });
+
+   it('assertOrdinaryObject', () =>
+   {
+      assert.throws(() => ObjectUtil.assertOrdinaryObject(false), 'Expected an ordinary object.');
+      assert.throws(() => ObjectUtil.assertOrdinaryObject(null), 'Expected an ordinary object.');
+      assert.throws(() => ObjectUtil.assertOrdinaryObject(void 0), 'Expected an ordinary object.');
+      assert.throws(() => ObjectUtil.assertOrdinaryObject([]), 'Expected an ordinary object.');
+      assert.throws(() => ObjectUtil.assertOrdinaryObject(new Map()), 'Expected an ordinary object.');
+
+      assert.throws(() => ObjectUtil.assertOrdinaryObject(void 0, 'Custom error message'), 'Custom error message');
+
+      // No-op visual type erasure check.
+      class Foo {}
+      const foo = new Foo();
+      ObjectUtil.assertOrdinaryObject(foo);
+      expectTypeOf(foo).toEqualTypeOf<Foo>();
+
+      const val: NoOpObj = { a: 123 };
+      ObjectUtil.assertOrdinaryObject(val);
+      expectTypeOf(val).toEqualTypeOf<NoOpObj>();
+   });
+
    it('assertPlainObject', () =>
    {
       assert.throws(() => ObjectUtil.assertPlainObject(false), 'Expected a plain object.');
@@ -159,7 +288,7 @@ describe('ObjectUtil:', () =>
       // No-op visual type erasure check.
       const val: NoOpObj = { a: 123 };
       ObjectUtil.assertRecord(val);
-      expectTypeOf(val).toEqualTypeOf<NoOpObj & Record<string, unknown>>();
+      expectTypeOf(val).toEqualTypeOf<NoOpObj & Record<PropertyKey, unknown>>();
    });
 
 
@@ -780,26 +909,26 @@ describe('ObjectUtil:', () =>
          {
             // @ts-expect-error
             assert.throws(() => ObjectUtil.deepMerge('bad', {}), TypeError,
-             `deepMerge error: 'target' is not an object.`);
+             `deepMerge error: 'target' is not an ordinary object.`);
          });
 
          it('throws - no source object', () =>
          {
             assert.throws(() => ObjectUtil.deepMerge({}), TypeError,
-             `deepMerge error: 'sourceObj' is not an object.`);
+             `deepMerge error: 'sourceObj' is not an ordinary object.`);
          });
 
          it('throws - source not object (string)', () =>
          {
             // @ts-expect-error
             assert.throws(() => ObjectUtil.deepMerge({}, 'bad'), TypeError,
-             `deepMerge error: 'sourceObj[0]' is not an object.`);
+             `deepMerge error: 'sourceObj[0]' is not an ordinary object.`);
          });
 
          it('throws - source not object (array)', () =>
          {
             assert.throws(() => ObjectUtil.deepMerge({}, [1, 2]), TypeError,
-             `deepMerge error: 'sourceObj[0]' is not an object.`);
+             `deepMerge error: 'sourceObj[0]' is not an ordinary object.`);
          });
 
          it('throws - for a circular source object', () =>
@@ -1461,6 +1590,327 @@ describe('ObjectUtil:', () =>
       // No-op visual type erasure check.
       const val: NoOpObj = { a: 123 };
       if (ObjectUtil.isObject(val)) { expectTypeOf(val).toEqualTypeOf<NoOpObj>(); }
+   });
+
+   describe('isObjectOrFunction:', () =>
+   {
+      it('accepts ordinary objects', () =>
+      {
+         assert.isTrue(ObjectUtil.isObjectOrFunction({}));
+         assert.isTrue(ObjectUtil.isObjectOrFunction({ value: 42 }));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(Object.create(null)));
+      });
+
+      it('accepts arrays', () =>
+      {
+         assert.isTrue(ObjectUtil.isObjectOrFunction([]));
+         assert.isTrue(ObjectUtil.isObjectOrFunction([1, 2, 3]));
+      });
+
+      it('accepts functions', () =>
+      {
+         assert.isTrue(ObjectUtil.isObjectOrFunction(() => void 0));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(function test() {}));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(async () => void 0));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(function* test() {}));
+      });
+
+      it('accepts class constructors and instances', () =>
+      {
+         class Test {}
+
+         assert.isTrue(ObjectUtil.isObjectOrFunction(Test));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Test()));
+      });
+
+      it('accepts specialized built-in objects', () =>
+      {
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Date()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(/test/));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Map()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Set()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new WeakMap()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new WeakSet()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Error('test')));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(Promise.resolve()));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new ArrayBuffer(8)));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new DataView(new ArrayBuffer(8))));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Uint8Array()));
+      });
+
+      it('accepts boxed primitive objects', () =>
+      {
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Boolean(false)));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new Number(42)));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(new String('test')));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(Object(1n)));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(Object(Symbol('test'))));
+      });
+
+      it('rejects null and undefined', () =>
+      {
+         assert.isFalse(ObjectUtil.isObjectOrFunction(null));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(void 0));
+      });
+
+      it('rejects primitive values', () =>
+      {
+         assert.isFalse(ObjectUtil.isObjectOrFunction(false));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(true));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(0));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(42));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(1n));
+         assert.isFalse(ObjectUtil.isObjectOrFunction('test'));
+         assert.isFalse(ObjectUtil.isObjectOrFunction(Symbol('test')));
+      });
+
+      it('differs from isObject by accepting arrays and functions', () =>
+      {
+         const array: unknown[] = [];
+         const callback = (): void => void 0;
+
+         assert.isFalse(ObjectUtil.isObject(array));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(array));
+
+         assert.isFalse(ObjectUtil.isObject(callback));
+         assert.isTrue(ObjectUtil.isObjectOrFunction(callback));
+      });
+
+      it('narrows unknown values to object', () =>
+      {
+         const value: unknown = {};
+
+         if (ObjectUtil.isObjectOrFunction(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<object>();
+         }
+      });
+
+      it('preserves known object types', () =>
+      {
+         interface Options
+         {
+            enabled?: boolean;
+         }
+
+         const value: Options = { enabled: true };
+
+         if (ObjectUtil.isObjectOrFunction(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<Options>();
+            assert.isTrue(value.enabled);
+         }
+      });
+
+      it('preserves known function types', () =>
+      {
+         const value = (input: number): string => `${input}`;
+
+         if (ObjectUtil.isObjectOrFunction(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<(input: number) => string>();
+            assert.equal(value(42), '42');
+         }
+      });
+
+      it('narrows mixed unions to their object-compatible members', () =>
+      {
+         const value = {} as Date | (() => void) | string | null;
+
+         if (ObjectUtil.isObjectOrFunction(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<Date | (() => void)>();
+         }
+      });
+   });
+
+   describe('isOrdinaryObject:', () =>
+   {
+      it('accepts plain objects', () =>
+      {
+         assert.isTrue(ObjectUtil.isOrdinaryObject({}));
+         assert.isTrue(ObjectUtil.isOrdinaryObject({ value: 42 }));
+         assert.isTrue(ObjectUtil.isOrdinaryObject(new Object())); // eslint-disable-line no-new-object
+      });
+
+      it('accepts null-prototype objects', () =>
+      {
+         const value = Object.create(null) as Record<PropertyKey, unknown>;
+
+         value.test = true;
+
+         assert.isTrue(ObjectUtil.isOrdinaryObject(value));
+      });
+
+      it('accepts objects with custom prototypes', () =>
+      {
+         const prototype = { inherited: true };
+         const value = Object.create(prototype) as Record<PropertyKey, unknown>;
+
+         value.own = true;
+
+         assert.isTrue(ObjectUtil.isOrdinaryObject(value));
+
+         // The custom prototype distinguishes this value from a plain object.
+         assert.isFalse(ObjectUtil.isPlainObject(value));
+      });
+
+      it('accepts ordinary class instances', () =>
+      {
+         class Test
+         {
+            value = 42;
+         }
+
+         const value = new Test();
+
+         assert.isTrue(ObjectUtil.isOrdinaryObject(value));
+
+         // Class instances are ordinary objects, but are not plain objects.
+         assert.isFalse(ObjectUtil.isPlainObject(value));
+      });
+
+      it('rejects primitive values', () =>
+      {
+         assert.isFalse(ObjectUtil.isOrdinaryObject(null));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(void 0));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(false));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(0));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(1n));
+         assert.isFalse(ObjectUtil.isOrdinaryObject('test'));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(Symbol('test')));
+      });
+
+      it('rejects functions and class constructors', () =>
+      {
+         class Test {}
+
+         assert.isFalse(ObjectUtil.isOrdinaryObject(() => void 0));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(function test() {}));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(Test));
+      });
+
+      it('rejects arrays', () =>
+      {
+         assert.isFalse(ObjectUtil.isOrdinaryObject([]));
+         assert.isFalse(ObjectUtil.isOrdinaryObject([1, 2, 3]));
+      });
+
+      it('rejects boxed primitive objects', () =>
+      {
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Boolean(false)));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Number(42)));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new String('test')));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(Object(1n)));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(Object(Symbol('test'))));
+      });
+
+      it('rejects specialized collection objects', () =>
+      {
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Map()));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Set()));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new WeakMap()));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new WeakSet()));
+      });
+
+      it('rejects specialized built-in objects', () =>
+      {
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Date()));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(/test/));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Error('test')));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(Promise.resolve()));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new ArrayBuffer(8)));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new DataView(new ArrayBuffer(8))));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(new Uint8Array()));
+      });
+
+      it('distinguishes ordinary objects from the broader isObject category', () =>
+      {
+         const ordinary = {};
+         const specialized = new Map();
+
+         assert.isTrue(ObjectUtil.isObject(ordinary));
+         assert.isTrue(ObjectUtil.isOrdinaryObject(ordinary));
+
+         assert.isTrue(ObjectUtil.isObject(specialized));
+         assert.isFalse(ObjectUtil.isOrdinaryObject(specialized));
+      });
+
+      it('honors a custom Symbol.toStringTag', () =>
+      {
+         const value = { [Symbol.toStringTag]: 'Configuration' };
+
+         assert.equal(Object.prototype.toString.call(value), '[object Configuration]');
+         assert.isFalse(ObjectUtil.isOrdinaryObject(value));
+      });
+
+      it('can classify a specialized object tagged as Object', () =>
+      {
+         const value = new Date();
+
+         Object.defineProperty(value, Symbol.toStringTag, { configurable: true, value: 'Object' });
+
+         assert.equal(Object.prototype.toString.call(value), '[object Object]');
+         assert.isTrue(ObjectUtil.isOrdinaryObject(value));
+      });
+
+      it('invokes a Symbol.toStringTag getter', () =>
+      {
+         let accessed = false;
+
+         const value = Object.defineProperty({}, Symbol.toStringTag, {
+            configurable: true,
+            get()
+            {
+               accessed = true;
+               return 'Object';
+            }
+         });
+
+         assert.isTrue(ObjectUtil.isOrdinaryObject(value));
+         assert.isTrue(accessed);
+      });
+
+      it('propagates Symbol.toStringTag access errors', () =>
+      {
+         const value = Object.defineProperty({}, Symbol.toStringTag, {
+            configurable: true,
+            get() { throw new Error('Unable to read Symbol.toStringTag.'); }
+         });
+
+         assert.throws(() => ObjectUtil.isOrdinaryObject(value), Error, 'Unable to read Symbol.toStringTag.');
+      });
+
+      it('propagates errors from revoked proxies', () =>
+      {
+         const revocable = Proxy.revocable({}, {});
+
+         revocable.revoke();
+
+         assert.throws(() => ObjectUtil.isOrdinaryObject(revocable.proxy), TypeError);
+      });
+
+      it('preserves a known object type', () =>
+      {
+         const value: NoOpObj = { a: 123 };
+
+         if (ObjectUtil.isOrdinaryObject(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<NoOpObj>();
+         }
+      });
+
+      it('narrows unknown values to a PropertyKey record', () =>
+      {
+         const value: unknown = { a: 123 };
+
+         if (ObjectUtil.isOrdinaryObject(value))
+         {
+            expectTypeOf(value).toEqualTypeOf<Record<PropertyKey, unknown>>();
+
+            assert.equal(value.a, 123);
+         }
+      });
    });
 
    it('isPlainObject', () =>
