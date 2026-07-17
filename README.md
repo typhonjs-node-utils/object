@@ -272,6 +272,8 @@ The weak collection exposes exact path operations, root membership and deletion,
 
 | Function | Purpose |
 | --- | --- |
+| `isNonNullObject` | Tests for a non-null object, including arrays, while preserving known object types where possible. |
+| `assertNonNullObject` | Asserts a non-null object, including arrays, while preserving the value's existing static type. |
 | `isObject` | Tests for a non-null, non-array object while preserving known object types. |
 | `assertObject` | Asserts the same runtime category while preserving the existing static type. |
 | `isObjectOrFunction` | Tests for any non-null object or function, including arrays and constructors. |
@@ -292,6 +294,7 @@ The weak collection exposes exact path operations, root membership and deletion,
 | `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
 | `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
 | `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
+| `NonNullObject<T>` | Extracts the non-null, non-callable object members of a type, including arrays and specialized built-in objects. |
 
 ### Property keys and paths
 
