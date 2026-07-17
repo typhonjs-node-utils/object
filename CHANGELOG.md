@@ -1,14 +1,67 @@
 # Changelog
+## 0.7.0 release (major)
+
+### Added
+
+* Added configurable resource limits for `PropertyPathMap` and `WeakPropertyPathMap`, including maximum stored path
+depth, entry count, trie node count, traversal result count, and traversal visit count.
+* Added `maxDepth`, `maxResults`, and `maxVisits` bounds to property-path traversal iterators.
+* Added `nodeCount` inspection for tracking allocated `PropertyPathMap` trie nodes.
+* Added `isOrdinaryObject` and `assertOrdinaryObject` for identifying tag-based ordinary objects, including plain
+objects, custom-prototype objects, and ordinary class instances while excluding arrays and specialized built-ins.
+* Added `isObjectOrFunction` and `assertIsObjectOrFunction` for validating any non-null JavaScript reference value,
+including arrays, functions, and class constructors.
+* Expanded record-oriented type guards and assertions to support `Record<PropertyKey, unknown>`, including symbol-keyed
+access.
+
+### Changed
+
+* Consolidated property-path validation, normalization, structural comparison, traversal bounds, traversal budgets,
+limit validation, and object/function traversability into shared canonical utilities.
+* Updated internal consumers to use publicly exported predicates and property-path utilities when their semantics are
+identical, reducing duplicate implementations.
+* Refactored `PropertyPathMap` insertion to preflight path, entry, and node limits before mutating trie state.
+* Updated `WeakPropertyPathMap` to apply the configured resource limits independently to each weak root and to create
+per-root tries only after successful validation.
+* Standardized strict non-negative safe-integer validation for depth, result, visit, entry, and node limits.
+* Preserved canonical frozen property paths for stored entries and deterministic traversal order.
+* Clarified the distinction between broad objects, object-or-function reference values, ordinary objects, plain objects,
+and indexable records.
+* Documented the observable effects of getters, Proxies, revoked Proxies, and `Symbol.toStringTag` during object
+classification and property traversal.
+
+### Fixed
+
+* Prevented failed `PropertyPathMap` insertions from leaving partially allocated trie branches or modified collection
+state.
+* Ensured trie node accounting remains accurate after insertion, deletion, descendant removal, and branch cleanup.
+* Ensured deleting the final path beneath a `WeakPropertyPathMap` root removes the now-empty root association.
+* Ensured traversal options are validated consistently even when a collection or weak root contains no matching entries.
+* Prevented traversal result limits from affecting equality correctness; equality traversal remains bounded by visit
+limits without silently accepting truncated comparisons.
+* Ensured terminal getters are not read unless their property value is requested and are read at most once when needed.
+
+### Security
+
+* Added bounded traversal and storage controls to reduce denial-of-service risk from excessively deep paths, broad
+tries, or unbounded result generation.
+* Preserved prototype-pollution key rejection and well-known symbol mutation guards across normalized structural paths.
+* Added atomic mutation preflight so validation and resource-limit failures cannot leave partially modified collection
+state.
+* Hardened constructor and iterator option validation against fractional, negative, non-finite, and unsafe integer
+values.
+
 ## 0.6.0 release (major)
 
-This release expands and hardens the object utility package, with a focus on property-path access, traversal, deep merging, symbols, and circular-reference safety.
+This release expands and hardens the object utility package, with a focus on property-path access, traversal, deep
+merging, symbols, and circular-reference safety.
 
 ### Property-path support
 
 Property-path APIs now accept dotted strings or exact `PropertyKey` arrays:
 
 ```ts
-type SafeAccessor = string | readonly PropertyKey[];
+type PropertyPath = string | readonly PropertyKey[];
 ```
 
 Exact arrays support:
@@ -72,7 +125,7 @@ Existing operations remain available:
 
 ### Symbol-aware traversal
 
-`safeKeyIterator` now yields readonly `PropertyKey` arrays instead of dotted strings.
+`pathKeyIterator` now yields readonly `PropertyKey` arrays instead of dotted strings.
 
 Traversal supports:
 
@@ -88,7 +141,7 @@ Array index ordering remains compatible with the previous implementation.
 Circular object paths are now detected by:
 
 * `deepMerge`
-* `safeKeyIterator`
+* `pathKeyIterator`
 * `safeEqual`
 
 Detection is path-local, allowing shared references while rejecting true ancestor cycles.
