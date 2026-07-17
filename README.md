@@ -270,60 +270,60 @@ The weak collection exposes exact path operations, root membership and deletion,
 
 ### Object validation
 
-| Function | Purpose |
-| --- | --- |
-| `isNonNullObject` | Tests for a non-null object, including arrays, while preserving known object types where possible. |
-| `assertNonNullObject` | Asserts a non-null object, including arrays, while preserving the value's existing static type. |
-| `isObject` | Tests for a non-null, non-array object while preserving known object types. |
-| `assertObject` | Asserts the same runtime category while preserving the existing static type. |
-| `isObjectOrFunction` | Tests for any non-null object or function, including arrays and constructors. |
-| `assertObjectOrFunction` | Asserts an object-or-function reference while filtering primitive union members. |
+| Function | Purpose                                                                                                                    |
+| --- |----------------------------------------------------------------------------------------------------------------------------|
+| `assertNonNullObject` | Asserts a non-null object, including arrays, while preserving the value's existing static type.                            |
+| `assertObject` | Asserts a non-null object, _excluding_ arrays, while preserving the value's existing static type.                          |
+| `assertObjectOrFunction` | Asserts an object-or-function reference while filtering primitive union members.                                           |
+| `assertOrdinaryObject` | Asserts an ordinary object while preserving the existing static type.                                                      |
+| `assertPlainObject` | Asserts a plain object while preserving the existing static type.                                                          |
+| `assertRecord` | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing.                                              |
+| `isNonNullObject` | Tests for a non-null object, including arrays, while preserving known object types where possible.                         |
+| `isObject` | Tests for a non-null, non-array object while preserving known object types.                                                |
+| `isObjectOrFunction` | Tests for any non-null object or function, including arrays and constructors.                                              |
 | `isOrdinaryObject` | Tests for the library's tag-based ordinary-object category, including class instances but excluding specialized built-ins. |
-| `assertOrdinaryObject` | Asserts an ordinary object while preserving the existing static type. |
-| `isPlainObject` | Tests for an object whose prototype is `Object.prototype` or `null`. |
-| `assertPlainObject` | Asserts a plain object while preserving the existing static type. |
-| `isRecord` | Narrows a non-null, non-array object to `Record<string, unknown>`. |
-| `assertRecord` | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing. |
+| `isPlainObject` | Tests for an object whose prototype is `Object.prototype` or `null`.                                                       |
+| `isRecord` | Narrows a non-null, non-array object to `Record<string, unknown>`.                                                         |
 
 ### Collections and public types
 
 | Export | Purpose |
 | --- | --- |
-| `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
-| `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
-| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
-| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
-| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
 | `NonNullObject<T>` | Extracts the non-null, non-callable object members of a type, including arrays and specialized built-in objects. |
+| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
+| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
+| `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
+| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
+| `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
 
 ### Property keys and paths
 
 | Function | Purpose |
 | --- | --- |
-| `isPropertyKey` | Tests for a string, number, or symbol property key. |
-| `isArrayIndex` | Tests for a numeric ECMAScript array index. |
-| `isPropertyPath` | Validates a non-empty dotted string or exact property-key array. |
-| `normalizePropertyPath` | Converts a path to its canonical readonly property-key array form. |
 | `concatPropertyPath` | Normalizes and concatenates one or more paths. |
-| `joinPropertyPath` | Converts an exact path to dotted form when lossless. |
+| `isArrayIndex` | Tests for a numeric ECMAScript array index. |
+| `isPropertyKey` | Tests for a string, number, or symbol property key. |
+| `isPropertyPath` | Validates a non-empty dotted string or exact property-key array. |
 | `isPropertyPathPrefix` | Tests whether one normalized path equals or structurally prefixes another. |
+| `joinPropertyPath` | Converts an exact path to dotted form when lossless. |
+| `normalizePropertyPath` | Converts a path to its canonical readonly property-key array form. |
 
 ### Property access and inspection
 
 | Function | Purpose |
 | --- | --- |
-| `safeAccess` | Resolves a strongly inferred path and applies an optional nullish fallback. |
 | `getProperty` | Resolves a strongly inferred path while preserving present `undefined` and `null`. |
-| `hasProperty` | Tests complete path existence without reading the terminal value. |
 | `getPropertyDescriptor` | Returns the terminal property descriptor without invoking a terminal getter. |
 | `getPropertyOwner` | Returns the object or prototype that owns the terminal property. |
+| `hasProperty` | Tests complete path existence without reading the terminal value. |
+| `safeAccess` | Resolves a strongly inferred path and applies an optional nullish fallback. |
 
 ### Property mutation
 
 | Function | Purpose |
 | --- | --- |
-| `safeSet` | Performs hardened path assignment, conditional assignment, or arithmetic update. |
 | `deleteProperty` | Deletes a configurable path with hardened keys and explicit prototype handling. |
+| `safeSet` | Performs hardened path assignment, conditional assignment, or arithmetic update. |
 
 ### Object traversal and comparison
 
@@ -336,8 +336,8 @@ The weak collection exposes exact path operations, root membership and deletion,
 
 | Function | Purpose |
 | --- | --- |
-| `deepMerge` | Merges source objects into a target with inferred accumulated output typing. |
 | `deepFreeze` | Iteratively freezes a traversed object graph. |
+| `deepMerge` | Merges source objects into a target with inferred accumulated output typing. |
 | `deepSeal` | Iteratively seals a traversed object graph. |
 | `klona` | Deep-clones a value through the re-exported `klona/full` implementation. |
 
@@ -347,17 +347,17 @@ The weak collection exposes exact path operations, root membership and deletion,
 | --- | --- |
 | `hasAccessor` | Tests for both getter and setter descriptors through the prototype chain. |
 | `hasGetter` | Tests for a getter descriptor through the prototype chain. |
-| `hasSetter` | Tests for a setter descriptor through the prototype chain. |
 | `hasPrototype` | Tests whether a constructor matches or inherits from another constructor. |
+| `hasSetter` | Tests for a setter descriptor through the prototype chain. |
 
 ### Iterable utilities
 
 | Function | Purpose |
 | --- | --- |
-| `isIterable` | Tests for synchronous iteration while intentionally excluding primitive strings. |
-| `isAsyncIterable` | Tests for asynchronous iteration. |
-| `ensureNonEmptyIterable` | Peeks and returns a replaying iterable only when at least one value exists. |
 | `ensureNonEmptyAsyncIterable` | Provides the equivalent behavior for async or synchronous iterable input. |
+| `ensureNonEmptyIterable` | Peeks and returns a replaying iterable only when at least one value exists. |
+| `isAsyncIterable` | Tests for asynchronous iteration. |
+| `isIterable` | Tests for synchronous iteration while intentionally excluding primitive strings. |
 
 ### General object utilities
 
