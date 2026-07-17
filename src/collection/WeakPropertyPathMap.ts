@@ -34,7 +34,7 @@ import type { PropertyPath }                 from '../types';
  * ## Root and path semantics
  *
  * - Root keys must be non-null objects or functions.
- * - Accessor paths use all structural and symbol semantics provided by {@link PropertyPathMap}.
+ * - Property paths use all structural and symbol semantics provided by {@link PropertyPathMap}.
  * - Different roots may store identical paths without conflict.
  * - `undefined` is a valid stored value; use {@link has} to distinguish it from an absent path.
  * - Deleting the final path for a root also removes that root from the internal `WeakMap` immediately.
@@ -114,30 +114,30 @@ export class WeakPropertyPathMap<R extends object, V>
    }
 
    /**
-    * Deletes one exact accessor path beneath a root.
+    * Deletes one exact property path beneath a root.
     *
     * If the removed path was the final entry beneath the root, the now-empty per-root trie is removed from the
     * internal `WeakMap`. Missing roots and missing exact paths return `false`.
     *
     * @param root - Weak root object or function.
     *
-    * @param accessor - Dotted or exact property-key accessor.
+    * @param path - Dotted or exact property-key path.
     *
     * @returns `true` when an exact path existed and was removed; otherwise `false`.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {TypeError} If `path` is not a valid {@link PropertyPath}.
     * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
-   delete(root: R, accessor: PropertyPath): boolean
+   delete(root: R, path: PropertyPath): boolean
    {
       WeakPropertyPathMap.#assertWeakPropertyPathMapRoot(root);
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0) { return this.#emptyPropertyPathMap.delete(accessor); }
+      if (map === void 0) { return this.#emptyPropertyPathMap.delete(path); }
 
-      if (!map.delete(accessor)) { return false; }
+      if (!map.delete(path)) { return false; }
 
       // Avoid retaining an empty trie while the root remains alive elsewhere.
       if (map.size === 0) { this.#roots.delete(root); }
@@ -168,23 +168,23 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @param root - Weak root object or function.
     *
-    * @param accessor - Dotted or exact property-key accessor.
+    * @param path - Dotted or exact property-key path.
     *
     * @returns Stored value or `undefined` when the root or exact path is absent.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {TypeError} If `path` is not a valid {@link PropertyPath}.
     * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
-   get(root: R, accessor: PropertyPath): V | undefined
+   get(root: R, path: PropertyPath): V | undefined
    {
       WeakPropertyPathMap.#assertWeakPropertyPathMapRoot(root);
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0) { return this.#emptyPropertyPathMap.get(accessor); }
+      if (map === void 0) { return this.#emptyPropertyPathMap.get(path); }
 
-      return map.get(accessor);
+      return map.get(path);
    }
 
    /**
@@ -192,23 +192,23 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @param root - Weak root object or function.
     *
-    * @param accessor - Dotted or exact property-key accessor.
+    * @param path - Dotted or exact property-key path.
     *
     * @returns Whether the root exists and the exact path stores a value.
     *
     * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
+    * @throws {TypeError} If `path` is not a valid {@link PropertyPath}.
     * @throws {RangeError} If the path exceeds the configured per-root `maxPathDepth`.
     */
-   has(root: R, accessor: PropertyPath): boolean
+   has(root: R, path: PropertyPath): boolean
    {
       WeakPropertyPathMap.#assertWeakPropertyPathMapRoot(root);
 
       const map: PropertyPathMap<V> | undefined = this.#roots.get(root);
 
-      if (map === void 0) { return this.#emptyPropertyPathMap.has(accessor); }
+      if (map === void 0) { return this.#emptyPropertyPathMap.has(path); }
 
-      return map.has(accessor);
+      return map.has(path);
    }
 
    /**
@@ -283,7 +283,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @param options - Path-only matching options.
     *
-    * @returns Iterator of canonical matching accessor paths.
+    * @returns Iterator of canonical matching property paths.
     *
     * @throws {TypeError} If `root`, a boolean, numeric limit, or path option is invalid.
     * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
@@ -339,6 +339,47 @@ export class WeakPropertyPathMap<R extends object, V>
    }
 
    /**
+    * Stores a value at an exact structural path beneath a weak root.
+    *
+    * The per-root trie is created lazily on the first successful insertion. Invalid paths therefore cannot leave
+    * an empty root association behind. Existing roots reuse their current trie and retain all normal
+    * {@link PropertyPathMap.set} overwrite and insertion-order semantics.
+    *
+    * @param root - Weak root object or function.
+    *
+    * @param path - Dotted or exact property-key path.
+    *
+    * @param value - Value to store. `undefined` is valid.
+    *
+    * @returns This weak map.
+    *
+    * @throws {TypeError} If `root` is not a non-null object or function.
+    * @throws {TypeError} If `path` is not a valid {@link PropertyPath}.
+    * @throws {RangeError} If the per-root path depth, entry count, or trie node count limit would be exceeded.
+    */
+   set(root: R, path: PropertyPath, value: V): this
+   {
+      WeakPropertyPathMap.#assertWeakPropertyPathMapRoot(root);
+
+      let map: PropertyPathMap<V> | undefined = this.#roots.get(root);
+
+      if (map === void 0)
+      {
+         // Configure and populate the trie before retaining the root so failed validation or resource limits cannot
+         // leave an empty weak-root association behind.
+         map = new PropertyPathMap<V>(null, this.#options);
+         map.set(path, value);
+         this.#roots.set(root, map);
+      }
+      else
+      {
+         map.set(path, value);
+      }
+
+      return this;
+   }
+
+   /**
     * Returns a bounded subtree entry iterator for one weak root.
     *
     * Candidate-independent subtree behavior, absolute `pathPrefix` selection, descendant pruning through `stopAt`,
@@ -376,7 +417,7 @@ export class WeakPropertyPathMap<R extends object, V>
     *
     * @param options - Subtree bounds.
     *
-    * @returns Iterator of canonical stored accessor paths.
+    * @returns Iterator of canonical stored property paths.
     *
     * @throws {TypeError} If `root`, a numeric limit, or path option is invalid.
     * @throws {RangeError} If path bounds exceed configured limits or `options.maxVisits` is exceeded.
@@ -415,47 +456,6 @@ export class WeakPropertyPathMap<R extends object, V>
 
       return map === void 0 ? this.#emptyPropertyPathMap.subtreeValues(options) :
        map.subtreeValues(options);
-   }
-
-   /**
-    * Stores a value at an exact structural path beneath a weak root.
-    *
-    * The per-root trie is created lazily on the first successful insertion. Invalid accessors therefore cannot leave
-    * an empty root association behind. Existing roots reuse their current trie and retain all normal
-    * {@link PropertyPathMap.set} overwrite and insertion-order semantics.
-    *
-    * @param root - Weak root object or function.
-    *
-    * @param accessor - Dotted or exact property-key accessor.
-    *
-    * @param value - Value to store. `undefined` is valid.
-    *
-    * @returns This weak map.
-    *
-    * @throws {TypeError} If `root` is not a non-null object or function.
-    * @throws {TypeError} If `accessor` is not a valid {@link PropertyPath}.
-    * @throws {RangeError} If the per-root path depth, entry count, or trie node count limit would be exceeded.
-    */
-   set(root: R, accessor: PropertyPath, value: V): this
-   {
-      WeakPropertyPathMap.#assertWeakPropertyPathMapRoot(root);
-
-      let map: PropertyPathMap<V> | undefined = this.#roots.get(root);
-
-      if (map === void 0)
-      {
-         // Configure and populate the trie before retaining the root so failed validation or resource limits cannot
-         // leave an empty weak-root association behind.
-         map = new PropertyPathMap<V>(null, this.#options);
-         map.set(accessor, value);
-         this.#roots.set(root, map);
-      }
-      else
-      {
-         map.set(accessor, value);
-      }
-
-      return this;
    }
 
    // Internal Utility Functions -------------------------------------------------------------------------------------
