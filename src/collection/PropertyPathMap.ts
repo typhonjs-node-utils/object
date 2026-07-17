@@ -1,6 +1,7 @@
 import {
    isArrayIndex,
-   isObjectOrFunction }             from '../functions';
+   isObjectOrFunction,
+   normalizePropertyPath }                from '../functions';
 
 import {
    assertPropertyPathOptionsObject,
@@ -13,17 +14,16 @@ import {
    DEFAULT_PROPERTY_PATH_RESULT_LIMIT,
    DEFAULT_PROPERTY_PATH_VISIT_LIMIT,
    normalizePropertyPathLimit,
-   normalizePropertyPathTraversalBounds,
-   normalizePropertyPathValue }     from '../internal';
+   normalizePropertyPathTraversalBounds } from '../internal';
 
 import type {
    NormalizedPropertyPathTraversalBounds,
    PropertyPathTraversalBudget,
-   PropertyPathTraversableValue }   from '../internal';
+   PropertyPathTraversableValue }         from '../internal';
 
 import type {
    PropertyPath,
-   PropertyPathTraversalLimits }    from '../types';
+   PropertyPathTraversalLimits }          from '../types';
 
 /**
  * Stores values by structural {@link PropertyPath} paths using a property-key trie.
@@ -847,8 +847,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     */
    #normalizeStoredPath(path: PropertyPath): readonly PropertyKey[]
    {
-      const normPath: readonly PropertyKey[] = normalizePropertyPathValue(path,
-       `normalizePropertyPath error: 'path' is not a valid property path.`);
+      const normPath: readonly PropertyKey[] = normalizePropertyPath(path);
 
       if (normPath.length > this.#maxPathDepth)
       {

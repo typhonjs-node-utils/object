@@ -1,6 +1,7 @@
 import {
    assertObject,
-   isPropertyPath }           from '../functions';
+   isPropertyPath,
+   normalizePropertyPath }    from '../functions';
 
 import type { PropertyPath }  from '../types';
 
@@ -154,16 +155,6 @@ export function isNormalizedPropertyPathPrefix(prefix: readonly PropertyKey[],
 }
 
 /**
- * Normalizes a property path or throws the supplied error message.
- */
-export function normalizePropertyPathValue(path: PropertyPath, errorMessage: string): readonly PropertyKey[]
-{
-   if (!isPropertyPath(path)) { throw new TypeError(errorMessage); }
-
-   return typeof path === 'string' ? path.split('.') : path;
-}
-
-/**
  * Normalizes an optional non-negative safe-integer resource limit.
  *
  * @param value - Candidate limit.
@@ -218,9 +209,9 @@ export function normalizePropertyPathTraversalBounds(input: PropertyPathTraversa
     `${config.errorPrefix} error: 'options.maxVisits' is not a non-negative safe integer.`);
 
    const normPrefixPath: readonly PropertyKey[] | undefined = prefixPath === void 0 ? void 0 :
-    normalizePropertyPathValue(prefixPath, `${config.errorPrefix} error: '${prefixOption}' is not a valid property path.`);
+    normalizePropertyPath(prefixPath, `${config.errorPrefix} error: '${prefixOption}' is not a valid property path.`);
    const normStopPath: readonly PropertyKey[] | undefined = stopPath === void 0 ? void 0 :
-    normalizePropertyPathValue(stopPath, `${config.errorPrefix} error: '${stopOption}' is not a valid property path.`);
+    normalizePropertyPath(stopPath, `${config.errorPrefix} error: '${stopOption}' is not a valid property path.`);
 
    if (normPrefixPath !== void 0 && normStopPath !== void 0 &&
     !isNormalizedPropertyPathPrefix(normPrefixPath, normStopPath))

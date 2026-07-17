@@ -5,18 +5,17 @@ import {
    createPropertyPathTraversalBudget,
    isNormalizedPropertyPathEqual,
    isNormalizedPropertyPathPrefix,
-   normalizePropertyPathTraversalBounds,
-   normalizePropertyPathValue }     from './internal';
+   normalizePropertyPathTraversalBounds } from './internal';
 
 import type {
    NonNullObject,
    PathKeyIteratorOptions,
-   PropertyPath }                   from './types';
+   PropertyPath }                         from './types';
 
 import type {
    NormalizedPropertyPathTraversalBounds,
    PropertyPathTraversalBudget,
-   PropertyPathTraversableValue }   from './internal';
+   PropertyPathTraversableValue }         from './internal';
 
 /**
  * Asserts that a value is a non-null object, including arrays.
@@ -1394,13 +1393,18 @@ export function joinPropertyPath(path: PropertyPath): string
  *
  * @param path - Property path to normalize.
  *
+ * @param [errorMessage] - Optional custom error message.
+ *
  * @returns The path as a readonly property-key array.
  *
  * @throws {TypeError} If `path` is not a valid {@link PropertyPath}.
  */
-export function normalizePropertyPath(path: PropertyPath): readonly PropertyKey[]
+export function normalizePropertyPath(path: PropertyPath,
+ errorMessage: string = `normalizePropertyPath error: 'path' is not a valid property path.`): readonly PropertyKey[]
 {
-   return normalizePropertyPathValue(path, `normalizePropertyPath error: 'path' is not a valid property path.`);
+   if (!isPropertyPath(path)) { throw new TypeError(errorMessage); }
+
+   return typeof path === 'string' ? path.split('.') : path;
 }
 
 /**
