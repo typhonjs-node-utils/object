@@ -283,6 +283,16 @@ The weak collection exposes exact path operations, root membership and deletion,
 | `isRecord` | Narrows a non-null, non-array object to `Record<string, unknown>`. |
 | `assertRecord` | Preserves the existing type and adds `Record<PropertyKey, unknown>` indexing. |
 
+### Collections and public types
+
+| Export | Purpose |
+| --- | --- |
+| `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
+| `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
+| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
+| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
+| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
+
 ### Property keys and paths
 
 | Function | Purpose |
@@ -352,16 +362,6 @@ The weak collection exposes exact path operations, root membership and deletion,
 | --- | --- |
 | `objectKeys` | Returns typed enumerable own string keys with safe fallback behavior. |
 | `objectSize` | Determines the supported size of objects, arrays, maps, sets, and strings. |
-
-### Collections and public types
-
-| Export | Purpose |
-| --- | --- |
-| `PropertyPathMap<V>` | Trie-backed structural property-path map with matching, subtree traversal, and defensive limits. |
-| `WeakPropertyPathMap<R, V>` | Weak-root association of independently limited structural property-path maps. |
-| `PropertyPath` | Dotted string or exact readonly `PropertyKey` array. |
-| `PropertyPathTraversalLimits` | Shared `maxDepth`, `maxResults`, and `maxVisits` controls. |
-| `PathKeyIteratorOptions` | Object traversal options including ownership and absolute path bounds. |
 
 ## Scope and semantics
 
