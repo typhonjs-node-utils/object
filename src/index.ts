@@ -84,17 +84,39 @@
  * > [!NOTE]
  * > Validates runtime object shapes through assertions and type guards while preserving or refining TypeScript types.
  * >
+ * > **_`assertNonNullObject`_** — Asserts a non-null object, including arrays, while preserving the value’s existing
+ * > static type.
+ * >
  * > **_`assertObject`_** — Asserts a non-null, non-array object while preserving the value's existing static type.
+ * >
+ * > **_`assertObjectOrFunction`_** — Asserts a non-null, non-array object or function while preserving the value's
+ * > existing static type.
+ * >
+ * > **_`assertOrdinaryObject`_** — Asserts a non-null, non-callable object for which
+ * > `Object.prototype.toString.call(value)` returns `'[object Object]'` while preserving the value's existing static
+ * > type.
  * >
  * > **_`assertPlainObject`_** — Asserts an object whose prototype is `Object.prototype` or `null`.
  * >
  * > **_`assertRecord`_** — Asserts a non-null, non-array object that can be treated as a string-keyed record.
  * >
+ * > **_`isNonNullObject`_** — Tests for a non-null object, including arrays, while preserving known object types where
+ * > possible.
+ * >
  * > **_`isObject`_** — Tests for a non-null, non-array object while preserving known object types where possible.
+ * >
+ * > **_`isObjectOrFunction`_** — Tests for a non-null, non-array object or function while preserving known object
+ * > types where possible.
+ * >
+ * > **_`isOrdinaryObject`_** — Tests for a non-null, non-callable object for which
+ * > `Object.prototype.toString.call(value)` returns `'[object Object]'`.
  * >
  * > **_`isPlainObject`_** — Tests for a plain dictionary-style object with no custom prototype.
  * >
  * > **_`isRecord`_** — Tests for a non-null, non-array object and narrows it to `Record<string, unknown>`.
+ * >
+ * > **_`NonNullObject`_** — Extracts the non-null, non-callable object members of a type, including arrays and
+ * > specialized built-in objects.
  *
  * @categoryDescription Property Access and Inspection
  * > [!NOTE]

@@ -1,4 +1,8 @@
 import {
+   isArrayIndex,
+   isObjectOrFunction }             from '../functions';
+
+import {
    assertPropertyPathOptionsObject,
    consumePropertyPathTraversalResult,
    consumePropertyPathTraversalVisit,
@@ -8,23 +12,26 @@ import {
    DEFAULT_PROPERTY_PATH_NODE_LIMIT,
    DEFAULT_PROPERTY_PATH_RESULT_LIMIT,
    DEFAULT_PROPERTY_PATH_VISIT_LIMIT,
-   isArrayIndexValue,
-   isPropertyPathTraversableValue,
    normalizePropertyPathLimit,
    normalizePropertyPathTraversalBounds,
-   normalizePropertyPathValue }                     from '../internal/PropertyPathTraversal';
+   normalizePropertyPathValue }     from '../internal';
 
 import type {
    NormalizedPropertyPathTraversalBounds,
    PropertyPathTraversalBudget,
-   PropertyPathTraversableValue }                     from '../internal/PropertyPathTraversal';
+   PropertyPathTraversableValue }   from '../internal';
 
 import type {
    PropertyPath,
-   PropertyPathTraversalLimits }                     from '../types';
+   PropertyPathTraversalLimits }    from '../types';
 
 /**
  * Stores values by structural {@link PropertyPath} paths using a property-key trie.
+ *
+ * `PropertyPathMap` combines exact structural path storage with trie-aware object matching and bounded subtree
+ * traversal. In addition to normal map-style lookup, stored paths can be evaluated collectively against a candidate
+ * object, allowing the map to operate as a reusable index of properties, bindings, field definitions, validators, or
+ * other metadata associated with an object structure.
  *
  * Unlike `Map<readonly PropertyKey[], V>`, lookup does not depend on accessor-array identity. Equivalent paths resolve
  * to the same entry even when a new accessor array is supplied:
@@ -48,6 +55,151 @@ import type {
  * Exact array accessors remain necessary for symbols, numeric keys, empty-string keys, and string keys containing
  * literal periods.
  *
+ * ## Iterator families
+ *
+ * The collection provides three complementary iterator families:
+ *
+ * - `entries`, `keys`, and `values` iterate all stored entries in normal map insertion order.
+ * - `matchingEntries`, `matchingKeys`, and `matchingValues` evaluate stored paths against a candidate object.
+ * - `subtreeEntries`, `subtreeKeys`, and `subtreeValues` traverse a selected trie branch without inspecting an object.
+ *
+ * Every iterator supports bounded operation through depth, result, and visit limits. Matching and subtree iterators
+ * additionally support absolute `pathPrefix` and `stopAt` bounds.
+ *
+ * ## Candidate-object matching
+ *
+ * The matching iterators treat the stored trie as a reusable structural query over a candidate object:
+ *
+ * @example
+ * ```ts
+ * const fields = new PropertyPathMap<string>();
+ *
+ * fields.set('system.attributes.hp.value', 'hit-points');
+ * fields.set('system.attributes.hp.max', 'maximum-hit-points');
+ * fields.set('system.attributes.ac.value', 'armor-class');
+ *
+ * const actor = {
+ *    system: {
+ *       attributes: {
+ *          hp: {
+ *             value: 12
+ *          }
+ *       }
+ *    }
+ * };
+ *
+ * [...fields.matchingEntries(actor)];
+ * // [
+ * //    [['system', 'attributes', 'hp', 'value'], 'hit-points']
+ * // ]
+ * ```
+ *
+ * Matching traverses the property-key trie and candidate object together. Shared path prefixes are inspected only
+ * once for each matching operation. When a candidate prefix is missing or cannot be traversed, the complete stored
+ * subtree beneath that prefix is rejected without resolving each descendant path independently. This makes matching
+ * particularly useful when the map contains many paths with common prefixes.
+ *
+ * `matchingKeys` yields only the available stored paths, while `matchingValues` yields only their mapped values.
+ * `matchingEntries` yields both:
+ *
+ * ```ts
+ * for (const path of fields.matchingKeys(actor))
+ * {
+ *    // path: readonly PropertyKey[]
+ * }
+ *
+ * for (const field of fields.matchingValues(actor))
+ * {
+ *    // field: string
+ * }
+ *
+ * for (const [path, field] of fields.matchingEntries(actor))
+ * {
+ *    // path: readonly PropertyKey[]
+ *    // field: string
+ * }
+ * ```
+ *
+ * By default, matching determines terminal property availability without reading the terminal value. This avoids
+ * invoking a terminal getter or proxy `get` trap merely to establish that a path exists.
+ *
+ * Set `includePropertyValue` to include the resolved candidate value in the iterator result:
+ *
+ * @example
+ * ```ts
+ * for (const [path, field, propertyValue] of fields.matchingEntries(actor, {
+ *    includePropertyValue: true
+ * }))
+ * {
+ *    // path: readonly PropertyKey[]
+ *    // field: string
+ *    // propertyValue: unknown
+ * }
+ *
+ * for (const [field, propertyValue] of fields.matchingValues(actor, {
+ *    includePropertyValue: true
+ * }))
+ * {
+ *    // field: string
+ *    // propertyValue: unknown
+ * }
+ * ```
+ *
+ * The overloads for `matchingEntries` and `matchingValues` reflect a literal `includePropertyValue: true` option in
+ * the returned iterator type.
+ *
+ * Matching follows normal JavaScript property lookup by default. Set `hasOwnOnly` to require every matched segment to
+ * be an own property of the candidate value reached at that depth.
+ *
+ * ## Prefix and stop bounds
+ *
+ * `pathPrefix` begins matching or subtree traversal directly at one absolute stored trie path. Unrelated branches are
+ * never visited:
+ *
+ * @example
+ * ```ts
+ * fields.matchingEntries(actor, {
+ *    pathPrefix: 'system.attributes.hp'
+ * });
+ * ```
+ *
+ * Returned paths remain absolute. The prefix itself is included when it stores a mapped value and satisfies the
+ * iterator operation.
+ *
+ * `stopAt` includes a selected path when it stores a value, but prunes every stored descendant beneath it:
+ *
+ * @example
+ * ```ts
+ * fields.matchingEntries(actor, {
+ *    pathPrefix: 'system.attributes',
+ *    stopAt: 'system.attributes.hp'
+ * });
+ * ```
+ *
+ * When both options are supplied, `stopAt` must equal or descend from `pathPrefix`.
+ *
+ * `maxDepth` is measured relative to `pathPrefix`, or relative to the trie root when no prefix is supplied.
+ *
+ * ## Candidate-independent subtree traversal
+ *
+ * Subtree iterators traverse stored entries without accessing a candidate object:
+ *
+ * @example
+ * ```ts
+ * for (const [path, field] of fields.subtreeEntries({
+ *    pathPrefix: 'system.attributes.hp'
+ * }))
+ * {
+ *    // Every yielded entry belongs to the stored HP subtree.
+ * }
+ * ```
+ *
+ * These iterators are useful for inspecting, processing, or removing logical groups of stored paths without scanning
+ * unrelated branches. They share the same `pathPrefix`, `stopAt`, `maxDepth`, `maxResults`, and `maxVisits` controls
+ * as matching traversal.
+ *
+ * Matching and subtree iterators use deterministic depth-first trie order rather than global insertion order.
+ *
  * ## Key semantics
  *
  * Each path segment is stored in a native `Map<PropertyKey, ...>`:
@@ -56,6 +208,10 @@ import type {
  * - Numbers compare with `Map` / SameValueZero semantics.
  * - Symbols compare by identity.
  * - Numeric and string segments remain distinct (`0` is not `'0'`).
+ *
+ * Stored canonical paths are copied and frozen once when first inserted. Overwriting an existing entry retains its
+ * original insertion position and canonical path. Deleting and reinserting a path moves it to the end, matching normal
+ * `Map` insertion-order behavior.
  *
  * ## Defensive limits
  *
@@ -76,18 +232,13 @@ import type {
  *
  * `get`, `has`, and `set` are `O(path length)`. `delete` is also `O(path length)` and prunes unused trie nodes.
  * Normal map iteration is `O(entry count)` and follows insertion order through a linked list of terminal entries.
- * Trie-aware matching visits only reachable stored prefixes, so unavailable prefixes reject all descendants with one
- * candidate-property check. Matching entry and value iterators may optionally include the property value resolved from
- * the candidate object without performing a second path lookup. `pathPrefix` can begin traversal directly at a stored
- * subtree, while `stopAt` prunes one descendant branch by trie-node identity.
  *
- * Candidate-independent subtree iterators reuse the same absolute bounds and visit only terminal entries beneath the
- * selected trie node. `maxDepth` is relative to `pathPrefix`, or to the trie root when no prefix is supplied. Matching
- * and subtree iterators use deterministic depth-first trie order rather than global insertion order.
+ * Trie-aware matching visits only reachable stored prefixes. An unavailable candidate prefix rejects every stored
+ * descendant beneath it with one candidate-property check. Matching entry and value iterators may optionally include
+ * the resolved candidate property value without performing a second path lookup.
  *
- * Stored canonical paths are copied and frozen once when first inserted. Overwriting an existing entry retains its
- * original insertion position and canonical path. Deleting and reinserting a path moves it to the end, matching normal
- * `Map` insertion-order behavior.
+ * `pathPrefix` begins traversal directly at a selected stored trie node, while `stopAt` prunes one descendant branch
+ * by node identity. Candidate-independent subtree iterators visit only terminal entries beneath the selected node.
  *
  * Mutation of the map while an iterator is active is intentionally unspecified.
  *
@@ -137,13 +288,13 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
     *
     * @param options - Defensive storage and traversal limits.
     *
-    * @param options.maxEntries - Maximum number of exact stored paths; default: `65536`.
-    * @param options.maxNodes - Maximum number of allocated non-root trie nodes; default: `262144`.
-    * @param options.maxPathDepth - Maximum number of property-key segments in any stored path; default: `256`.
+    * @param options.maxEntries - Maximum number of exact stored paths; default: `16384`.
+    * @param options.maxNodes - Maximum number of allocated non-root trie nodes; default: `65536`.
+    * @param options.maxPathDepth - Maximum number of property-key segments in any stored path; default: `64`.
     * @param options.maxTraversalResults - Maximum results produced by one iterator unless reduced per call; default:
-    *        `65536`.
+    *        `16384`.
     * @param options.maxTraversalVisits - Maximum properties or trie nodes inspected by one iterator unless reduced per
-    *        call; default: `262144`.
+    *        call; default: `65536`.
     *
     * @throws {TypeError} If a constructor option is not a non-negative safe integer.
     * @throws {RangeError} If an initial entry exceeds a configured storage limit.
@@ -788,11 +939,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
        'PropertyPathMap traversal');
 
       // Resolve trie bounds before touching candidate data so a missing stored prefix rejects the operation cheaply.
-      if (budget.maxResults === 0 || startNode === void 0 ||
-       !isPropertyPathTraversableValue(data))
-      {
-         return;
-      }
+      if (budget.maxResults === 0 || startNode === void 0 || !isObjectOrFunction(data)) { return; }
 
       const startPathLength: number = bounds.prefixPath?.length ?? 0;
       let stack: PropertyPathMapMatchFrame<V>[];
@@ -810,7 +957,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
             const key: PropertyKey = bounds.prefixPath[index];
 
             // Arrays reject string indexes and non-index string properties consistently at every prefix depth.
-            if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndexValue(key)) { return; }
+            if (Array.isArray(candidate) && typeof key !== 'symbol' && !isArrayIndex(key)) { return; }
 
             const exists: boolean = hasOwnOnly ? Object.hasOwn(candidate, key) : key in candidate;
 
@@ -831,7 +978,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
 
             if (!isFinal)
             {
-               if (!isPropertyPathTraversableValue(propertyValue)) { return; }
+               if (!isObjectOrFunction(propertyValue)) { return; }
                candidate = propertyValue;
             }
          }
@@ -843,8 +990,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
          }
 
          if (budget.results >= budget.maxResults || startPathLength >= bounds.maxPathLength ||
-          startNode === stopNode || startNode.children === void 0 ||
-          !isPropertyPathTraversableValue(propertyValue))
+          startNode === stopNode || startNode.children === void 0 || !isObjectOrFunction(propertyValue))
          {
             return;
          }
@@ -879,7 +1025,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
          const childPathLength: number = frame.pathLength + 1;
 
          // Arrays deliberately reject string indexes and non-index string properties to match PropertyPath traversal.
-         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndexValue(key)) { continue; }
+         if (Array.isArray(frame.value) && typeof key !== 'symbol' && !isArrayIndex(key)) { continue; }
 
          const exists: boolean = hasOwnOnly ? Object.hasOwn(frame.value, key) : key in frame.value;
 
@@ -903,11 +1049,7 @@ class PropertyPathMap<V> implements Iterable<[readonly PropertyKey[], V]>
             yield { entry: child.entry, propertyValue };
          }
 
-         if (budget.results >= budget.maxResults || !canDescend ||
-          !isPropertyPathTraversableValue(propertyValue))
-         {
-            continue;
-         }
+         if (budget.results >= budget.maxResults || !canDescend || !isObjectOrFunction(propertyValue)) { continue; }
 
          stack.push({ value: propertyValue, iterator: child.children!.entries(), pathLength: childPathLength });
       }
@@ -1066,28 +1208,28 @@ declare namespace PropertyPathMap
          /**
           * Maximum number of exact stored paths. Overwriting an existing path does not consume another entry.
           *
-          * @default 65536
+          * @default 16384
           */
          maxEntries?: number;
 
          /**
           * Maximum number of allocated non-root trie nodes. Shared path prefixes consume one node per unique segment.
           *
-          * @default 262144
+          * @default 65536
           */
          maxNodes?: number;
 
          /**
           * Maximum number of property-key segments in a stored or queried path.
           *
-          * @default 256
+          * @default 64
           */
          maxPathDepth?: number;
 
          /**
           * Maximum results produced by one iterator unless reduced per call. Reaching the limit truncates normally.
           *
-          * @default 65536
+          * @default 16384
           */
          maxTraversalResults?: number;
 
@@ -1095,7 +1237,7 @@ declare namespace PropertyPathMap
           * Maximum properties or trie nodes processed during iterator traversal unless reduced per call. Exceeding the limit
           * throws a `RangeError`.
           *
-          * @default 262144
+          * @default 65536
           */
          maxTraversalVisits?: number;
       }

@@ -1,6 +1,18 @@
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
+ * Extracts the non-null, non-callable object members of `T`.
+ *
+ * This includes arrays, ordinary objects, class instances, boxed primitives, and specialized built-in objects.
+ * Primitive, nullish, callable, and constructable members are excluded.
+ *
+ * @category Object Validation
+ *
+ * @typeParam T - Type whose non-null object members are extracted.
+ */
+export type NonNullObject<T> = Exclude<T & object, ((...args: any[]) => any) | (abstract new (...args: any[]) => any)>;
+
+/**
  * Represents a structural path to a property within an object.
  *
  * A property path may be expressed as either a dotted string or a readonly array of exact {@link PropertyKey}

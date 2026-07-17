@@ -1,4 +1,8 @@
-import type { PropertyPath } from '../types';
+import {
+   assertObject,
+   isPropertyPath }           from '../functions';
+
+import type { PropertyPath }  from '../types';
 
 /**
  * Object or function that can provide a direct JavaScript property-path segment.
@@ -6,19 +10,19 @@ import type { PropertyPath } from '../types';
 export type PropertyPathTraversableValue = object | ((...args: any[]) => any);
 
 /** Default maximum number of property-key segments accepted by trie-backed collections. */
-export const DEFAULT_PROPERTY_PATH_DEPTH_LIMIT = 256;
+export const DEFAULT_PROPERTY_PATH_DEPTH_LIMIT = 64;
 
 /** Default maximum number of entries retained by one {@link PropertyPathMap}. */
-export const DEFAULT_PROPERTY_PATH_ENTRY_LIMIT = 65_536;
+export const DEFAULT_PROPERTY_PATH_ENTRY_LIMIT = 16_384;
 
 /** Default maximum number of non-root trie nodes retained by one {@link PropertyPathMap}. */
-export const DEFAULT_PROPERTY_PATH_NODE_LIMIT = 262_144;
+export const DEFAULT_PROPERTY_PATH_NODE_LIMIT = 65_536;
 
 /** Default maximum number of results produced by one bounded traversal. */
-export const DEFAULT_PROPERTY_PATH_RESULT_LIMIT = 65_536;
+export const DEFAULT_PROPERTY_PATH_RESULT_LIMIT = 16_384;
 
 /** Default maximum number of properties or trie nodes inspected by one bounded traversal. */
-export const DEFAULT_PROPERTY_PATH_VISIT_LIMIT = 262_144;
+export const DEFAULT_PROPERTY_PATH_VISIT_LIMIT = 65_536;
 
 /**
  * Raw common traversal bounds accepted by the shared normalization helper.
@@ -71,16 +75,12 @@ export interface PropertyPathTraversalBudget
    visits: number;
 }
 
-
 /**
  * Validates a runtime options object before property access or destructuring.
  */
 export function assertPropertyPathOptionsObject(value: unknown, errorPrefix: string): asserts value is object
 {
-   if (typeof value !== 'object' || value === null || Array.isArray(value))
-   {
-      throw new TypeError(`${errorPrefix} error: 'options' is not an object.`);
-   }
+   return assertObject(value, `${errorPrefix} error: 'options' is not an object.`);
 }
 
 /**
@@ -122,25 +122,6 @@ export function createPropertyPathTraversalBudget(bounds: NormalizedPropertyPath
 }
 
 /**
- * Returns whether a value can participate as a JavaScript property-path target.
- *
- * Functions are included because they may own or inherit properties even though `typeof` reports `"function"`.
- * Primitive boxing is intentionally not performed.
- */
-export function isPropertyPathTraversableValue(value: unknown): value is PropertyPathTraversableValue
-{
-   return value !== null && (typeof value === 'object' || typeof value === 'function');
-}
-
-/**
- * Returns whether a value is a valid ECMAScript array index.
- */
-export function isArrayIndexValue(value: unknown): value is number
-{
-   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
-}
-
-/**
  * Determines whether two normalized property-key paths are structurally equal with SameValueZero segment semantics.
  */
 export function isNormalizedPropertyPathEqual(pathA: readonly PropertyKey[],
@@ -173,37 +154,11 @@ export function isNormalizedPropertyPathPrefix(prefix: readonly PropertyKey[],
 }
 
 /**
- * Determines whether a value is a JavaScript property key.
- */
-export function isPropertyKeyValue(value: unknown): value is PropertyKey
-{
-   const valueType: string = typeof value;
-   return valueType === 'string' || valueType === 'number' || valueType === 'symbol';
-}
-
-/**
- * Determines whether a value is a valid property path representation.
- */
-export function isPropertyPathValue(value: unknown): value is PropertyPath
-{
-   if (typeof value === 'string') { return value.length > 0; }
-
-   if (!Array.isArray(value) || value.length === 0) { return false; }
-
-   for (let index: number = 0; index < value.length; index++)
-   {
-      if (!isPropertyKeyValue(value[index])) { return false; }
-   }
-
-   return true;
-}
-
-/**
  * Normalizes a property path or throws the supplied error message.
  */
 export function normalizePropertyPathValue(path: PropertyPath, errorMessage: string): readonly PropertyKey[]
 {
-   if (!isPropertyPathValue(path)) { throw new TypeError(errorMessage); }
+   if (!isPropertyPath(path)) { throw new TypeError(errorMessage); }
 
    return typeof path === 'string' ? path.split('.') : path;
 }
@@ -243,12 +198,12 @@ export function normalizePropertyPathTraversalBounds(input: PropertyPathTraversa
    const prefixOption: string = `options.${config.prefixOption}`;
    const stopOption: string = `options.${config.stopOption}`;
 
-   if (prefixPath !== void 0 && !isPropertyPathValue(prefixPath))
+   if (prefixPath !== void 0 && !isPropertyPath(prefixPath))
    {
       throw new TypeError(`${config.errorPrefix} error: '${prefixOption}' is not a valid property path.`);
    }
 
-   if (stopPath !== void 0 && !isPropertyPathValue(stopPath))
+   if (stopPath !== void 0 && !isPropertyPath(stopPath))
    {
       throw new TypeError(`${config.errorPrefix} error: '${stopOption}' is not a valid property path.`);
    }

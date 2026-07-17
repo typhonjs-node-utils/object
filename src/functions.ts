@@ -3,23 +3,58 @@ import {
    consumePropertyPathTraversalResult,
    consumePropertyPathTraversalVisit,
    createPropertyPathTraversalBudget,
-   isArrayIndexValue,
    isNormalizedPropertyPathEqual,
    isNormalizedPropertyPathPrefix,
-   isPropertyPathTraversableValue,
-   isPropertyKeyValue,
-   isPropertyPathValue,
    normalizePropertyPathTraversalBounds,
-   normalizePropertyPathValue }                     from './internal/PropertyPathTraversal';
+   normalizePropertyPathValue }     from './internal';
 
 import type {
+   NonNullObject,
    PathKeyIteratorOptions,
-   PropertyPath }                                    from './types';
+   PropertyPath }                   from './types';
 
 import type {
    NormalizedPropertyPathTraversalBounds,
    PropertyPathTraversalBudget,
-   PropertyPathTraversableValue }                     from './internal/PropertyPathTraversal';
+   PropertyPathTraversableValue }   from './internal';
+
+/**
+ * Asserts that a value is a non-null object, including arrays.
+ *
+ * Unlike {@link isNonNullObject}, this function preserves the **existing** static type of the variable while removing
+ * nullish, primitive, function, and class-constructor union members.
+ *
+ * This assertion accepts arrays, ordinary objects, class instances, boxed primitives, and specialized built-in
+ * objects such as `Date`, `Map`, and `Set`.
+ *
+ * Use this function when:
+ * ```
+ *   - You expect a non-null object at runtime, including an array, **and**
+ *   - You want to keep its compile-time type intact after validation.
+ * ```
+ *
+ * @example
+ * function process(value: string[] | (() => void) | undefined): void
+ * {
+ *    assertNonNullObject(value);
+ *
+ *    value.push('entry');
+ *    // `value` is narrowed to `string[]`.
+ * }
+ *
+ * @category Object Validation
+ *
+ * @param value - The value to validate.
+ *
+ * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is null, primitive, or callable.
+ */
+export function assertNonNullObject<T>(value: T, errorMsg: string = 'Expected a non-null object.'):
+ asserts value is NonNullObject<T>
+{
+   if (!isNonNullObject(value)) { throw new TypeError(errorMsg); }
+}
 
 /**
  * Asserts that a value is an object, not null, and not an array.
@@ -52,7 +87,82 @@ import type {
  */
 export function assertObject<T>(value: T, errorMsg: string = 'Expected an object.'): asserts value is T & object
 {
-   if (value === null || typeof value !== 'object' || Array.isArray(value)) { throw new TypeError(errorMsg); }
+   if (!isObject(value)) { throw new TypeError(errorMsg); }
+}
+
+/**
+ * Asserts that a value is a non-null object or function.
+ *
+ * Unlike {@link isObjectOrFunction}, this function does **not** narrow the value to a generic object type. Instead, it
+ * preserves the **existing** static type of the variable while removing primitive and nullish union members.
+ *
+ * This assertion accepts all JavaScript reference values, including arrays, functions, class constructors, ordinary
+ * objects, and specialized built-in objects.
+ *
+ * Use this function when:
+ * ```
+ *   - You expect a value to be an object or function at runtime, **and**
+ *   - You want to keep its compile-time type intact after validation.
+ * ```
+ *
+ * @example
+ * function execute(value: Date | (() => void) | undefined): void
+ * {
+ *    assertIsObjectOrFunction(value);
+ *
+ *    // `value` is now `Date | (() => void)`.
+ * }
+ *
+ * @category Object Validation
+ *
+ * @param value - The value to validate.
+ *
+ * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is null or a primitive value.
+ */
+export function assertObjectOrFunction<T>(value: T, errorMsg: string = 'Expected an object or function.'):
+ asserts value is T & object
+{
+   if (!isObjectOrFunction(value)) { throw new TypeError(errorMsg); }
+}
+
+/**
+ * Asserts that a value is an ordinary object.
+ *
+ * Unlike {@link isOrdinaryObject}, this function preserves the **existing** static type of the variable rather than
+ * narrowing it to a generic indexable structure. It accepts plain objects, custom-prototype objects, and ordinary
+ * class instances, while rejecting arrays, functions, primitives, and specialized built-in objects.
+ *
+ * Use this function when:
+ * ```
+ *   - You expect a value to be an ordinary object at runtime, **and**
+ *   - You want to keep its compile-time type intact after validation.
+ * ```
+ *
+ * @example
+ * class Options {
+ *   flag?: boolean;
+ *   value?: number;
+ * }
+ *
+ * function run(opts: Options) {
+ *   assertOrdinaryObject(opts, `'opts' is not an ordinary object.`);
+ *   opts.value; // `opts` remains typed as `Options`.
+ * }
+ *
+ * @category Object Validation
+ *
+ * @param value - The value to validate.
+ *
+ * @param errorMsg - Optional message used for the thrown TypeError.
+ *
+ * @throws {TypeError} if the value is not an ordinary object.
+ */
+export function assertOrdinaryObject<T>(value: T, errorMsg: string = 'Expected an ordinary object.'):
+ asserts value is T & object
+{
+   if (!isOrdinaryObject(value)) { throw new TypeError(errorMsg); }
 }
 
 /**
@@ -87,7 +197,7 @@ export function assertObject<T>(value: T, errorMsg: string = 'Expected an object
 export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a plain object.'):
  asserts value is T & object
 {
-   if (!isPlainObjectValue(value)) { throw new TypeError(errorMsg); }
+   if (!isPlainObject(value)) { throw new TypeError(errorMsg); }
 }
 
 /**
@@ -120,9 +230,9 @@ export function assertPlainObject<T>(value: T, errorMsg: string = 'Expected a pl
  * @throws {TypeError} if the value is null, non-object, or an array.
  */
 export function assertRecord<T>(value: T, errorMsg: string = 'Expected a record object.'):
- asserts value is T & Record<string, unknown>
+ asserts value is T & Record<PropertyKey, unknown>
 {
-   if (typeof value !== 'object' || value === null || Array.isArray(value)) { throw new TypeError(errorMsg); }
+   if (!isRecord(value)) { throw new TypeError(errorMsg); }
 }
 
 /**
@@ -243,21 +353,21 @@ export function deepMerge<T extends object, U extends object[]>(target: T, ...so
 
 export function deepMerge(target: object, ...sourceObj: object[]): object
 {
-   if (!isMergeObjectValue(target))
+   if (!isOrdinaryObject(target))
    {
-      throw new TypeError(`deepMerge error: 'target' is not an object.`);
+      throw new TypeError(`deepMerge error: 'target' is not an ordinary object.`);
    }
 
    if (sourceObj.length === 0)
    {
-      throw new TypeError(`deepMerge error: 'sourceObj' is not an object.`);
+      throw new TypeError(`deepMerge error: 'sourceObj' is not an ordinary object.`);
    }
 
    for (let i: number = 0; i < sourceObj.length; i++)
    {
-      if (!isMergeObjectValue(sourceObj[i]))
+      if (!isOrdinaryObject(sourceObj[i]))
       {
-         throw new TypeError(`deepMerge error: 'sourceObj[${i}]' is not an object.`);
+         throw new TypeError(`deepMerge error: 'sourceObj[${i}]' is not an ordinary object.`);
       }
 
       // Preflight every source before mutating the target so a circular source cannot leave a partial merge behind.
@@ -282,11 +392,11 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
             const sourceValue: any = entry.source[key];
             const targetValue: any = entry.target[key];
 
-            if (isPlainObjectValue(sourceValue))
+            if (isPlainObject(sourceValue))
             {
                // Preserve an existing plain branch; otherwise create only the two supported plain-object prototype
                // categories. Custom source prototypes are never propagated into recursively merged branches.
-               const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
+               const mergedTarget: Record<PropertyKey, unknown> = isPlainObject(targetValue) ?
                 targetValue : Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
 
                entry.target[key] = mergedTarget;
@@ -319,11 +429,11 @@ export function deepMerge(target: object, ...sourceObj: object[]): object
                const sourceValue: any = entry.source[key];
                const targetValue: any = entry.target[key];
 
-               if (isPlainObjectValue(sourceValue))
+               if (isPlainObject(sourceValue))
                {
                   // Copy an existing plain target branch before merging so multi-source operation does not mutate
                   // that preexisting nested object by reference. Missing / non-plain branches are recreated safely.
-                  const mergedTarget: Record<PropertyKey, unknown> = isPlainObjectValue(targetValue) ?
+                  const mergedTarget: Record<PropertyKey, unknown> = isPlainObject(targetValue) ?
                    clonePlainEnumerable(targetValue) :
                     Object.create(Object.getPrototypeOf(sourceValue) === null ? null : Object.prototype);
 
@@ -821,7 +931,7 @@ export function hasSetter<T extends object, K extends keyof T>(object: T, access
  */
 export function isArrayIndex(value: unknown): value is number
 {
-   return isArrayIndexValue(value);
+   return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFE;
 }
 
 /**
@@ -853,6 +963,39 @@ export function isIterable<T>(value: unknown): value is Iterable<T>
 {
    return value !== null && typeof value === 'object' && typeof (value as any)[Symbol.iterator] === 'function';
 }
+
+/**
+ * Determines whether a value is a non-null object, including arrays.
+ *
+ * This predicate accepts arrays, ordinary objects, class instances, boxed primitives, and specialized built-in
+ * objects such as `Date`, `Map`, and `Set`. It rejects `null`, primitive values, functions, and class constructors.
+ *
+ * Unlike {@link isObject}, this function accepts arrays. Unlike {@link isObjectOrFunction}, it rejects functions and
+ * class constructors.
+ *
+ * Known object types retain their existing static type. Mixed unions are narrowed to their non-null, non-callable
+ * object members.
+ *
+ * @example
+ * const value: string[] | (() => void) | undefined = [];
+ *
+ * if (isNonNullObject(value))
+ * {
+ *    value.push('entry');
+ *    // `value` is narrowed to `string[]`.
+ * }
+ *
+ * @category Object Validation
+ *
+ * @param value - The value to evaluate.
+ *
+ * @returns Whether the value has a runtime type of `object` and is not `null`.
+ */
+export function isNonNullObject<T>(value: T): value is NonNullObject<T>
+{
+   return typeof value === 'object' && value !== null;
+}
+
 
 export function isObject<T extends object>(value: T): value is T;
 
@@ -897,6 +1040,134 @@ export function isObject(value: unknown): value is object
    return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
+export function isObjectOrFunction<T extends object>(value: T): value is T;
+
+/**
+ * Determines whether a value is a non-null object or function.
+ *
+ * This predicate accepts all JavaScript reference values, including arrays, functions, class constructors, ordinary
+ * objects, and specialized built-in objects such as `Date`, `Map`, and `Set`. It rejects `null` and all primitive
+ * values.
+ *
+ * Unlike {@link isObject}, this function accepts arrays and functions.
+ *
+ * Known object and function types retain their existing static type. Values typed as `unknown` are narrowed to
+ * `object`.
+ *
+ * @example
+ * function execute(value: object | (() => void) | undefined): void
+ * {
+ *    if (!isObjectOrFunction(value)) { return; }
+ *
+ *    // `value` retains its object-compatible union members.
+ * }
+ *
+ * @category Object Validation
+ *
+ * @param value - The value to evaluate.
+ *
+ * @returns Whether the value is a non-null object or function.
+ */
+export function isObjectOrFunction(value: unknown): value is object;
+export function isObjectOrFunction(value: unknown): value is object
+{
+   return value !== null && (typeof value === 'object' || typeof value === 'function');
+}
+
+export function isOrdinaryObject<T extends object>(value: T): value is T;
+
+/**
+ * Runtime check for whether a value is an ordinary object:
+ *
+ * An ordinary object in this context is a non-null, non-callable object for which
+ * `Object.prototype.toString.call(value)` returns `'[object Object]'`.
+ *
+ * This includes:
+ *
+ * - Object literals created with `{}`.
+ * - Objects created with `new Object()`.
+ * - Objects with a `null` prototype.
+ * - Objects with a custom prototype.
+ * - Instances of ordinary user-defined classes.
+ *
+ * This excludes:
+ *
+ * - Arrays.
+ * - Functions and class constructors.
+ * - Primitive and boxed primitive values.
+ * - Specialized built-in objects such as `Date`, `RegExp`, `Map`, `Set`, `Promise`, `Error`, `ArrayBuffer`,
+ *   `DataView`, and typed arrays.
+ *
+ * This predicate occupies the middle ground between the other object predicates:
+ *
+ * - {@link isObject} accepts the broader category of non-null, non-array objects, including specialized built-ins.
+ * - {@link isRecord} accepts the same broad record-like category, but narrows the result for dictionary-style keyed
+ *   access.
+ * - `isOrdinaryObject` additionally requires the runtime string tag `'[object Object]'`. It accepts class instances
+ *   and objects with custom prototypes, but rejects specialized built-ins.
+ * - {@link isPlainObject} requires the prototype to be exactly `Object.prototype` or `null`. It therefore rejects
+ *   class instances and objects with other custom prototypes.
+ *
+ * Unlike {@link isPlainObject}, this function does not inspect or restrict the object's prototype.
+ *
+ * @remarks
+ * This is a tag-based classification and is not an implementation of the ECMAScript specification's internal
+ * distinction between ordinary and exotic objects.
+ *
+ * The result of `Object.prototype.toString.call` can be influenced by `Symbol.toStringTag`. Consequently, an object
+ * may opt out of this classification by supplying another tag, and a specialized object may present itself with the
+ * tag `'Object'`.
+ *
+ * @example
+ * ```ts
+ * isOrdinaryObject({ value: 1 });             // true
+ * isOrdinaryObject(Object.create(null));      // true
+ *
+ * class Configuration {}
+ * isOrdinaryObject(new Configuration());      // true
+ *
+ * isOrdinaryObject(new Map());                // false
+ * isOrdinaryObject(new Date());               // false
+ * isOrdinaryObject([]);                       // false
+ * ```
+ *
+ * @example
+ * The distinction from {@link isPlainObject} concerns the prototype:
+ *
+ * ```ts
+ * class Configuration {}
+ *
+ * const value = new Configuration();
+ *
+ * isOrdinaryObject(value); // true
+ * isPlainObject(value);    // false
+ * ```
+ *
+ * @example
+ * `Symbol.toStringTag` can alter the result:
+ *
+ * ```ts
+ * const value = {
+ *    [Symbol.toStringTag]: 'Configuration'
+ * };
+ *
+ * isOrdinaryObject(value); // false: '[object Configuration]'
+ * ```
+ *
+ * @category Object Validation
+ *
+ * @param value - Any value to evaluate.
+ *
+ * @returns Whether `value` is a non-null object with the runtime string tag `'[object Object]'`.
+ */
+export function isOrdinaryObject(value: unknown): value is Record<PropertyKey, unknown>;
+export function isOrdinaryObject(value: unknown): value is Record<PropertyKey, unknown>
+{
+   return value !== null &&
+    typeof value === 'object' &&
+    Object.prototype.toString.call(value) === '[object Object]';
+}
+
 export function isPlainObject<T extends object>(value: T): value is T;
 
 /**
@@ -911,7 +1182,8 @@ export function isPlainObject<T extends object>(value: T): value is T;
  *
  * Type Behavior:
  * - If the input already has a known object type `T`, that type is preserved after narrowing.
- * - If the input is `unknown` or untyped the result narrows to `Record<string, unknown>` allowing safe keyed access.
+ * - If the input is `unknown` or untyped the result narrows to `Record<PropertyKey, unknown>` allowing safe keyed
+ * access.
  *
  * Useful when validating configuration objects, cloning or merging data, performing deep equality, or working with
  * structured JSON where non-plain / prototype values would be considered invalid.
@@ -935,10 +1207,12 @@ export function isPlainObject<T extends object>(value: T): value is T;
  *
  * @returns True if the value is a plain object with no special prototype.
  */
-export function isPlainObject(value: unknown): value is Record<string, unknown>;
-export function isPlainObject(value: unknown): value is Record<string, unknown>
+export function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>;
+export function isPlainObject(value: unknown): value is Record<PropertyKey, unknown>
 {
-   return isPlainObjectValue(value);
+   if (value === null || typeof value !== 'object') { return false; }
+   const prototype: object | null = Object.getPrototypeOf(value);
+   return prototype === null || prototype === Object.prototype;
 }
 
 /**
@@ -955,7 +1229,8 @@ export function isPlainObject(value: unknown): value is Record<string, unknown>
  */
 export function isPropertyKey(value: unknown): value is PropertyKey
 {
-   return isPropertyKeyValue(value);
+   const valueType: string = typeof value;
+   return valueType === 'string' || valueType === 'number' || valueType === 'symbol';
 }
 
 /**
@@ -1008,7 +1283,16 @@ export function isRecord(value: unknown): value is Record<string, unknown>
  */
 export function isPropertyPath(value: unknown): value is PropertyPath
 {
-   return isPropertyPathValue(value);
+   if (typeof value === 'string') { return value.length > 0; }
+
+   if (!Array.isArray(value) || value.length === 0) { return false; }
+
+   for (let index: number = 0; index < value.length; index++)
+   {
+      if (!isPropertyKey(value[index])) { return false; }
+   }
+
+   return true;
 }
 
 /**
@@ -1163,9 +1447,9 @@ export function objectSize(object: any): number
  *        root when no prefix is supplied. A value of `0` yields only the prefix itself when selected; default:
  *        unlimited.
  *
- * @param [options.maxResults] - Maximum number of paths yielded; default: `65536`.
+ * @param [options.maxResults] - Maximum number of paths yielded; default: `16384`.
  *
- * @param [options.maxVisits] - Maximum number of enumerable properties or array indexes inspected; default: `262144`.
+ * @param [options.maxVisits] - Maximum number of enumerable properties or array indexes inspected; default: `65536`.
  *
  * @param [options.prefixPath] - Absolute property path selecting the branch where traversal begins. Returned paths
  *        remain absolute. A missing or non-enumerable prefix produces an empty iterator.
@@ -1181,10 +1465,7 @@ export function objectSize(object: any): number
 export function* pathKeyIterator(data: object, options: PathKeyIteratorOptions = {}):
  IterableIterator<readonly PropertyKey[]>
 {
-   if (typeof data !== 'object' || data === null)
-   {
-      throw new TypeError(`pathKeyIterator error: 'data' is not an object.`);
-   }
+   if (!isNonNullObject(data)) { throw new TypeError(`pathKeyIterator error: 'data' is not an object.`); }
 
    assertPropertyPathOptionsObject(options, 'pathKeyIterator');
 
@@ -1333,8 +1614,8 @@ export function safeAccess<T extends object, const P extends PropertyPath, R = D
  *
  * @param [options.hasOwnOnly] - Set to `false` to include enumerable prototype properties; default: `true`.
  *
- * @param [options.maxVisits] - Maximum number of enumerable source properties or array indexes inspected; default:
- *        `262144`.
+ * @param [options.maxVisits] - Maximum number of enumerable source properties or array indexes inspected;
+ *        default: `65536`.
  *
  * @returns True if equal.
  *
@@ -1464,7 +1745,7 @@ export function safeSet(data: object, path: PropertyPath, value: any, { operatio
             (target as any)[key] = next;
          }
 
-         if (!isPropertyPathTraversableValue(next)) { return false; }
+         if (!isObjectOrFunction(next)) { return false; }
          target = next;
       }
    }
@@ -1518,7 +1799,7 @@ function assertNoCircularPlainObject(source: object): void
          if (isBlockedPrototypeKey(key)) { continue; }
 
          const child: unknown = (value as any)[key];
-         if (!isPlainObjectValue(child)) { continue; }
+         if (!isPlainObject(child)) { continue; }
 
          if (ancestors.has(child))
          {
@@ -1685,48 +1966,6 @@ function getEnumerablePropertyKeys(object: object, hasOwnOnly: boolean): Propert
 function isBlockedPrototypeKey(key: PropertyKey): boolean
 {
    return typeof key === 'string' && (key === '__proto__' || key === 'prototype' || key === 'constructor');
-}
-
-/**
- * Returns whether a value is accepted as a top-level {@link deepMerge} target or source.
- *
- * This deliberately accepts class instances whose intrinsic tag is `[object Object]`, preserving legacy behavior for
- * top-level inputs. Recursive merging remains restricted by {@link isPlainObjectValue}; nested class instances are
- * assigned as values rather than traversed.
- *
- * Called by:
- * - {@link deepMerge} for top-level target and source validation.
- *
- * @param value - Candidate merge input.
- *
- * @returns Whether the value is an accepted non-array object record.
- */
-function isMergeObjectValue(value: unknown): value is Record<PropertyKey, unknown>
-{
-   return value !== null && typeof value === 'object' && !Array.isArray(value) &&
-    Object.prototype.toString.call(value) === '[object Object]';
-}
-
-/**
- * Returns whether a value is a plain object with either `Object.prototype` or `null` as its prototype.
- *
- * Direct prototype inspection avoids `Symbol.toStringTag` spoofing and excludes arrays, functions, and class
- * instances from recursive plain-object operations.
- *
- * Called by:
- * - {@link assertPlainObject} and {@link isPlainObject}.
- * - {@link deepMerge} to decide which nested values are recursively merged.
- * - {@link assertNoCircularPlainObject} to limit cycle detection to recursively mergeable values.
- *
- * @param value - Candidate plain object.
- *
- * @returns Whether `value` is a plain object.
- */
-function isPlainObjectValue(value: unknown): value is Record<PropertyKey, unknown>
-{
-   if (value === null || typeof value !== 'object') { return false; }
-   const prototype: object | null = Object.getPrototypeOf(value);
-   return prototype === null || prototype === Object.prototype;
 }
 
 /**
@@ -1917,7 +2156,7 @@ function resolvePropertyPath(data: object, path: readonly PropertyKey[],
 
       const next: unknown = (candidate as Record<PropertyKey, unknown>)[key];
 
-      if (!isPropertyPathTraversableValue(next)) { return void 0; }
+      if (!isObjectOrFunction(next)) { return void 0; }
 
       candidate = next;
 

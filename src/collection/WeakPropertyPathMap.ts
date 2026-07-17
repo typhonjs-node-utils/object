@@ -1,10 +1,10 @@
-import {
-   assertPropertyPathOptionsObject,
-   isPropertyPathTraversableValue } from '../internal/PropertyPathTraversal';
+import { isObjectOrFunction }                from '../functions';
 
-import { PropertyPathMap }          from './PropertyPathMap';
+import { assertPropertyPathOptionsObject }   from '../internal';
 
-import type { PropertyPath }        from '../types';
+import { PropertyPathMap }                   from './PropertyPathMap';
+
+import type { PropertyPath }                 from '../types';
 
 /**
  * Associates structural {@link PropertyPath} paths with values beneath weakly held root objects.
@@ -472,7 +472,7 @@ export class WeakPropertyPathMap<R extends object, V>
     */
    static #assertWeakPropertyPathMapRoot(value: unknown): asserts value is object
    {
-      if (!isPropertyPathTraversableValue(value))
+      if (!isObjectOrFunction(value))
       {
          throw new TypeError(`WeakPropertyPathMap error: 'root' is not an object or function.`);
       }

@@ -111,6 +111,124 @@ const s_VERIFY_SAFESET_SUB_NO_ARRAY = `{"a":0,"b":0,"c":0,"array":[10,10,10],"le
 
 describe('ObjectUtil:', () =>
 {
+   describe('assertNonNullObject:', () =>
+   {
+      it('accepts ordinary objects and arrays', () =>
+      {
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject({}));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(Object.create(null)));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject([]));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject([1, 2, 3]));
+      });
+
+      it('accepts class instances and specialized built-ins', () =>
+      {
+         class Test {}
+
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(new Test()));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(new Date()));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(new Map()));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(new Set()));
+         assert.doesNotThrow(() => ObjectUtil.assertNonNullObject(/test/));
+      });
+
+      it('throws for null and undefined', () =>
+      {
+         assert.throws(
+          () => ObjectUtil.assertNonNullObject(null),
+          TypeError,
+          'Expected a non-null object.'
+         );
+
+         assert.throws(
+          () => ObjectUtil.assertNonNullObject(void 0),
+          TypeError,
+          'Expected a non-null object.'
+         );
+      });
+
+      it('throws for primitive values', () =>
+      {
+         assert.throws(() => ObjectUtil.assertNonNullObject(false), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject(42), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject(1n), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject('test'), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject(Symbol('test')), TypeError);
+      });
+
+      it('throws for functions and class constructors', () =>
+      {
+         class Test {}
+
+         assert.throws(() => ObjectUtil.assertNonNullObject(() => void 0), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject(function test() {}), TypeError);
+         assert.throws(() => ObjectUtil.assertNonNullObject(Test), TypeError);
+      });
+
+      it('uses a custom error message', () =>
+      {
+         assert.throws(() => ObjectUtil.assertNonNullObject(null, `'value' is not a non-null object.`), TypeError,
+          `'value' is not a non-null object.`);
+      });
+
+      it('narrows unknown values to object', () =>
+      {
+         const value: unknown = [];
+
+         ObjectUtil.assertNonNullObject(value);
+
+         expectTypeOf(value).toEqualTypeOf<object>();
+      });
+
+      it('preserves existing object types', () =>
+      {
+         interface Options
+         {
+            enabled?: boolean;
+         }
+
+         const value: Options = { enabled: true };
+
+         ObjectUtil.assertNonNullObject(value);
+
+         expectTypeOf(value).toEqualTypeOf<Options>();
+         assert.isTrue(value.enabled);
+      });
+
+      it('preserves array types', () =>
+      {
+         const value: number[] = [1, 2, 3];
+
+         ObjectUtil.assertNonNullObject(value);
+
+         expectTypeOf(value).toEqualTypeOf<number[]>();
+         value.push(4);
+      });
+
+      it('removes primitive, nullish, and function union members', () =>
+      {
+         const value = [] as number[] | (() => void) | string | null | undefined;
+
+         ObjectUtil.assertNonNullObject(value);
+
+         expectTypeOf(value).toEqualTypeOf<number[]>();
+      });
+
+      it('removes class-constructor union members', () =>
+      {
+         class Test
+         {
+            value = 42;
+         }
+
+         const value = new Test() as Test | typeof Test | null;
+
+         ObjectUtil.assertNonNullObject(value);
+
+         expectTypeOf(value).toEqualTypeOf<Test>();
+      });
+   });
+
    it('assertObject', () =>
    {
       assert.throws(() => ObjectUtil.assertObject(false), 'Expected an object.');
@@ -2169,6 +2287,7 @@ describe('ObjectUtil:', () =>
       {
          const result = ObjectUtil.safeAccess(s_OBJECT_SYM, [s_SYMBOL_LEVEL1, s_SYMBOL_LEVEL2]);
          assert.isTrue(result);
+         expectTypeOf(ObjectUtil.safeAccess(s_OBJECT_SYM, [s_SYMBOL_LEVEL1, s_SYMBOL_LEVEL2])).toEqualTypeOf<boolean>();
       });
 
       it('base array', () =>
@@ -2178,6 +2297,8 @@ describe('ObjectUtil:', () =>
          assert.isTrue(ObjectUtil.safeAccess(array, [0]));
          assert.isFalse(ObjectUtil.safeAccess(array, [1]));
          assert.isTrue(ObjectUtil.safeAccess(array, [2]));
+
+         expectTypeOf(ObjectUtil.safeAccess(array, [0])).toEqualTypeOf<boolean>();
       });
 
       it('returns the default for primitive intermediate values', () =>
@@ -2185,6 +2306,8 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeAccess({ value: 42 }, 'value.test', null), null);
          assert.equal(ObjectUtil.safeAccess({ value: true }, 'value.test', null), null);
          assert.equal(ObjectUtil.safeAccess({ value: 'text' }, 'value.test', null), null);
+
+         expectTypeOf(ObjectUtil.safeAccess({ value: 42 }, 'value.test', false)).toEqualTypeOf<boolean>();
       });
 
       it('default value conditions', () =>
@@ -2196,6 +2319,8 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeAccess({ a: [true] }, 'a.1', 'defaultValue'), 'defaultValue');
          // @ts-expect-error
          assert.equal(ObjectUtil.safeAccess({ a: null }, [false], 'defaultValue'), 'defaultValue');
+
+         expectTypeOf(ObjectUtil.safeAccess(null, '', 'defaultValue')).toEqualTypeOf<string>();
       });
    });
 
@@ -2224,7 +2349,9 @@ describe('ObjectUtil:', () =>
          assert.equal(ObjectUtil.safeEqual({ value: null }, {}), false);
          assert.equal(ObjectUtil.safeEqual({ value: null }, { value: null }), true);
 
-         assert.equal(ObjectUtil.safeEqual({ values: [void 0] }, { values: new Array(1) }, { arrayIndex: true }), false);
+         assert.equal(ObjectUtil.safeEqual({ values: [void 0] }, { values: new Array(1) }, { arrayIndex: true }),
+          false);
+
          assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: ['a'] }, { arrayIndex: true }), true);
          assert.equal(ObjectUtil.safeEqual({ values: ['a'] }, { values: [] }, { arrayIndex: true }), false);
 
