@@ -279,9 +279,9 @@ export function concatPropertyPath(path: PropertyPath, ...paths: PropertyPath[])
  *
  * @param data - An object or array.
  *
- * @param options - Options.
+ * @param [options] - Options.
  *
- * @param options.skipKeys - A readonly set of property keys whose values are excluded from traversal. Numeric keys are
+ * @param [options.skipKeys] - A readonly set of property keys whose values are excluded from traversal. Numeric keys are
  *        normalized to their JavaScript string-key representation. A matching key is skipped regardless of where it
  *        appears in the object graph.
  *
