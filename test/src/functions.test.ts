@@ -4,6 +4,10 @@ import * as ObjectUtil  from '../../src/functions';
 
 import { klona }        from '../../src';
 
+import type {
+   JSONPropertyPath,
+   PropertyPath }       from '../../src';
+
 /**
  * For visual no-op type erasure tests.
  */
@@ -2046,6 +2050,170 @@ describe('ObjectUtil:', () =>
       assert.isTrue(ObjectUtil.isAsyncIterable((async function *generator() {})()));
    });
 
+   describe('isJSONPropertyPath:', () =>
+   {
+      it('accepts non-empty dotted string paths', () =>
+      {
+         assert.isTrue(ObjectUtil.isJSONPropertyPath('actor'));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath('actor.system.hp'));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath('level1..value'));
+      });
+
+      it('rejects an empty string path', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(''));
+      });
+
+      it('accepts non-empty string-key arrays', () =>
+      {
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['actor']));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['actor', 'system', 'hp']));
+      });
+
+      it('accepts empty-string and literal-period array segments', () =>
+      {
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['']));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['actor', '', 'value']));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['literal.period']));
+      });
+
+      it('accepts numeric segments', () =>
+      {
+         assert.isTrue(ObjectUtil.isJSONPropertyPath([0]));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(['actors', 0, 'name']));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath([-1]));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath([1.5]));
+         assert.isTrue(ObjectUtil.isJSONPropertyPath([Number.MAX_VALUE]));
+      });
+
+      it('accepts negative zero', () =>
+      {
+         assert.isTrue(ObjectUtil.isJSONPropertyPath([-0]));
+      });
+
+      it('accepts readonly property-key arrays', () =>
+      {
+         const path = ['actors', 0, 'name'] as const;
+
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(path));
+      });
+
+      it('round-trips accepted string paths through JSON', () =>
+      {
+         const path: JSONPropertyPath = 'actor.system.hp';
+
+         const restored: unknown = JSON.parse(JSON.stringify(path));
+
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(restored));
+         assert.strictEqual(restored, path);
+      });
+
+      it('round-trips accepted array paths through JSON', () =>
+      {
+         const path: JSONPropertyPath = ['actors', 0, 'name'];
+
+         const restored: unknown = JSON.parse(JSON.stringify(path));
+
+         assert.isTrue(ObjectUtil.isJSONPropertyPath(restored));
+         assert.deepEqual(restored, path);
+      });
+
+      it('rejects an empty array', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([]));
+      });
+
+      it('rejects symbol segments', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([Symbol('metadata')]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(['actor', Symbol.for('metadata')]));
+      });
+
+      it('rejects non-finite numeric segments', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([NaN]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([Infinity]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([-Infinity]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(['actor', NaN]));
+      });
+
+      it('rejects sparse arrays', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(new Array(1)));
+
+         const path = ['actor', 'system', 'value'];
+
+         delete path[1];
+
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(path));
+      });
+
+      it('rejects sparse arrays even when later entries are valid', () =>
+      {
+         const path: unknown[] = [];
+
+         path.length = 3;
+         path[0] = 'actor';
+         path[2] = 'value';
+
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(path));
+      });
+
+      it('rejects nested arrays', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([['actor']]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(['actor', ['system']]));
+      });
+
+      it('rejects nullish and primitive non-path values', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(null));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(void 0));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(true));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(false));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(0));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(42));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(1n));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(Symbol('path')));
+      });
+
+      it('rejects objects and functions', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath({}));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath({ path: 'actor.system' }));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(new Set(['actor'])));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath(() => void 0));
+      });
+
+      it('rejects unsupported array entry values', () =>
+      {
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([null]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([void 0]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([true]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([1n]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([{}]));
+         assert.isFalse(ObjectUtil.isJSONPropertyPath([() => void 0]));
+      });
+
+      it('narrows unknown values to JSONPropertyPath', () =>
+      {
+         const value: unknown = ['actors', 0, 'name'];
+
+         if (!ObjectUtil.isJSONPropertyPath(value)) { assert.fail('Expected a JSON property path.'); }
+
+         expectTypeOf(value).toEqualTypeOf<JSONPropertyPath>();
+      });
+
+      it('preserves a known JSONPropertyPath type', () =>
+      {
+         const value: JSONPropertyPath = ['actors', 0, 'name'];
+
+         if (!ObjectUtil.isJSONPropertyPath(value)) { assert.fail('Expected a JSON property path.'); }
+
+         expectTypeOf(value).toExtend<JSONPropertyPath>();
+      });
+   });
+
    it('isObject', () =>
    {
       assert.isFalse(ObjectUtil.isObject(false));
@@ -2475,6 +2643,46 @@ describe('ObjectUtil:', () =>
          assert.isFalse(ObjectUtil.isPropertyPath(void 0));
          assert.isFalse(ObjectUtil.isPropertyPath(42));
          assert.isFalse(ObjectUtil.isPropertyPath({}));
+      });
+
+      it('rejects sparse arrays', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPath(new Array(1)));
+
+         const path = ['actor', 'system', 'value'];
+
+         delete path[1];
+
+         assert.isFalse(ObjectUtil.isPropertyPath(path));
+      });
+
+      it('rejects sparse arrays even when later entries are valid', () =>
+      {
+         const path: unknown[] = [];
+
+         path.length = 3;
+         path[0] = 'actor';
+         path[2] = 'value';
+
+         assert.isFalse(ObjectUtil.isPropertyPath(path));
+      });
+
+      it('narrows unknown values to PropertyPath', () =>
+      {
+         const value: unknown = ['actors', 0, 'name'];
+
+         if (!ObjectUtil.isPropertyPath(value)) { assert.fail('Expected a property path.'); }
+
+         expectTypeOf(value).toEqualTypeOf<PropertyPath>();
+      });
+
+      it('preserves a known PropertyPath type', () =>
+      {
+         const value: PropertyPath = ['actors', 0, 'name'];
+
+         if (!ObjectUtil.isPropertyPath(value)) { assert.fail('Expected a property path.'); }
+
+         expectTypeOf(value).toExtend<PropertyPath>();
       });
    });
 
