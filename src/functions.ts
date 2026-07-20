@@ -8,6 +8,7 @@ import {
    normalizePropertyPathTraversalBounds } from './internal';
 
 import type {
+   JSONPropertyPath,
    NonNullObject,
    PathKeyIteratorOptions,
    PropertyPath }                         from './types';
@@ -989,6 +990,60 @@ export function isIterable<T>(value: unknown): value is Iterable<T>
 {
    return value !== null && typeof value === 'object' && typeof (value as any)[Symbol.iterator] === 'function';
 }
+
+/**
+ * Determines whether a value is a {@link JSONPropertyPath}.
+ *
+ * A JSON property path is either:
+ *
+ * - A non-empty dotted string.
+ * - A non-empty, dense array containing only strings and finite numbers.
+ *
+ * Symbol segments are rejected because symbols cannot be represented by JSON. Non-finite numbers are also rejected
+ * because `JSON.stringify` converts `NaN`, `Infinity`, and `-Infinity` to `null`. Sparse arrays are rejected because
+ * missing elements are likewise serialized as `null`.
+ *
+ * Numeric values do not need to be integers or valid array indexes. This function validates lossless JSON
+ * representation only; array-index constraints remain dependent on the value traversed by a path-aware operation.
+ *
+ * `-0` is accepted because JSON normalizes it to `0`, which is equivalent under the package's property-key comparison
+ * semantics.
+ *
+ * @example
+ * ```ts
+ * isJSONPropertyPath('actor.system.hp');       // true
+ * isJSONPropertyPath(['actors', 0, 'name']);   // true
+ * isJSONPropertyPath(['literal.period']);      // true
+ *
+ * isJSONPropertyPath([Symbol('metadata')]);    // false
+ * isJSONPropertyPath(['actors', NaN]);         // false
+ * isJSONPropertyPath(new Array(1));            // false
+ * ```
+ *
+ * @category Property Keys and Paths
+ *
+ * @param value - Value to evaluate.
+ *
+ * @returns Whether the value is a non-empty property path that can be represented losslessly through ordinary JSON
+ *          serialization.
+ */
+export function isJSONPropertyPath(value: unknown): value is JSONPropertyPath
+{
+   if (typeof value === 'string') { return value.length > 0; }
+
+   if (!Array.isArray(value) || value.length === 0)
+   {
+      return false;
+   }
+
+   for (let index = 0; index < value.length; index++)
+   {
+      const key: unknown = value[index];
+
+      if (typeof key !== 'string' && (typeof key !== 'number' || !Number.isFinite(key))) { return false; }
+   }
+
+   return true;}
 
 /**
  * Determines whether a value is a non-null object, including arrays.

@@ -142,6 +142,9 @@
  * >
  * > **_`isArrayIndex`_** — Determines whether a number is a valid ECMAScript array index.
  * >
+ * > **_`isJSONPropertyPath`_** — Validates a dotted string or array of string and finite-number segments that can be
+ * > represented losslessly as a property path by JSON.
+ * >
  * > **_`isPropertyKey`_** — Determines whether a value is a string, number, or symbol property key.
  * >
  * > **_`isPropertyPath`_** — Validates a dotted string or exact property-key array as a property path.
@@ -150,6 +153,9 @@
  * >
  * > **_`joinPropertyPath`_** — Converts an exact property-key path to dotted-string form when the conversion is
  * > lossless.
+ * >
+ * > **_`JSONPropertyPath`_** — Defines a non-empty property path that can be represented losslessly through ordinary
+ * > JSON serialization.
  * >
  * > **_`normalizePropertyPath`_** — Converts a property path to its canonical property-key array representation.
  * >

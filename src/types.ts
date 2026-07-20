@@ -1,6 +1,16 @@
 // External Types ----------------------------------------------------------------------------------------------------
 
 /**
+ * Represents a {@link PropertyPath} that can be losslessly encoded as JSON.
+ *
+ * Symbol segments are excluded. Numeric segments must be finite at runtime because JSON converts `NaN` and infinities
+ * to `null`.
+ *
+ * @category Property Keys and Paths
+ */
+export type JSONPropertyPath = string | readonly (string | number)[];
+
+/**
  * Extracts the non-null, non-callable object members of `T`.
  *
  * This includes arrays, ordinary objects, class instances, boxed primitives, and specialized built-in objects.
