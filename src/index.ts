@@ -147,6 +147,9 @@
  * >
  * > **_`isPropertyKey`_** — Determines whether a value is a string, number, or symbol property key.
  * >
+ * > **_`isPropertyPathEqual`_** — Determines whether two normalized property paths contain the same segments in the
+ * > same order using SameValueZero comparison semantics.
+ * >
  * > **_`isPropertyPath`_** — Validates a dotted string or exact property-key array as a property path.
  * >
  * > **_`isPropertyPathPrefix`_** — Determines whether one normalized property path is a structural prefix of another.

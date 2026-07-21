@@ -2686,6 +2686,255 @@ describe('ObjectUtil:', () =>
       });
    });
 
+   describe('isPropertyPathEqual:', () =>
+   {
+      it('compares identical dotted paths as equal', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual('actor.system.name', 'actor.system.name'));
+      });
+
+      it('compares equivalent dotted and exact array paths as equal', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          'actor.system.name',
+          ['actor', 'system', 'name']
+         ));
+
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          ['actor', 'system', 'name'],
+          'actor.system.name'
+         ));
+      });
+
+      it('compares equivalent independently allocated array paths as equal', () =>
+      {
+         const pathA = ['actor', 'system', 'name'] as const;
+         const pathB = ['actor', 'system', 'name'] as const;
+
+         assert.notStrictEqual(pathA, pathB);
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(pathA, pathB));
+      });
+
+      it('compares the same array instance as equal', () =>
+      {
+         const path = ['actor', 'system', 'name'] as const;
+
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(path, path));
+      });
+
+      it('returns false for paths with different segment values', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          'actor.system.name',
+          'actor.system.id'
+         ));
+
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['actor', 'system', 'name'],
+          ['actor', 'system', 'id']
+         ));
+      });
+
+      it('returns false for paths with different segment order', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['actor', 'system', 'name'],
+          ['system', 'actor', 'name']
+         ));
+      });
+
+      it('returns false for paths with different lengths', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['actor', 'system'],
+          ['actor', 'system', 'name']
+         ));
+
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          'actor.system.name',
+          'actor.system'
+         ));
+      });
+
+      it('distinguishes numeric and string segments', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['items', 0, 'name'],
+          ['items', '0', 'name']
+         ));
+      });
+
+      it('compares zero and negative zero as equal', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          ['items', 0],
+          ['items', -0]
+         ));
+      });
+
+      it('compares NaN segments as equal', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          ['items', NaN],
+          ['items', NaN]
+         ));
+      });
+
+      it('compares other numeric segments by value', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          ['items', 1.5],
+          ['items', 1.5]
+         ));
+
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['items', 1.5],
+          ['items', 2.5]
+         ));
+      });
+
+      it('compares symbol segments by identity', () =>
+      {
+         const symbol = Symbol('metadata');
+
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          [symbol, 'enabled'],
+          [symbol, 'enabled']
+         ));
+
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          [Symbol('metadata'), 'enabled'],
+          [Symbol('metadata'), 'enabled']
+         ));
+      });
+
+      it('compares global symbols by identity', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          [Symbol.for('metadata'), 'enabled'],
+          [Symbol.for('metadata'), 'enabled']
+         ));
+      });
+
+      it('preserves literal-period array segment semantics', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          ['actor.system.name'],
+          ['actor.system.name']
+         ));
+
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          ['actor.system.name'],
+          'actor.system.name'
+         ));
+      });
+
+      it('compares dotted empty segments with equivalent exact array segments', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(
+          'actor..name',
+          ['actor', '', 'name']
+         ));
+      });
+
+      it('distinguishes a single empty-string key from dotted empty segments', () =>
+      {
+         assert.isTrue(ObjectUtil.isPropertyPathEqual([''], ['']));
+
+         // An empty dotted string is not a valid PropertyPath.
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          [''],
+          '' as any
+         ));
+      });
+
+      it('accepts readonly and frozen exact paths', () =>
+      {
+         const pathA = Object.freeze(['actor', 'system', 'name'] as const);
+         const pathB = ['actor', 'system', 'name'] as const;
+
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(pathA, pathB));
+      });
+
+      it('returns false when the first path is undefined', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          undefined,
+          'actor.system.name'
+         ));
+      });
+
+      it('returns false when the second path is undefined', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(
+          'actor.system.name',
+          undefined
+         ));
+      });
+
+      it('returns false when both paths are undefined', () =>
+      {
+         assert.isFalse(ObjectUtil.isPropertyPathEqual(undefined, undefined));
+      });
+
+      it('defensively returns false for invalid JavaScript inputs', () =>
+      {
+         const invalidValues = [
+            null,
+            '',
+            [],
+            42,
+            true,
+            {},
+            ['actor', null],
+            ['actor', {}]
+         ];
+
+         for (const invalid of invalidValues)
+         {
+            assert.isFalse(ObjectUtil.isPropertyPathEqual(
+             invalid as any,
+             'actor.system.name'
+            ));
+
+            assert.isFalse(ObjectUtil.isPropertyPathEqual(
+             'actor.system.name',
+             invalid as any
+            ));
+         }
+      });
+
+      it('does not throw for invalid JavaScript inputs', () =>
+      {
+         assert.doesNotThrow(() =>
+         {
+            ObjectUtil.isPropertyPathEqual(null as any, {} as any);
+         });
+      });
+
+      it('returns a boolean', () =>
+      {
+         const result = ObjectUtil.isPropertyPathEqual(
+          'actor.system.name',
+          ['actor', 'system', 'name']
+         );
+
+         expectTypeOf(result).toEqualTypeOf<boolean>();
+      });
+
+      it('accepts PropertyPath or undefined variables', () =>
+      {
+         const pathA: PropertyPath | undefined = 'actor.system.name';
+         const pathB: PropertyPath | undefined = ['actor', 'system', 'name'];
+
+         expectTypeOf(
+          ObjectUtil.isPropertyPathEqual(pathA, pathB)
+         ).toEqualTypeOf<boolean>();
+
+         assert.isTrue(ObjectUtil.isPropertyPathEqual(pathA, pathB));
+      });
+   });
+
    describe('isPropertyPathPrefix:', () =>
    {
       it('matches equal and descendant structural paths', () =>

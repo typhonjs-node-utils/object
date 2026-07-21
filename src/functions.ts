@@ -1377,6 +1377,60 @@ export function isPropertyPath(value: unknown): value is PropertyPath
 }
 
 /**
+ * Determines whether two property paths are structurally equivalent.
+ *
+ * Both paths are normalized before comparison, so an ordinary dotted path and its equivalent string-key array compare
+ * as equal:
+ *
+ * @example
+ * ```ts
+ * isPropertyPathEqual('actor.system.name', ['actor', 'system', 'name']);
+ * // true
+ * ```
+ *
+ * Segment comparison follows native `Map` / SameValueZero semantics:
+ *
+ * - Strings compare by value.
+ * - Numbers compare with SameValueZero semantics, so `0` equals `-0` and `NaN` equals `NaN`.
+ * - Symbols compare by identity.
+ * - Numeric and string segments remain distinct.
+ *
+ * Invalid property paths return `false` rather than throwing, matching predicate conventions.
+ *
+ * @see [SameValueZero - TC39](https://tc39.es/ecma262/multipage/abstract-operations.html#sec-samevaluezero)
+ *
+ * @category Property Keys and Paths
+ *
+ * @param pathA - First property path.
+ * @param pathB - Second property path.
+ *
+ * @returns Whether both paths contain the same property-key segments in the same order.
+ */
+export function isPropertyPathEqual(pathA: PropertyPath | undefined, pathB: PropertyPath | undefined): boolean
+{
+   if (!isPropertyPath(pathA) || !isPropertyPath(pathB)) { return false; }
+
+   const keysA = normalizePropertyPath(pathA);
+   const keysB = normalizePropertyPath(pathB);
+
+   if (keysA.length !== keysB.length) { return false; }
+
+   for (let index = 0; index < keysA.length; index++)
+   {
+      const keyA = keysA[index];
+      const keyB = keysB[index];
+
+      if (keyA !== keyB && !(typeof keyA === 'number' && typeof keyB === 'number' &&
+       Number.isNaN(keyA) && Number.isNaN(keyB)))
+      {
+         return false;
+      }
+   }
+
+   return true;
+}
+
+/**
  * Determines whether one property path is an exact structural prefix of another.
  *
  * Both property paths are compared after normalization. Segment comparison follows native `Map` / SameValueZero
