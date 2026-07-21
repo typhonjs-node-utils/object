@@ -3369,6 +3369,302 @@ describe('ObjectUtil:', () =>
       });
    });
 
+   describe('propertyPathIterator:', () =>
+   {
+      it('yields a dotted string as one property path', () =>
+      {
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator('actor.system.name')],
+          ['actor.system.name']
+         );
+      });
+
+      it('yields an exact property-key array as one property path', () =>
+      {
+         const symbol = Symbol('metadata');
+         const path = ['actor', 0, symbol] as const;
+
+         const result = [...ObjectUtil.propertyPathIterator(path)];
+
+         assert.lengthOf(result, 1);
+         assert.strictEqual(result[0], path);
+      });
+
+      it('gives a valid property path precedence over iterable interpretation', () =>
+      {
+         const path = ['actor.name', 'actor.id'];
+
+         const result = [...ObjectUtil.propertyPathIterator(path)];
+
+         assert.lengthOf(result, 1);
+         assert.strictEqual(result[0], path);
+      });
+
+      it('interprets an all-string array as one exact path', () =>
+      {
+         const paths = ['actor.name', 'actor.id'];
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          [
+             ['actor.name', 'actor.id']
+          ]
+         );
+      });
+
+      it('yields multiple dotted-string paths from a Set', () =>
+      {
+         const paths = new Set<PropertyPath>([
+            'actor.name',
+            'actor.id'
+         ]);
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          [
+             'actor.name',
+             'actor.id'
+          ]
+         );
+      });
+
+      it('yields multiple exact paths from an outer array', () =>
+      {
+         const paths: PropertyPath[] = [
+            ['actor', 'name'],
+            ['actor', 'id'],
+            ['items', 0, 'name']
+         ];
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          paths
+         );
+      });
+
+      it('yields mixed dotted and exact paths', () =>
+      {
+         const symbol = Symbol('metadata');
+
+         const paths: PropertyPath[] = [
+            'actor.name',
+            ['items', 0, 'name'],
+            [symbol, 'enabled']
+         ];
+
+         const result = [...ObjectUtil.propertyPathIterator(paths)];
+
+         assert.deepEqual(result, paths);
+         assert.strictEqual(result[1], paths[1]);
+         assert.strictEqual(result[2], paths[2]);
+      });
+
+      it('supports generator input', () =>
+      {
+         function* paths(): IterableIterator<PropertyPath>
+         {
+            yield 'actor.name';
+            yield ['actor', 'id'];
+         }
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths())],
+          [
+             'actor.name',
+             ['actor', 'id']
+          ]
+         );
+      });
+
+      it('supports one-shot iterable input', () =>
+      {
+         const source = (function*(): IterableIterator<PropertyPath>
+         {
+            yield 'actor.name';
+            yield 'actor.id';
+         })();
+
+         const iterator = ObjectUtil.propertyPathIterator(source);
+
+         assert.deepEqual([...iterator], [
+            'actor.name',
+            'actor.id'
+         ]);
+
+         assert.deepEqual([...iterator], []);
+      });
+
+      it('preserves source iteration order', () =>
+      {
+         const paths = new Set<PropertyPath>([
+            'z.value',
+            'a.value',
+            'm.value'
+         ]);
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          [
+             'z.value',
+             'a.value',
+             'm.value'
+          ]
+         );
+      });
+
+      it('returns an empty iterator for an empty iterable', () =>
+      {
+         const paths = new Set<PropertyPath>();
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          []
+         );
+      });
+
+      it('interprets an empty array as an empty iterable', () =>
+      {
+         const paths: PropertyPath[] = [];
+
+         assert.deepEqual(
+          [...ObjectUtil.propertyPathIterator(paths)],
+          []
+         );
+      });
+
+      it('yields paths unchanged without normalization or copying', () =>
+      {
+         const first = ['actor', 'name'] as const;
+         const second = ['actor', 'id'] as const;
+
+         const paths: PropertyPath[] = [first, second];
+         const result = [...ObjectUtil.propertyPathIterator(paths)];
+
+         assert.strictEqual(result[0], first);
+         assert.strictEqual(result[1], second);
+      });
+
+      it('validates iterable entries lazily', () =>
+      {
+         let steps = 0;
+
+         function* paths(): IterableIterator<any>
+         {
+            steps++;
+            yield 'actor.name';
+
+            steps++;
+            yield 42;
+         }
+
+         const iterator = ObjectUtil.propertyPathIterator(paths());
+
+         assert.equal(steps, 0);
+
+         assert.deepEqual(iterator.next(), {
+            value: 'actor.name',
+            done: false
+         });
+
+         assert.equal(steps, 1);
+
+         assert.throws(() => iterator.next(), TypeError,
+          `propertyPathIterator error: iterable entry at index 1 is not a property path.`);
+
+         assert.equal(steps, 2);
+      });
+
+      it('reports the index of an invalid iterable entry', () =>
+      {
+         const paths = [
+            'actor.name',
+            ['actor', 'id'],
+            null
+         ];
+
+         assert.throws(() => [...ObjectUtil.propertyPathIterator(paths as any)], TypeError,
+          `propertyPathIterator error: iterable entry at index 2 is not a property path.`);
+      });
+
+      it('rejects an iterable containing an empty string path', () =>
+      {
+         const paths = new Set<any>([
+            'actor.name',
+            ''
+         ]);
+
+         assert.throws(() => [...ObjectUtil.propertyPathIterator(paths)], TypeError,
+          `propertyPathIterator error: iterable entry at index 1 is not a property path.`);
+      });
+
+      it('rejects an iterable containing an empty array path', () =>
+      {
+         const paths = new Set<any>([
+            'actor.name',
+            []
+         ]);
+
+         assert.throws(() => [...ObjectUtil.propertyPathIterator(paths)], TypeError,
+          `propertyPathIterator error: iterable entry at index 1 is not a property path.`);
+      });
+
+      it('rejects an iterable containing invalid path segments', () =>
+      {
+         const paths = new Set<any>([
+            ['actor', 'name'],
+            ['actor', null]
+         ]);
+
+         assert.throws(() => [...ObjectUtil.propertyPathIterator(paths)], TypeError,
+          `propertyPathIterator error: iterable entry at index 1 is not a property path.`);
+      });
+
+      it('rejects a non-iterable invalid value during iteration', () =>
+      {
+         const iterator = ObjectUtil.propertyPathIterator(null);
+
+         assert.throws(() => iterator.next(), TypeError,
+          `propertyPathIterator error: 'paths' is not a property path or iterable of property paths.`);
+      });
+
+      it('rejects an empty string during iteration', () =>
+      {
+         // `isIterable` intentionally excludes primitive strings, and the empty string is not a valid PropertyPath.
+         const iterator = ObjectUtil.propertyPathIterator('');
+
+         assert.throws(() => iterator.next(), TypeError,
+          `propertyPathIterator error: 'paths' is not a property path or iterable of property paths.`);
+      });
+
+      it('rejects primitive non-path values', () =>
+      {
+         for (const value of [void 0, true, 42, Symbol('path')])
+         {
+            const iterator = ObjectUtil.propertyPathIterator(value as any);
+
+            assert.throws(() => iterator.next(), TypeError,
+             `propertyPathIterator error: 'paths' is not a property path or iterable of property paths.`);
+         }
+      });
+
+      it('returns an IterableIterator of PropertyPath', () =>
+      {
+         const iterator = ObjectUtil.propertyPathIterator(new Set<PropertyPath>(['actor.name']));
+
+         expectTypeOf(iterator).toEqualTypeOf<IterableIterator<PropertyPath>>();
+      });
+
+      it('narrows yielded values to PropertyPath', () =>
+      {
+         const source: Iterable<PropertyPath> = new Set(['actor.name', ['actor', 'id']]);
+
+         for (const path of ObjectUtil.propertyPathIterator(source))
+         {
+            expectTypeOf(path).toEqualTypeOf<PropertyPath>();
+         }
+      });
+   });
+
    describe('safeSet:', () =>
    {
       const paths = [...ObjectUtil.pathKeyIterator(s_OBJECT_NUM, { arrayIndex: true })];

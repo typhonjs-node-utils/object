@@ -161,6 +161,9 @@
  * >
  * > **_`PropertyPath`_** — Defines a dotted string path or exact readonly `PropertyKey` array accepted by path-aware
  * > APIs.
+ * >
+ * > **_`propertyPathIterator`_** — Produces a validating iterator from a single property path or iterable of property
+ * > paths, giving valid single paths precedence over iterable interpretation.
  *
  * @categoryDescription Property Mutation
  * > [!NOTE]

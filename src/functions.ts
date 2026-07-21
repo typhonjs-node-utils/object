@@ -1649,6 +1649,88 @@ export function* pathKeyIterator(data: object, options: PathKeyIteratorOptions =
 }
 
 /**
+ * Returns a validating iterator for either one {@link PropertyPath} or an iterable of property paths.
+ *
+ * A value satisfying {@link isPropertyPath} is always interpreted as one path before iterable detection occurs. This
+ * precedence is necessary because dotted strings and exact property-key arrays are themselves iterable.
+ *
+ * Consequently, an array containing only property keys represents one exact path:
+ *
+ * @example
+ * ```ts
+ * [...propertyPathIterator(['actor', 'name'])];
+ * // [
+ * //    ['actor', 'name']
+ * // ]
+ * ```
+ *
+ * To supply multiple dotted-string paths, use an iterable that is not itself a valid property path, such as a `Set`:
+ *
+ * @example
+ * ```ts
+ * [...propertyPathIterator(new Set([
+ *    'actor.name',
+ *    'actor.id'
+ * ]))];
+ * // ['actor.name', 'actor.id']
+ * ```
+ *
+ * An outer array of exact array paths is also unambiguous because its entries are arrays rather than property keys:
+ *
+ * @example
+ * ```ts
+ * [...propertyPathIterator([
+ *    ['actor', 'name'],
+ *    ['actor', 'id']
+ * ])];
+ * // [
+ * //    ['actor', 'name'],
+ * //    ['actor', 'id']
+ * // ]
+ * ```
+ *
+ * Iterable entries are validated lazily as iteration advances. An invalid entry throws when that entry is reached;
+ * valid preceding entries may already have been yielded. An empty iterable produces an empty iterator.
+ *
+ * Paths are yielded unchanged. Exact array paths are not normalized, copied, or frozen.
+ *
+ * @category Property Keys and Paths
+ *
+ * @param paths - A single property path or an iterable containing property paths.
+ *
+ * @returns A validating iterator that yields each property path in source order.
+ *
+ * @throws {TypeError} During iteration if `paths` is neither a property path nor an iterable.
+ * @throws {TypeError} During iteration if an iterable entry is not a valid property path.
+ */
+export function* propertyPathIterator(paths: PropertyPath | Iterable<PropertyPath>): IterableIterator<PropertyPath>
+{
+   if (isPropertyPath(paths))
+   {
+      yield paths;
+      return;
+   }
+
+   if (!isIterable<PropertyPath>(paths))
+   {
+      throw new TypeError(`propertyPathIterator error: 'paths' is not a property path or iterable of property paths.`);
+   }
+
+   let index = 0;
+
+   for (const path of paths)
+   {
+      if (!isPropertyPath(path))
+      {
+         throw new TypeError(`propertyPathIterator error: iterable entry at index ${index} is not a property path.`);
+      }
+
+      yield path;
+      index++;
+   }
+}
+
+/**
  * Provides a way to safely access an object's data / entries using either a dotted property path string or an array of
  * exact property keys.
  *
